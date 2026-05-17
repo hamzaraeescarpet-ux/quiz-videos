@@ -16,7 +16,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     // Dynamic fetching from backend
-    axios.get('http://localhost:8000/api/categories').then(res => {
+    axios.get('/api/categories').then(res => {
       setCategories(res.data.categories || []);
       if (res.data.categories && res.data.categories.length > 0) {
         setSelectedCategory(res.data.categories[0]);
@@ -28,7 +28,7 @@ export default function Dashboard() {
     let interval;
     if (sessionId && status === 'Processing') {
       interval = setInterval(() => {
-        axios.get(`http://localhost:8000/api/status/${sessionId}`).then(res => {
+        axios.get(`/api/status/${sessionId}`).then(res => {
           setStatus(res.data.status);
           setProgress({ current: res.data.completed_so_far, total: res.data.total_expected });
         }).catch(err => console.error(err));
@@ -116,7 +116,7 @@ export default function Dashboard() {
     try {
       setStatus('Processing');
       setProgress({ current: 0, total: rows.length });
-      const res = await axios.post('http://localhost:8000/api/generate-bulk', formData);
+      const res = await axios.post('/api/generate-bulk', formData);
       setSessionId(res.data.session_id);
     } catch (err) {
       console.error(err);
@@ -128,7 +128,7 @@ export default function Dashboard() {
   const stopGeneration = async () => {
     if (sessionId) {
       try {
-        await axios.post(`http://localhost:8000/api/stop-generation/${sessionId}`);
+        await axios.post(`/api/stop-generation/${sessionId}`);
         setStatus('Interrupted');
       } catch (err) {
         console.error(err);
@@ -137,7 +137,7 @@ export default function Dashboard() {
   };
 
   const downloadZip = () => {
-    window.location.href = `http://localhost:8000/api/download/${sessionId}`;
+    window.location.href = `/api/download/${sessionId}`;
   };
 
   return (

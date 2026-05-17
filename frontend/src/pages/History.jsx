@@ -53,7 +53,7 @@ export default function History() {
                   <td className="px-4 py-3 md:px-6 md:py-4 text-right">
                     {(job.status === 'Completed' || job.status === 'Interrupted') && (
                       <button 
-                        onClick={() => window.location.href = `http://localhost:8000/api/download/${job.session_id}`}
+                        onClick={() => window.location.href = `/api/download/${job.session_id}`}
                         className="inline-flex items-center gap-1 md:gap-2 text-brand-400 hover:text-brand-300 transition-colors bg-brand-500/10 hover:bg-brand-500/20 px-3 py-1.5 md:px-4 md:py-2 rounded-lg"
                       >
                         <Download className="w-4 h-4" /> <span className="hidden md:inline">Download</span>
