@@ -1,0 +1,11 @@
+.venv
+frontend/
+start_saas.bat
+.git
+__pycache__
+*.pyc
+*.pyo
+.DS_Store
+quizviral.db
+output/*
+temp/*
