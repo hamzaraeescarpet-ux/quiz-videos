@@ -103,8 +103,10 @@ def process_video_batch(session_id: str, questions: List[dict], category: str, l
                     db.commit()
             except Exception as e:
                 import traceback
-                print(f"Error processing row {idx}: {e}")
-                traceback.print_exc()
+                error_msg = f"Error processing row {idx}: {e}\n{traceback.format_exc()}"
+                print(error_msg, flush=True)
+                with open("error_logs.txt", "a") as f:
+                    f.write(error_msg + "\n")
                 
         if job.status != "Interrupted":
             if job.completed_so_far == 0:
@@ -191,6 +193,13 @@ def download_zip(session_id: str):
         raise HTTPException(status_code=404, detail="ZIP file not ready or found")
         
     return FileResponse(job.zip_file_path, media_type="application/zip", filename=f"QuizViral_Videos_{session_id}.zip")
+
+@app.get("/api/logs")
+def get_logs():
+    if os.path.exists("error_logs.txt"):
+        with open("error_logs.txt", "r") as f:
+            return HTMLResponse(f"<pre>{f.read()}</pre>")
+    return {"message": "No errors logged yet."}
 
 # Serve React Frontend (For Hugging Face Spaces & Production)
 if os.path.exists(FRONTEND_DIST):

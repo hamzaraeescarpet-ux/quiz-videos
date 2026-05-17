@@ -15,13 +15,14 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Fix ImageMagick security policy
-RUN sed -i '/<policy domain="path" rights="none" pattern="@\*"/d' /etc/ImageMagick-6/policy.xml || true
+RUN mv /etc/ImageMagick-6/policy.xml /etc/ImageMagick-6/policy.xml.bak || true
 
 # Setup a non-root user
 RUN useradd -m -u 1000 user
 USER user
 ENV HOME=/home/user \
-    PATH=/home/user/.local/bin:$PATH
+    PATH=/home/user/.local/bin:$PATH \
+    IMAGEMAGICK_BINARY=/usr/bin/convert
 
 WORKDIR $HOME/app
 
