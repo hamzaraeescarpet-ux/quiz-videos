@@ -79,11 +79,10 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
             category_path = BG_VIDEO_FOLDER # fallback
         bg_files = [f for f in os.listdir(category_path) if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))]
         if not bg_files:
-            return None
+            raise Exception(f"No background files found in {category_path}")
         bg_video_path = os.path.join(category_path, random.choice(bg_files))
     except Exception as e:
-        print(f"Error finding background: {e}")
-        return None
+        raise Exception(f"Error finding background: {e}")
 
     # 2) Audio generation
     audio_path_1 = os.path.join(TEMP_FOLDER, f"temp_q_{vid_id}.mp3")
@@ -95,14 +94,13 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
     try:
         asyncio.run(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2))
     except Exception as e:
-        print(f"Failed to generate audio: {e}")
-        return None
+        raise Exception(f"Failed to generate audio: {e}")
 
     import time
     time.sleep(1.0) # Ensure files are written
 
     if not (os.path.exists(audio_path_1) and os.path.exists(audio_path_2)):
-        return None
+        raise Exception("Audio files were not created on disk")
 
     voice_clip_1 = AudioFileClip(audio_path_1).volumex(1.4)
     voice_clip_2 = AudioFileClip(audio_path_2).volumex(1.4)

@@ -102,10 +102,15 @@ def process_video_batch(session_id: str, questions: List[dict], category: str, l
                     job.completed_so_far += 1
                     db.commit()
             except Exception as e:
-                print(f"Error processing row: {e}")
+                import traceback
+                print(f"Error processing row {idx}: {e}")
+                traceback.print_exc()
                 
         if job.status != "Interrupted":
-            job.status = "Completed"
+            if job.completed_so_far == 0:
+                job.status = "Failed"
+            else:
+                job.status = "Completed"
             
     except Exception as e:
         job.status = "Failed"
