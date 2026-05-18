@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
-# Fix ImageMagick security policy
-RUN mv /etc/ImageMagick-6/policy.xml /etc/ImageMagick-6/policy.xml.bak || true
+# Fix ImageMagick security policy globally for all versions
+RUN find /etc -name "policy.xml" -type f -exec mv {} {}.bak \; || true
 
 # Setup a non-root user
 RUN useradd -m -u 1000 user
