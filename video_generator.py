@@ -94,7 +94,13 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
     try:
         asyncio.run(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2))
     except Exception as e:
-        raise Exception(f"Failed to generate audio: {e}")
+        print(f"edge-tts failed: {e}. Falling back to gTTS...", flush=True)
+        try:
+            from gtts import gTTS
+            gTTS(text=speech_1, lang='en', tld='us').save(audio_path_1)
+            gTTS(text=speech_2, lang='en', tld='us').save(audio_path_2)
+        except Exception as e2:
+            raise Exception(f"Both edge-tts and gTTS failed. gTTS Error: {e2}")
 
     import time
     time.sleep(1.0) # Ensure files are written
