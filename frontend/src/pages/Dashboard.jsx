@@ -3,8 +3,13 @@ import axios from 'axios';
 import { useDropzone } from 'react-dropzone';
 import { UploadCloud, Play, Square, Download, Trash2, Plus, Image as ImageIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
 
 export default function Dashboard() {
+  const { currentUser, login, credits, isPremium, consumeCredits } = useAuth();
+  const navigate = useNavigate();
+
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [rows, setRows] = useState([{ id: 1, question: '', option1: '', option2: '', option3: '', option4: '', answer: '' }]);
@@ -97,13 +102,23 @@ export default function Dashboard() {
   };
 
   const startGeneration = async () => {
+    if (!currentUser) {
+      return login();
+    }
+
     const isValid = rows.every(r => r.question && r.option1 && r.option2 && r.option3 && r.option4 && r.answer);
     if (!isValid) return alert("Please fill all fields in the rows.");
     
-    if (rows.length > 5) {
-      const wantsPremium = window.confirm("Free tier limits you to 5 videos. Proceed with only 5?");
-      if (!wantsPremium) return;
-      setRows(rows.slice(0, 5));
+    if (!isPremium && rows.length > credits) {
+      alert(`You only have ${credits} credits left. You are trying to generate ${rows.length} videos.`);
+      navigate('/pricing');
+      return;
+    }
+
+    // Consume credits
+    if (!consumeCredits(rows.length)) {
+       navigate('/pricing');
+       return;
     }
 
     const formData = new FormData();
@@ -122,6 +137,7 @@ export default function Dashboard() {
       console.error(err);
       alert("Failed to start generation.");
       setStatus(null);
+      // Optional: Restore credits if failed here, but for simplicity we keep it.
     }
   };
 
@@ -250,7 +266,7 @@ export default function Dashboard() {
             className="w-full md:max-w-md py-4 px-4 rounded-xl bg-gradient-to-r from-brand-600 to-brand-400 text-white font-bold text-base md:text-lg hover:from-brand-500 hover:to-brand-300 transition-all shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transform hover:scale-105 active:scale-95"
           >
             <Play className="fill-current w-5 h-5" />
-            Generate Bulk Videos
+            {isPremium ? 'Generate Bulk Videos' : `Generate Bulk Videos (${credits} Credits Left)`}
           </button>
         ) : (
           <div className="w-full space-y-6">

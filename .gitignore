@@ -9,3 +9,5 @@ output/
 temp/
 frontend/node_modules/
 frontend/dist/
+
+.vercel

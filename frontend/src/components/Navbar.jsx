@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Layers, History, CreditCard, Sparkles, Menu, X } from 'lucide-react';
 import clsx from 'clsx';
+import { useAuth } from '../AuthContext';
 
 export default function Navbar() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const { currentUser, login, logout } = useAuth();
 
   const navLinks = [
     { name: 'Dashboard', path: '/', icon: Layers },
@@ -25,7 +27,7 @@ export default function Navbar() {
           </div>
           
           {/* Desktop Menu */}
-          <div className="hidden md:flex gap-4">
+          <div className="hidden md:flex items-center gap-4">
             {navLinks.map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.path;
@@ -45,6 +47,28 @@ export default function Navbar() {
                 </Link>
               );
             })}
+            
+            {/* Desktop Auth Buttons */}
+            {currentUser ? (
+              <div className="flex items-center gap-3 ml-4 border-l border-dark-600 pl-4">
+                <span className="text-sm text-gray-300 font-medium truncate max-w-[150px]">
+                  {currentUser.email}
+                </span>
+                <button 
+                  onClick={logout}
+                  className="bg-dark-700 hover:bg-red-500/20 hover:text-red-400 text-gray-300 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={login}
+                className="ml-4 bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-md text-sm font-bold shadow-lg shadow-brand-500/25 transition-all flex items-center gap-2"
+              >
+                Login / Sign In
+              </button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -83,6 +107,28 @@ export default function Navbar() {
                 </Link>
               );
             })}
+            
+            {/* Mobile Auth Buttons */}
+            <div className="border-t border-dark-700 pt-4 pb-2 mt-4 px-3">
+              {currentUser ? (
+                <div className="flex flex-col gap-3">
+                  <span className="text-sm text-gray-400">Signed in as {currentUser.email}</span>
+                  <button 
+                    onClick={() => { logout(); setIsOpen(false); }}
+                    className="w-full bg-dark-700 text-left text-red-400 px-3 py-2 rounded-md font-medium"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => { login(); setIsOpen(false); }}
+                  className="w-full bg-brand-600 hover:bg-brand-500 text-white px-3 py-2 rounded-md font-bold text-center"
+                >
+                  Login / Sign In
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
