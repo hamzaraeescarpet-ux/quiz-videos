@@ -5,8 +5,7 @@ const AuthContext = createContext();
 
 // Add your premium emails here to unlock unlimited generation
 export const PREMIUM_USERS_LIST = [
-  'admin@example.com',
-  'your.email@gmail.com' 
+  'hamzaraeescarpet@gmail.com' 
 ];
 
 export function AuthProvider({ children }) {
