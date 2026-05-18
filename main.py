@@ -116,7 +116,11 @@ def process_video_batch(session_id: str, questions: List[dict], category: str, l
             
     except Exception as e:
         job.status = "Failed"
-        print(f"Batch generation failed: {e}")
+        import traceback
+        error_msg = f"Batch generation failed: {e}\n{traceback.format_exc()}"
+        print(error_msg, flush=True)
+        with open("error_logs.txt", "a") as f:
+            f.write(error_msg + "\n")
         
     finally:
         zip_path = os.path.join(OUTPUT_DIR, f"{session_id}.zip")

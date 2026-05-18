@@ -244,7 +244,7 @@ export default function Dashboard() {
 
       {/* Step 3: Generation Control */}
       <section className="bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 shadow-xl flex flex-col items-center">
-        {!status || status === 'Failed' ? (
+        {!status ? (
           <button 
             onClick={startGeneration}
             className="w-full md:max-w-md py-4 px-4 rounded-xl bg-gradient-to-r from-brand-600 to-brand-400 text-white font-bold text-base md:text-lg hover:from-brand-500 hover:to-brand-300 transition-all shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transform hover:scale-105 active:scale-95"
@@ -293,6 +293,13 @@ export default function Dashboard() {
                   <Download className="w-5 h-5" />
                   Download ZIP
                 </button>
+              </div>
+            )}
+            {status === 'Failed' && (
+              <div className="mt-4 p-4 bg-red-900/50 border border-red-500/50 rounded-lg text-white">
+                <h3 className="font-bold text-red-400 mb-2">Generation Failed!</h3>
+                <p className="text-sm">Please visit <a href="/api/logs" target="_blank" className="underline text-blue-300">this link</a> to see the exact error.</p>
+                <button onClick={() => setStatus(null)} className="mt-3 px-4 py-2 bg-dark-700 hover:bg-dark-600 rounded text-sm">Try Again</button>
               </div>
             )}
           </div>
