@@ -233,6 +233,21 @@ export default function Dashboard() {
 
   const progressPercent = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
 
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+
+  // Helper for category icons
+  const getCategoryIcon = (cat) => {
+    const lower = cat.toLowerCase();
+    if (lower.includes('minecraft')) return '⛏️';
+    if (lower.includes('satisfy')) return '🫧';
+    if (lower.includes('nature')) return '🌲';
+    if (lower.includes('space')) return '🚀';
+    if (lower.includes('gta')) return '🚗';
+    if (lower.includes('subway')) return '🏃';
+    if (lower.includes('asmr')) return '🔪';
+    return '✨';
+  };
+
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
       <header className="px-2">
@@ -240,25 +255,39 @@ export default function Dashboard() {
         <p className="text-gray-400 text-sm md:text-base">Transform text into highly engaging trivia short videos instantly.</p>
       </header>
 
-      {/* Step 1: Category */}
-      <section className="bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 shadow-xl">
+      {/* Step 1: Category Dropdown */}
+      <section className="bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 shadow-xl relative z-20">
         <h2 className="text-lg md:text-xl font-semibold mb-4 text-brand-300">1. Choose Template Category</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {categories.length > 0 ? categories.map(cat => (
-            <div 
-              key={cat} 
-              onClick={() => setSelectedCategory(cat)}
-              className={`cursor-pointer p-4 rounded-lg border-2 transition-all duration-300 flex flex-col items-center justify-center gap-2
-                ${selectedCategory === cat ? 'border-brand-500 bg-brand-900/30' : 'border-dark-600 bg-dark-700 hover:border-brand-400/50 hover:bg-dark-600'}
-              `}
-            >
-              <div className="w-12 h-12 rounded-full bg-dark-800 flex items-center justify-center text-xl shadow-inner">
-                {cat === 'Minecraft' ? '⛏️' : cat === 'Satisfying' ? '🫧' : cat === 'Nature' ? '🌲' : cat === 'Space' ? '🚀' : '✨'}
-              </div>
-              <span className="font-medium text-sm text-center">{cat}</span>
+        <div className="relative w-full md:w-1/2 lg:w-1/3">
+          <button
+            onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+            className="w-full bg-dark-900 border border-dark-600 hover:border-brand-500 text-white px-4 py-3 rounded-lg flex items-center justify-between transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl">{getCategoryIcon(selectedCategory)}</span>
+              <span className="font-medium">{selectedCategory || "Select Category"}</span>
             </div>
-          )) : (
-            <div className="col-span-full text-center text-gray-500 py-4">No categories found.</div>
+            <svg className={`w-5 h-5 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+          </button>
+
+          {isCategoryDropdownOpen && (
+            <div className="absolute top-full left-0 mt-2 w-full bg-dark-800 border border-dark-600 rounded-lg shadow-2xl overflow-hidden z-50">
+              {categories.length > 0 ? categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setSelectedCategory(cat);
+                    setIsCategoryDropdownOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-dark-700 transition-colors ${selectedCategory === cat ? 'bg-brand-900/30 border-l-2 border-brand-500' : ''}`}
+                >
+                  <span className="text-xl">{getCategoryIcon(cat)}</span>
+                  <span className="font-medium text-gray-200">{cat}</span>
+                </button>
+              )) : (
+                <div className="px-4 py-3 text-gray-500 text-sm">No categories found.</div>
+              )}
+            </div>
           )}
         </div>
       </section>
