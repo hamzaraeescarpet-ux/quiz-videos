@@ -82,7 +82,7 @@ def get_categories():
 
 from video_generator import create_video_from_row
 
-def process_video_batch(session_id: str, questions: List[dict], category: str, logo_path: str = None):
+def process_video_batch(session_id: str, questions: List[dict], category: str, logo_path: str = None, user_email: str = None):
     db = SessionLocal()
     job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
     
@@ -113,6 +113,11 @@ def process_video_batch(session_id: str, questions: List[dict], category: str, l
                 job.status = "Failed"
             else:
                 job.status = "Completed"
+                
+                # AUTOMATION: Send email to user
+                if user_email:
+                    print(f"\n[{user_email}] AUTOMATION: Sending email -> 'Sit back and relax, your bulk videos are ready to download!'", flush=True)
+                    # Implementation for actual email sending (e.g. smtplib, SendGrid) would go here
             
     except Exception as e:
         job.status = "Failed"
@@ -136,7 +141,8 @@ async def generate_bulk(
     background_tasks: BackgroundTasks,
     questions: str = Form(...), 
     category: str = Form(...),
-    logo: Optional[UploadFile] = File(None)
+    logo: Optional[UploadFile] = File(None),
+    email: Optional[str] = Form(None)
 ):
     questions_list = json.loads(questions)
     
@@ -162,7 +168,7 @@ async def generate_bulk(
     db.close()
     
     active_sessions[session_id] = "run"
-    background_tasks.add_task(process_video_batch, session_id, questions_list, category, logo_path)
+    background_tasks.add_task(process_video_batch, session_id, questions_list, category, logo_path, email)
     
     return {"session_id": session_id, "message": "Generation started"}
 

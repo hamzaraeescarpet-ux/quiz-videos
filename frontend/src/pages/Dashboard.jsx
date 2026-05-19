@@ -1,10 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useDropzone } from 'react-dropzone';
-import { UploadCloud, Play, Square, Download, Trash2, Plus, Image as ImageIcon } from 'lucide-react';
+import { UploadCloud, Play, Square, Download, Trash2, Plus, Image as ImageIcon, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Setting up pdf.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 export default function Dashboard() {
   const { currentUser, login, credits, isPremium, consumeCredits } = useAuth();
@@ -18,9 +22,10 @@ export default function Dashboard() {
   const [sessionId, setSessionId] = useState(null);
   const [status, setStatus] = useState(null); // 'Processing', 'Completed', 'Interrupted', 'Failed'
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [startTime, setStartTime] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
 
   useEffect(() => {
-    // Dynamic fetching from backend
     axios.get('/api/categories').then(res => {
       setCategories(res.data.categories || []);
       if (res.data.categories && res.data.categories.length > 0) {
@@ -31,6 +36,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     let interval;
+    let timerInterval;
+
     if (sessionId && status === 'Processing') {
       interval = setInterval(() => {
         axios.get(`/api/status/${sessionId}`).then(res => {
@@ -38,9 +45,18 @@ export default function Dashboard() {
           setProgress({ current: res.data.completed_so_far, total: res.data.total_expected });
         }).catch(err => console.error(err));
       }, 2000);
+
+      timerInterval = setInterval(() => {
+        if (startTime) {
+          setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+        }
+      }, 1000);
     }
-    return () => clearInterval(interval);
-  }, [sessionId, status]);
+    return () => {
+      clearInterval(interval);
+      clearInterval(timerInterval);
+    };
+  }, [sessionId, status, startTime]);
 
   const onLogoDrop = useCallback(acceptedFiles => {
     setLogoFile(acceptedFiles[0]);
@@ -71,9 +87,11 @@ export default function Dashboard() {
     }
   };
 
-  const handleCSVUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
+    if (!file) return;
+
+    if (file.name.toLowerCase().endsWith('.csv')) {
       const reader = new FileReader();
       reader.onload = (evt) => {
         const text = evt.target.result;
@@ -93,18 +111,67 @@ export default function Dashboard() {
             });
           }
         }
-        if (parsedRows.length > 0) {
-          setRows(parsedRows.slice(0, 100)); // Max 100
-        }
+        if (parsedRows.length > 0) setRows(parsedRows.slice(0, 100));
       };
       reader.readAsText(file);
+    } else if (file.name.toLowerCase().endsWith('.pdf')) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+        let fullText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map(item => item.str).join(' ');
+          fullText += pageText + ' ';
+        }
+        
+        // Simple heuristic to split text into rows (Requires structured PDF)
+        // Assume format: Q: ... A: ... B: ... C: ... D: ... Ans: ...
+        const questions = fullText.split(/Q\d*:|Question\d*:/i).slice(1);
+        const parsedRows = [];
+        
+        questions.forEach((qBlock, idx) => {
+          try {
+            // Very basic regex to try to capture parts, assuming A) B) C) D) Ans: formats
+            const qMatch = qBlock.split(/A\)|A\.|Option A/i)[0]?.trim();
+            const aMatch = qBlock.match(/(?:A\)|A\.|Option A)(.*?)(?:B\)|B\.|Option B)/i)?.[1]?.trim();
+            const bMatch = qBlock.match(/(?:B\)|B\.|Option B)(.*?)(?:C\)|C\.|Option C)/i)?.[1]?.trim();
+            const cMatch = qBlock.match(/(?:C\)|C\.|Option C)(.*?)(?:D\)|D\.|Option D)/i)?.[1]?.trim();
+            const dMatch = qBlock.match(/(?:D\)|D\.|Option D)(.*?)(?:Ans:|Answer:|Correct:)/i)?.[1]?.trim();
+            const ansMatch = qBlock.match(/(?:Ans:|Answer:|Correct:)(.*?)(?:$|Q\d*:|Question)/i)?.[1]?.trim();
+
+            if (qMatch && aMatch && ansMatch) {
+              parsedRows.push({
+                id: Date.now() + idx,
+                question: qMatch,
+                option1: aMatch || '',
+                option2: bMatch || '',
+                option3: cMatch || '',
+                option4: dMatch || '',
+                answer: ansMatch || ''
+              });
+            }
+          } catch (e) {
+            console.log("Failed to parse block", e);
+          }
+        });
+        
+        if (parsedRows.length > 0) {
+          setRows(parsedRows.slice(0, 100));
+          alert(`Successfully extracted ${parsedRows.length} questions from PDF!`);
+        } else {
+          alert("Could not extract questions. Please ensure the PDF follows this exact text format:\nQ: What is 2+2? A) 1 B) 2 C) 3 D) 4 Ans: 4");
+        }
+      } catch (error) {
+        console.error("Error reading PDF", error);
+        alert("Failed to read PDF file.");
+      }
     }
   };
 
   const startGeneration = async () => {
-    if (!currentUser) {
-      return login();
-    }
+    if (!currentUser) return login();
 
     const isValid = rows.every(r => r.question && r.option1 && r.option2 && r.option3 && r.option4 && r.answer);
     if (!isValid) return alert("Please fill all fields in the rows.");
@@ -115,7 +182,6 @@ export default function Dashboard() {
       return;
     }
 
-    // Consume credits
     if (!consumeCredits(rows.length)) {
        navigate('/pricing');
        return;
@@ -124,6 +190,8 @@ export default function Dashboard() {
     const formData = new FormData();
     formData.append('questions', JSON.stringify(rows));
     formData.append('category', selectedCategory);
+    formData.append('email', currentUser.email); // Send email for automation
+    
     if (logoFile) {
       formData.append('logo', logoFile);
     }
@@ -131,13 +199,14 @@ export default function Dashboard() {
     try {
       setStatus('Processing');
       setProgress({ current: 0, total: rows.length });
+      setStartTime(Date.now());
+      setElapsedTime(0);
       const res = await axios.post('/api/generate-bulk', formData);
       setSessionId(res.data.session_id);
     } catch (err) {
       console.error(err);
       alert("Failed to start generation.");
       setStatus(null);
-      // Optional: Restore credits if failed here, but for simplicity we keep it.
     }
   };
 
@@ -155,6 +224,14 @@ export default function Dashboard() {
   const downloadZip = () => {
     window.location.href = `/api/download/${sessionId}`;
   };
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const progressPercent = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
@@ -213,9 +290,9 @@ export default function Dashboard() {
             <h3 className="font-medium text-gray-200">Questions Data</h3>
             <div className="flex w-full sm:w-auto items-center gap-3">
               <label className="flex-1 sm:flex-none cursor-pointer bg-dark-700 hover:bg-dark-600 text-white px-3 py-2 md:py-1.5 rounded-md text-sm md:text-sm transition-colors flex items-center justify-center gap-2">
-                <UploadCloud className="w-4 h-4" />
-                Upload CSV
-                <input type="file" accept=".csv" className="hidden" onChange={handleCSVUpload} />
+                <FileText className="w-4 h-4" />
+                Upload CSV / PDF
+                <input type="file" accept=".csv, .pdf, application/pdf, text/csv" className="hidden" onChange={handleFileUpload} />
               </label>
               <button onClick={addRow} className="flex-1 sm:flex-none bg-brand-600 hover:bg-brand-500 text-white px-3 py-2 md:py-1.5 rounded-md text-sm md:text-sm transition-colors flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20">
                 <Plus className="w-4 h-4" /> Add Row
@@ -276,8 +353,13 @@ export default function Dashboard() {
                   {status === 'Processing' ? 'Rendering in progress...' : status === 'Completed' ? 'Generation Complete!' : 'Generation Interrupted'}
                 </h3>
                 <p className="text-gray-400 text-sm">
-                  {progress.current} of {progress.total} videos generated
+                  {progress.current} of {progress.total} videos generated ({progressPercent}%) • Time elapsed: {formatTime(elapsedTime)}
                 </p>
+                {status === 'Processing' && (
+                  <p className="text-brand-400 text-xs mt-2 italic">
+                    Sit back and relax, your bulk videos are being generated. We will email you once they are ready to download!
+                  </p>
+                )}
               </div>
               {status === 'Processing' && (
                 <button 
@@ -291,13 +373,16 @@ export default function Dashboard() {
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full bg-dark-900 rounded-full h-3 md:h-4 overflow-hidden shadow-inner">
+            <div className="w-full bg-dark-900 rounded-full h-3 md:h-4 overflow-hidden shadow-inner relative">
               <motion.div 
                 className="bg-gradient-to-r from-brand-500 to-blue-500 h-3 md:h-4"
                 initial={{ width: 0 }}
-                animate={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
+                animate={{ width: `${progressPercent}%` }}
                 transition={{ duration: 0.5 }}
               />
+              <span className="absolute inset-0 flex items-center justify-center text-[10px] md:text-xs font-bold text-white drop-shadow-md mix-blend-difference">
+                {progressPercent}%
+              </span>
             </div>
 
             {(status === 'Completed' || status === 'Interrupted') && (
