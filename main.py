@@ -117,7 +117,44 @@ def process_video_batch(session_id: str, questions: List[dict], category: str, l
                 # AUTOMATION: Send email to user
                 if user_email:
                     print(f"\n[{user_email}] AUTOMATION: Sending email -> 'Sit back and relax, your bulk videos are ready to download!'", flush=True)
-                    # Implementation for actual email sending (e.g. smtplib, SendGrid) would go here
+                    try:
+                        import smtplib
+                        from email.mime.text import MIMEText
+                        from email.mime.multipart import MIMEMultipart
+
+                        sender_email = os.environ.get("GMAIL_SENDER_EMAIL")
+                        app_password = os.environ.get("GMAIL_APP_PASSWORD")
+
+                        if sender_email and app_password:
+                            msg = MIMEMultipart()
+                            msg["From"] = sender_email
+                            msg["To"] = user_email
+                            msg["Subject"] = "Your Bulk Quiz Videos are Ready! 🎉"
+                            
+                            download_link = f"https://quizviral-nine.vercel.app"
+                            body = f"""
+                            Hello Creator,
+
+                            Your bulk trivia videos have been successfully generated!
+                            
+                            You can download them right now by going to your dashboard or using this direct link:
+                            {download_link}
+                            
+                            Keep growing your viral factory!
+                            - QuizViral AI Team
+                            """
+                            msg.attach(MIMEText(body, "plain"))
+                            
+                            server = smtplib.SMTP("smtp.gmail.com", 587)
+                            server.starttls()
+                            server.login(sender_email, app_password)
+                            server.send_message(msg)
+                            server.quit()
+                            print(f"Successfully sent email to {user_email}", flush=True)
+                        else:
+                            print("Email not sent: GMAIL_SENDER_EMAIL or GMAIL_APP_PASSWORD not set in environment.", flush=True)
+                    except Exception as email_err:
+                        print(f"Failed to send email: {email_err}", flush=True)
             
     except Exception as e:
         job.status = "Failed"
