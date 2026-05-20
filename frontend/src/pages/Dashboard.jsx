@@ -19,13 +19,21 @@ export default function Dashboard() {
   const [rows, setRows] = useState([{ id: 1, question: '', option1: '', option2: '', option3: '', option4: '', answer: '' }]);
   const [logoFile, setLogoFile] = useState(null);
   
-  const [sessionId, setSessionId] = useState(null);
+  const [sessionId, setSessionId] = useState(() => localStorage.getItem('current_session_id') || null);
   const [status, setStatus] = useState(null); // 'Processing', 'Completed', 'Interrupted', 'Failed'
   const [progress, setProgress] = useState({ current: 0, total: 0 });
-  const [startTime, setStartTime] = useState(null);
+  const [startTime, setStartTime] = useState(() => {
+    const saved = localStorage.getItem('current_start_time');
+    return saved ? parseInt(saved, 10) : null;
+  });
   const [elapsedTime, setElapsedTime] = useState(0);
 
   useEffect(() => {
+    // If we mount and already have a session, we assume it might be processing
+    if (sessionId && !status) {
+      setStatus('Processing');
+    }
+    
     axios.get('/api/categories').then(res => {
       setCategories(res.data.categories || []);
       if (res.data.categories && res.data.categories.length > 0) {
@@ -199,10 +207,16 @@ export default function Dashboard() {
     try {
       setStatus('Processing');
       setProgress({ current: 0, total: rows.length });
-      setStartTime(Date.now());
+      
+      const now = Date.now();
+      setStartTime(now);
       setElapsedTime(0);
+      localStorage.setItem('current_start_time', now.toString());
+
       const res = await axios.post('/api/generate-bulk', formData);
-      setSessionId(res.data.session_id);
+      const newSessionId = res.data.session_id;
+      setSessionId(newSessionId);
+      localStorage.setItem('current_session_id', newSessionId);
     } catch (err) {
       console.error(err);
       alert("Failed to start generation.");
@@ -215,6 +229,8 @@ export default function Dashboard() {
       try {
         await axios.post(`/api/stop-generation/${sessionId}`);
         setStatus('Interrupted');
+        localStorage.removeItem('current_session_id');
+        localStorage.removeItem('current_start_time');
       } catch (err) {
         console.error(err);
       }
@@ -223,7 +239,17 @@ export default function Dashboard() {
 
   const downloadZip = () => {
     window.location.href = `/api/download/${sessionId}`;
+    localStorage.removeItem('current_session_id');
+    localStorage.removeItem('current_start_time');
   };
+
+  // Helper to check if status is complete/failed and clear storage
+  useEffect(() => {
+    if (status === 'Completed' || status === 'Failed' || status === 'Interrupted') {
+      localStorage.removeItem('current_session_id');
+      localStorage.removeItem('current_start_time');
+    }
+  }, [status]);
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
