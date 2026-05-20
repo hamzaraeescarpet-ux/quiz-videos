@@ -22,11 +22,7 @@ export default function Dashboard() {
   const [sessionId, setSessionId] = useState(() => localStorage.getItem('current_session_id') || null);
   const [status, setStatus] = useState(null); // 'Processing', 'Completed', 'Interrupted', 'Failed'
   const [progress, setProgress] = useState({ current: 0, total: 0 });
-  const [startTime, setStartTime] = useState(() => {
-    const saved = localStorage.getItem('current_start_time');
-    return saved ? parseInt(saved, 10) : null;
-  });
-  const [elapsedTime, setElapsedTime] = useState(0);
+  const [displayPercent, setDisplayPercent] = useState(0);
 
   useEffect(() => {
     // If we mount and already have a session, we assume it might be processing
@@ -44,9 +40,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     let interval;
-    let timerInterval;
+    let fakeProgressInterval;
 
     if (sessionId && status === 'Processing') {
+      // Poll real status every 2 seconds
       interval = setInterval(() => {
         axios.get(`/api/status/${sessionId}`).then(res => {
           setStatus(res.data.status);
@@ -54,17 +51,35 @@ export default function Dashboard() {
         }).catch(err => console.error(err));
       }, 2000);
 
-      timerInterval = setInterval(() => {
-        if (startTime) {
-          setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
-        }
-      }, 1000);
+      // Smooth percentage animator
+      fakeProgressInterval = setInterval(() => {
+        setDisplayPercent((prev) => {
+          if (progress.total === 0) return 0;
+          
+          const basePercent = Math.round((progress.current / progress.total) * 100);
+          const chunkSize = Math.round((1 / progress.total) * 100);
+          const cap = basePercent + chunkSize - 1; // e.g. cap at 19% if base is 0% and chunk is 20%
+
+          // If we are completed, snap to 100
+          if (progress.current === progress.total) return 100;
+          
+          // Slowly increment towards the cap
+          if (prev < basePercent) return basePercent; // Catch up if behind
+          if (prev < cap) return prev + 1; // Increment slowly
+          return prev; // Stay at cap until real progress updates
+        });
+      }, 1500); // Increment 1% every 1.5 seconds (gives a smooth continuous feel)
     }
+    
+    if (status === 'Completed') {
+      setDisplayPercent(100);
+    }
+
     return () => {
       clearInterval(interval);
-      clearInterval(timerInterval);
+      clearInterval(fakeProgressInterval);
     };
-  }, [sessionId, status, startTime]);
+  }, [sessionId, status, progress.current, progress.total]);
 
   const onLogoDrop = useCallback(acceptedFiles => {
     setLogoFile(acceptedFiles[0]);
@@ -135,13 +150,11 @@ export default function Dashboard() {
         }
         
         // Simple heuristic to split text into rows (Requires structured PDF)
-        // Assume format: Q: ... A: ... B: ... C: ... D: ... Ans: ...
         const questions = fullText.split(/Q\d*:|Question\d*:/i).slice(1);
         const parsedRows = [];
         
         questions.forEach((qBlock, idx) => {
           try {
-            // Very basic regex to try to capture parts, assuming A) B) C) D) Ans: formats
             const qMatch = qBlock.split(/A\)|A\.|Option A/i)[0]?.trim();
             const aMatch = qBlock.match(/(?:A\)|A\.|Option A)(.*?)(?:B\)|B\.|Option B)/i)?.[1]?.trim();
             const bMatch = qBlock.match(/(?:B\)|B\.|Option B)(.*?)(?:C\)|C\.|Option C)/i)?.[1]?.trim();
@@ -207,12 +220,8 @@ export default function Dashboard() {
     try {
       setStatus('Processing');
       setProgress({ current: 0, total: rows.length });
+      setDisplayPercent(0);
       
-      const now = Date.now();
-      setStartTime(now);
-      setElapsedTime(0);
-      localStorage.setItem('current_start_time', now.toString());
-
       const res = await axios.post('/api/generate-bulk', formData);
       const newSessionId = res.data.session_id;
       setSessionId(newSessionId);
@@ -230,7 +239,6 @@ export default function Dashboard() {
         await axios.post(`/api/stop-generation/${sessionId}`);
         setStatus('Interrupted');
         localStorage.removeItem('current_session_id');
-        localStorage.removeItem('current_start_time');
       } catch (err) {
         console.error(err);
       }
@@ -240,24 +248,14 @@ export default function Dashboard() {
   const downloadZip = () => {
     window.location.href = `/api/download/${sessionId}`;
     localStorage.removeItem('current_session_id');
-    localStorage.removeItem('current_start_time');
   };
 
   // Helper to check if status is complete/failed and clear storage
   useEffect(() => {
     if (status === 'Completed' || status === 'Failed' || status === 'Interrupted') {
       localStorage.removeItem('current_session_id');
-      localStorage.removeItem('current_start_time');
     }
   }, [status]);
-
-  const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const progressPercent = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
 
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
 
@@ -319,7 +317,7 @@ export default function Dashboard() {
       </section>
 
       {/* Step 2: Data & Media */}
-      <section className="bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 shadow-xl space-y-6 md:space-y-8">
+      <section className="bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 shadow-xl space-y-6 md:space-y-8 relative z-10">
         <h2 className="text-lg md:text-xl font-semibold text-brand-300">2. Input Data & Branding</h2>
         
         {/* Branding */}
@@ -408,7 +406,7 @@ export default function Dashboard() {
                   {status === 'Processing' ? 'Rendering in progress...' : status === 'Completed' ? 'Generation Complete!' : 'Generation Interrupted'}
                 </h3>
                 <p className="text-gray-400 text-sm">
-                  {progress.current} of {progress.total} videos generated ({progressPercent}%) • Time elapsed: {formatTime(elapsedTime)}
+                  {progress.current} of {progress.total} videos completed ({displayPercent}%)
                 </p>
                 {status === 'Processing' && (
                   <p className="text-brand-400 text-xs mt-2 italic">
@@ -432,11 +430,11 @@ export default function Dashboard() {
               <motion.div 
                 className="bg-gradient-to-r from-brand-500 to-blue-500 h-3 md:h-4"
                 initial={{ width: 0 }}
-                animate={{ width: `${progressPercent}%` }}
-                transition={{ duration: 0.5 }}
+                animate={{ width: `${displayPercent}%` }}
+                transition={{ duration: 0.5, ease: "linear" }}
               />
               <span className="absolute inset-0 flex items-center justify-center text-[10px] md:text-xs font-bold text-white drop-shadow-md mix-blend-difference">
-                {progressPercent}%
+                {displayPercent}%
               </span>
             </div>
 
