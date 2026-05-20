@@ -13,7 +13,7 @@ export default function Pricing() {
       features: ['Unlimited bulk video generation', 'Bypass the 5 credits limit', 'Custom logo branding', '1080p high quality', 'Priority rendering speed'],
       cta: 'Subscribe Monthly',
       popular: false,
-      gumroadLink: 'https://hamzaraeescarpet.gumroad.com/l/quizviral-ai'
+      gumroadLink: 'https://hamzaraeescarpet.gumroad.com/l/quizviralai'
     },
     {
       name: 'Yearly Unlimited',
@@ -23,7 +23,7 @@ export default function Pricing() {
       features: ['Everything in Monthly', 'Save over 80% compared to monthly', 'Cancel anytime', 'Premium templates unlock'],
       cta: 'Subscribe Yearly',
       popular: true,
-      gumroadLink: 'https://hamzaraeescarpet.gumroad.com/l/quizviral-ai'
+      gumroadLink: 'https://hamzaraeescarpet.gumroad.com/l/quizviralai'
     }
   ];
 
