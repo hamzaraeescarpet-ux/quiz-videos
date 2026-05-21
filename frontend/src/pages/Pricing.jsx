@@ -1,8 +1,21 @@
+import { useEffect } from 'react';
 import { Check } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 
 export default function Pricing() {
   const { isPremium, credits } = useAuth();
+
+  useEffect(() => {
+    // Load Lemon Squeezy script for the overlay
+    const script = document.createElement('script');
+    script.src = "https://assets.lemonsqueezy.com/lemon.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
   const plans = [
     {
@@ -13,7 +26,7 @@ export default function Pricing() {
       features: ['Unlimited bulk video generation', 'Bypass the 5 credits limit', 'Custom logo branding', '1080p high quality', 'Priority rendering speed'],
       cta: 'Subscribe Monthly',
       popular: false,
-      gumroadLink: 'https://hamzaraeescarpet.gumroad.com/l/quizviralai'
+      checkoutLink: 'https://valeableworkflow.lemonsqueezy.com/checkout/buy/a0bb61a6-41c0-41bd-8802-d8d0da27526e?embed=1'
     },
     {
       name: 'Yearly Unlimited',
@@ -23,7 +36,7 @@ export default function Pricing() {
       features: ['Everything in Monthly', 'Save over 80% compared to monthly', 'Cancel anytime', 'Premium templates unlock'],
       cta: 'Subscribe Yearly',
       popular: true,
-      gumroadLink: 'https://hamzaraeescarpet.gumroad.com/l/quizviralai'
+      checkoutLink: 'https://valeableworkflow.lemonsqueezy.com/checkout/buy/a0bb61a6-41c0-41bd-8802-d8d0da27526e?embed=1'
     }
   ];
 
@@ -75,10 +88,8 @@ export default function Pricing() {
             </ul>
 
             <a 
-              href={plan.gumroadLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`w-full py-3 rounded-xl font-bold transition-all text-center block ${
+              href={plan.checkoutLink}
+              className={`lemonsqueezy-button w-full py-3 rounded-xl font-bold transition-all text-center block ${
                 isPremium 
                   ? 'bg-gray-600 text-gray-400 cursor-not-allowed pointer-events-none'
                   : plan.popular 
