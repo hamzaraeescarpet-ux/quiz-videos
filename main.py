@@ -248,6 +248,34 @@ def get_logs():
             return HTMLResponse(f"<pre>{f.read()}</pre>")
     return {"message": "No errors logged yet."}
 
+@app.post("/api/test-email")
+def test_email(email: str = Form(...)):
+    sender_email = os.environ.get("GMAIL_SENDER_EMAIL")
+    app_password = os.environ.get("GMAIL_APP_PASSWORD")
+    if not sender_email or not app_password:
+        return {"status": "error", "message": "GMAIL_SENDER_EMAIL or GMAIL_APP_PASSWORD are not set in the environment variables."}
+    
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        msg = MIMEMultipart()
+        msg["From"] = sender_email
+        msg["To"] = email
+        msg["Subject"] = "QuizViral AI - Test Email"
+        msg.attach(MIMEText("If you received this, the SMTP email configuration on Hugging Face is working perfectly!", "plain"))
+        
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(sender_email, app_password)
+        server.send_message(msg)
+        server.quit()
+        return {"status": "success", "message": f"Successfully sent test email to {email}"}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
 # Serve React Frontend (For Hugging Face Spaces & Production)
 if os.path.exists(FRONTEND_DIST):
     app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="frontend-assets")
