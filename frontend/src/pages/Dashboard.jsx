@@ -261,6 +261,7 @@ export default function Dashboard() {
     setSessionId(null);
     setProgress({ current: 0, total: 0 });
     setDisplayPercent(0);
+    setRows([{ id: Date.now(), question: '', option1: '', option2: '', option3: '', option4: '', answer: '' }]);
     localStorage.removeItem('current_session_id');
   };
 
