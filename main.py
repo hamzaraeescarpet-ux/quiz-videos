@@ -118,43 +118,38 @@ def process_video_batch(session_id: str, questions: List[dict], category: str, l
                 if user_email:
                     print(f"\n[{user_email}] AUTOMATION: Sending email -> 'Sit back and relax, your bulk videos are ready to download!'", flush=True)
                     try:
-                        import smtplib
-                        from email.mime.text import MIMEText
-                        from email.mime.multipart import MIMEMultipart
+                        import json
+                        import urllib.request
 
-                        sender_email = os.environ.get("GMAIL_SENDER_EMAIL")
-                        app_password = os.environ.get("GMAIL_APP_PASSWORD")
+                        mailer_url = "https://quizviral-nine.vercel.app/api/mailer"
+                        download_link = "https://quizviral-nine.vercel.app"
+                        body = f"""Hello Creator,
 
-                        if sender_email and app_password:
-                            msg = MIMEMultipart()
-                            msg["From"] = sender_email
-                            msg["To"] = user_email
-                            msg["Subject"] = "Your Bulk Quiz Videos are Ready! 🎉"
-                            
-                            download_link = f"https://quizviral-nine.vercel.app"
-                            body = f"""
-                            Hello Creator,
+Your bulk trivia videos have been successfully generated!
 
-                            Your bulk trivia videos have been successfully generated!
-                            
-                            You can download them right now by going to your dashboard or using this direct link:
-                            {download_link}
-                            
-                            Keep growing your viral factory!
-                            - QuizViral AI Team
-                            """
-                            msg.attach(MIMEText(body, "plain"))
-                            
-                            server = smtplib.SMTP("smtp.gmail.com", 587)
-                            server.starttls()
-                            server.login(sender_email, app_password)
-                            server.send_message(msg)
-                            server.quit()
-                            print(f"Successfully sent email to {user_email}", flush=True)
-                        else:
-                            print("Email not sent: GMAIL_SENDER_EMAIL or GMAIL_APP_PASSWORD not set in environment.", flush=True)
+You can download them right now by going to your dashboard or using this direct link:
+{download_link}
+
+Keep growing your viral factory!
+- QuizViral AI Team"""
+
+                        payload = {
+                            "to": user_email,
+                            "subject": "Your Bulk Quiz Videos are Ready! 🎉",
+                            "text": body
+                        }
+
+                        data = json.dumps(payload).encode('utf-8')
+                        req = urllib.request.Request(mailer_url, data=data, headers={'Content-Type': 'application/json'})
+                        
+                        with urllib.request.urlopen(req, timeout=15) as response:
+                            if response.status == 200:
+                                print(f"Successfully sent email to {user_email} via Vercel mailer", flush=True)
+                            else:
+                                print(f"Failed to send via Vercel: {response.read()}", flush=True)
+                                
                     except Exception as email_err:
-                        print(f"Failed to send email: {email_err}", flush=True)
+                        print(f"Failed to send email HTTP request: {email_err}", flush=True)
             
     except Exception as e:
         job.status = "Failed"
@@ -250,28 +245,29 @@ def get_logs():
 
 @app.post("/api/test-email")
 def test_email(email: str = Form(...)):
-    sender_email = os.environ.get("GMAIL_SENDER_EMAIL")
-    app_password = os.environ.get("GMAIL_APP_PASSWORD")
-    if not sender_email or not app_password:
-        return {"status": "error", "message": "GMAIL_SENDER_EMAIL or GMAIL_APP_PASSWORD are not set in the environment variables."}
-    
     try:
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
+        import json
+        import urllib.request
         
-        msg = MIMEMultipart()
-        msg["From"] = sender_email
-        msg["To"] = email
-        msg["Subject"] = "QuizViral AI - Test Email"
-        msg.attach(MIMEText("If you received this, the SMTP email configuration on Hugging Face is working perfectly!", "plain"))
+        mailer_url = "https://quizviral-nine.vercel.app/api/mailer"
+        payload = {
+            "to": email,
+            "subject": "QuizViral AI - Test Email via Vercel",
+            "text": "If you received this, the Vercel Mailer Bridge is working perfectly and bypassing the Hugging Face firewall!"
+        }
         
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(sender_email, app_password)
-        server.send_message(msg)
-        server.quit()
-        return {"status": "success", "message": f"Successfully sent test email to {email}"}
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(mailer_url, data=data, headers={'Content-Type': 'application/json'})
+        
+        with urllib.request.urlopen(req, timeout=15) as response:
+            resp_body = response.read().decode('utf-8')
+            if response.status == 200:
+                return {"status": "success", "message": f"Successfully sent test email to {email}", "vercel_response": resp_body}
+            else:
+                return {"status": "error", "message": f"Vercel rejected the email: {resp_body}"}
+                
+    except urllib.error.HTTPError as e:
+        return {"status": "error", "message": f"HTTP Error from Vercel: {e.code} - {e.read().decode('utf-8')}"}
     except Exception as e:
         import traceback
         return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
