@@ -30,7 +30,7 @@ export default function Dashboard() {
       setStatus('Processing');
     }
     
-    axios.get('/api/categories').then(res => {
+    axios.get('/api/hf/categories').then(res => {
       setCategories(res.data.categories || []);
       if (res.data.categories && res.data.categories.length > 0) {
         setSelectedCategory(res.data.categories[0]);
@@ -45,7 +45,7 @@ export default function Dashboard() {
     if (sessionId && status === 'Processing') {
       // Poll real status every 2 seconds
       interval = setInterval(() => {
-        axios.get(`/api/status/${sessionId}`).then(res => {
+        axios.get(`/api/hf/status/${sessionId}`).then(res => {
           setStatus(res.data.status);
           setProgress({ current: res.data.completed_so_far, total: res.data.total_expected });
         }).catch(err => {
@@ -229,7 +229,7 @@ export default function Dashboard() {
       setProgress({ current: 0, total: rows.length });
       setDisplayPercent(0);
       
-      const res = await axios.post('/api/generate-bulk', formData);
+      const res = await axios.post('/api/hf/generate-bulk', formData);
       const newSessionId = res.data.session_id;
       setSessionId(newSessionId);
       localStorage.setItem('current_session_id', newSessionId);
@@ -243,7 +243,7 @@ export default function Dashboard() {
   const stopGeneration = async () => {
     if (sessionId) {
       try {
-        await axios.post(`/api/stop-generation/${sessionId}`);
+        await axios.post(`/api/hf/stop-generation/${sessionId}`);
         setStatus('Interrupted');
         localStorage.removeItem('current_session_id');
       } catch (err) {
@@ -253,7 +253,7 @@ export default function Dashboard() {
   };
 
   const downloadZip = () => {
-    window.location.href = `/api/download/${sessionId}`;
+    window.location.href = `/api/hf/download/${sessionId}`;
   };
 
   const resetState = () => {
@@ -474,7 +474,7 @@ export default function Dashboard() {
             {status === 'Failed' && (
               <div className="mt-4 p-4 bg-red-900/50 border border-red-500/50 rounded-lg text-white">
                 <h3 className="font-bold text-red-400 mb-2">Generation Failed! (Server may have restarted)</h3>
-                <p className="text-sm">Please visit <a href="/api/logs" target="_blank" className="underline text-blue-300">this link</a> to see the exact error.</p>
+                <p className="text-sm">Please visit <a href="/api/hf/logs" target="_blank" className="underline text-blue-300">this link</a> to see the exact error.</p>
                 <button onClick={resetState} className="mt-3 px-4 py-2 bg-dark-700 hover:bg-dark-600 rounded text-sm font-semibold">Start New Bulk</button>
               </div>
             )}

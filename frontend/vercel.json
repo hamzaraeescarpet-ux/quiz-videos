@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api/(?!mailer)(.*)",
-      "destination": "https://hamzaraeescarpet-quiz-viral-api.hf.space/api/$1"
+      "source": "/api/hf/:path*",
+      "destination": "https://hamzaraeescarpet-quiz-viral-api.hf.space/api/:path*"
     },
     {
       "source": "/(.*)",
