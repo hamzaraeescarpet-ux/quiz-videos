@@ -48,7 +48,14 @@ export default function Dashboard() {
         axios.get(`/api/status/${sessionId}`).then(res => {
           setStatus(res.data.status);
           setProgress({ current: res.data.completed_so_far, total: res.data.total_expected });
-        }).catch(err => console.error(err));
+        }).catch(err => {
+          console.error(err);
+          // If the backend lost the session (e.g. server restarted), clear it locally
+          if (err.response && err.response.status === 404) {
+             setStatus('Failed');
+             localStorage.removeItem('current_session_id');
+          }
+        });
       }, 2000);
 
       // Smooth percentage animator
@@ -247,6 +254,13 @@ export default function Dashboard() {
 
   const downloadZip = () => {
     window.location.href = `/api/download/${sessionId}`;
+  };
+
+  const resetState = () => {
+    setStatus(null);
+    setSessionId(null);
+    setProgress({ current: 0, total: 0 });
+    setDisplayPercent(0);
     localStorage.removeItem('current_session_id');
   };
 
@@ -439,7 +453,7 @@ export default function Dashboard() {
             </div>
 
             {(status === 'Completed' || status === 'Interrupted') && (
-              <div className="flex justify-center pt-2 md:pt-4">
+              <div className="flex flex-col sm:flex-row justify-center pt-2 md:pt-4 gap-4">
                 <button 
                   onClick={downloadZip}
                   className="w-full sm:w-auto bg-green-600 hover:bg-green-500 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-base md:text-lg transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
@@ -447,13 +461,20 @@ export default function Dashboard() {
                   <Download className="w-5 h-5" />
                   Download ZIP
                 </button>
+                <button 
+                  onClick={resetState}
+                  className="w-full sm:w-auto bg-dark-700 hover:bg-dark-600 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-base md:text-lg transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  Start New Bulk
+                </button>
               </div>
             )}
             {status === 'Failed' && (
               <div className="mt-4 p-4 bg-red-900/50 border border-red-500/50 rounded-lg text-white">
-                <h3 className="font-bold text-red-400 mb-2">Generation Failed!</h3>
+                <h3 className="font-bold text-red-400 mb-2">Generation Failed! (Server may have restarted)</h3>
                 <p className="text-sm">Please visit <a href="/api/logs" target="_blank" className="underline text-blue-300">this link</a> to see the exact error.</p>
-                <button onClick={() => setStatus(null)} className="mt-3 px-4 py-2 bg-dark-700 hover:bg-dark-600 rounded text-sm">Try Again</button>
+                <button onClick={resetState} className="mt-3 px-4 py-2 bg-dark-700 hover:bg-dark-600 rounded text-sm font-semibold">Start New Bulk</button>
               </div>
             )}
           </div>

@@ -148,17 +148,17 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
     font_to_use = FONT_PATH if os.path.exists(FONT_PATH) else 'Arial'
     txt_q = create_rounded_text(
         q_text, fontsize=75, txt_color='black', bg_color='white', font_path=font_to_use,
-        size=(880, None), align='center', padding=70
+        size=(880, None), align='center', padding=25
     ).set_position(('center', 250)).set_duration(total_duration).crossfadein(0.5)
 
     txt_opt = create_rounded_text(
         options_text, fontsize=60, txt_color='black', bg_color=(240, 240, 240), font_path=font_to_use,
-        size=(880, None), align='West', padding=70
+        size=(880, None), align='West', padding=25
     ).set_position(('center', 800)).set_start(0.5).set_duration(total_duration - 0.5).crossfadein(0.5)
 
     txt_ans = create_rounded_text(
         f"Correct Answer:\n{answer}", fontsize=85, txt_color='white', bg_color=(34, 139, 34), font_path=font_to_use,
-        size=(880, None), align='center', padding=70
+        size=(880, None), align='center', padding=25
     ).set_position(('center', 1400)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.3)
 
     # 5) Custom Logo Check
