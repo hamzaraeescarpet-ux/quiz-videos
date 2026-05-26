@@ -20,7 +20,7 @@ try:
 except Exception:
     pass
 
-def create_rounded_text(text, fontsize, txt_color, bg_color, font_path, size, align='center', radius=40, padding=70):
+def create_rounded_text(text, fontsize, txt_color, bg_color, font_path, size, align='center', radius=40, padding=70, border_color=None, border_width=0):
     txt_clip = TextClip(
         text, fontsize=fontsize, color=txt_color, font=font_path,
         method='caption', align=align, size=size
@@ -28,9 +28,13 @@ def create_rounded_text(text, fontsize, txt_color, bg_color, font_path, size, al
     w, h = txt_clip.size
     bg_w, bg_h = w + padding, h + padding
     
+    # If radius is -1, make it a perfect pill capsule
+    if radius == -1:
+        radius = bg_h // 2
+        
     img = Image.new('RGBA', (bg_w, bg_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    draw.rounded_rectangle((0, 0, bg_w, bg_h), radius=radius, fill=bg_color)
+    draw.rounded_rectangle((0, 0, bg_w, bg_h), radius=radius, fill=bg_color, outline=border_color, width=border_width)
     
     img_array = np.array(img)
     rgb = img_array[:, :, :3]
@@ -64,13 +68,26 @@ async def generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2):
 def create_video_from_row(row, category, custom_logo_path, output_dir):
     vid_id = str(row.get('id', random.randint(1000, 9999)))
     q_text = str(row.get('question', ''))
-    options_text = (
-        f"A) {str(row.get('option1', ''))}\n\n"
-        f"B) {str(row.get('option2', ''))}\n\n"
-        f"C) {str(row.get('option3', ''))}\n\n"
-        f"D) {str(row.get('option4', ''))}"
-    )
-    answer = str(row.get('answer', ''))
+    opt1_val = str(row.get('option1', '')).strip()
+    opt2_val = str(row.get('option2', '')).strip()
+    opt3_val = str(row.get('option3', '')).strip()
+    opt4_val = str(row.get('option4', '')).strip()
+    ans_val = str(row.get('answer', '')).strip()
+
+    correct_idx = None
+    correct_label = "A"
+    if ans_val.lower() == opt1_val.lower():
+        correct_idx = 1
+        correct_label = "A"
+    elif ans_val.lower() == opt2_val.lower():
+        correct_idx = 2
+        correct_label = "B"
+    elif ans_val.lower() == opt3_val.lower():
+        correct_idx = 3
+        correct_label = "C"
+    elif ans_val.lower() == opt4_val.lower():
+        correct_idx = 4
+        correct_label = "D"
 
     # 1) Background pick dynamically from category
     category_path = os.path.join(BG_VIDEO_FOLDER, category)
@@ -86,10 +103,10 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
 
     # 2) Audio generation
     audio_path_1 = os.path.join(TEMP_FOLDER, f"temp_q_{vid_id}.mp3")
-    speech_1 = f"Question... {q_text} ... Is it ... {str(row.get('option1', ''))} ... {str(row.get('option2', ''))} ... {str(row.get('option3', ''))} ... or {str(row.get('option4', ''))}"
+    speech_1 = f"Question... {q_text} ... Is it ... {opt1_val} ... {opt2_val} ... {opt3_val} ... or {opt4_val}"
 
     audio_path_2 = os.path.join(TEMP_FOLDER, f"temp_a_{vid_id}.mp3")
-    speech_2 = f"The correct answer is ... {answer}"
+    speech_2 = f"The correct answer is ... {ans_val}"
 
     try:
         asyncio.run(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2))
@@ -146,20 +163,56 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
 
     # 4) Text setup
     font_to_use = FONT_PATH if os.path.exists(FONT_PATH) else 'Arial'
+    
+    # Beautiful Question Card (Red Rounded Rectangle with Bright Red Outlined border matching the second image)
     txt_q = create_rounded_text(
-        q_text, fontsize=75, txt_color='black', bg_color='white', font_path=font_to_use,
-        size=(880, None), align='center', padding=25
-    ).set_position(('center', 250)).set_duration(total_duration).crossfadein(0.5)
+        q_text, fontsize=70, txt_color='white', bg_color=(192, 10, 20, 255), font_path=font_to_use,
+        size=(880, None), align='center', padding=35, radius=35, border_color=(255, 80, 80, 255), border_width=10
+    ).set_position(('center', 220)).set_duration(total_duration).crossfadein(0.5)
 
-    txt_opt = create_rounded_text(
-        options_text, fontsize=60, txt_color='black', bg_color=(240, 240, 240), font_path=font_to_use,
-        size=(880, None), align='West', padding=25
-    ).set_position(('center', 800)).set_start(0.5).set_duration(total_duration - 0.5).crossfadein(0.5)
+    # High-quality Red Option Cards (A, B, C, D) fully rounded like capsules with White Borders
+    opt_labels = ["A", "B", "C", "D"]
+    opt_vals = [opt1_val, opt2_val, opt3_val, opt4_val]
+    y_coords = [680, 830, 980, 1130]
+    
+    option_clips = []
+    for idx, (label, val, y) in enumerate(zip(opt_labels, opt_vals, y_coords), start=1):
+        opt_text = f"  {label})  {val}"
+        
+        if idx == correct_idx:
+            # Active red normal card with White Border before reveal
+            normal_before = create_rounded_text(
+                opt_text, fontsize=52, txt_color='white', bg_color=(200, 20, 20, 255), font_path=font_to_use,
+                size=(880, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 255), border_width=5
+            ).set_position(('center', y)).set_start(0.5).set_duration(reveal_time - 0.5).crossfadein(0.3)
+            
+            # Highlighted green card with White Border after reveal
+            green_after = create_rounded_text(
+                opt_text, fontsize=52, txt_color='white', bg_color=(46, 204, 113, 255), font_path=font_to_use,
+                size=(880, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 255), border_width=5
+            ).set_position(('center', y)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.2)
+            
+            option_clips.extend([normal_before, green_after])
+        else:
+            # Normal red option card with White Border before reveal
+            normal_before = create_rounded_text(
+                opt_text, fontsize=52, txt_color='white', bg_color=(200, 20, 20, 255), font_path=font_to_use,
+                size=(880, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 255), border_width=5
+            ).set_position(('center', y)).set_start(0.5).set_duration(reveal_time - 0.5).crossfadein(0.3)
+            
+            # Dimmed red card with semi-transparent White Border after reveal
+            dimmed_after = create_rounded_text(
+                opt_text, fontsize=52, txt_color=(200, 200, 200), bg_color=(130, 20, 20, 100), font_path=font_to_use,
+                size=(880, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 100), border_width=5
+            ).set_position(('center', y)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.2)
+            
+            option_clips.extend([normal_before, dimmed_after])
 
+    # Beautiful Green Bottom Answer Banner with White Border
     txt_ans = create_rounded_text(
-        f"Correct Answer:\n{answer}", fontsize=85, txt_color='white', bg_color=(34, 139, 34), font_path=font_to_use,
-        size=(880, None), align='center', padding=25
-    ).set_position(('center', 1400)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.3)
+        f"Correct Answer: {correct_label} 🎉", fontsize=75, txt_color='white', bg_color=(39, 174, 96, 255), font_path=font_to_use,
+        size=(880, None), align='center', padding=35, radius=30, border_color=(255, 255, 255, 255), border_width=6
+    ).set_position(('center', 1350)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.3)
 
     # 5) Custom Logo Check
     logo_clip_final = None
@@ -180,7 +233,7 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
         except Exception as e:
             print(f"Logo Processing Warning: {e}")
 
-    final_elements = [clip, txt_q, txt_opt, txt_ans]
+    final_elements = [clip, txt_q] + option_clips + [txt_ans]
     if logo_clip_final:
         final_elements.append(logo_clip_final)
 
@@ -201,7 +254,8 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
     final.close()
     clip.close()
     txt_q.close()
-    txt_opt.close()
+    for o_clip in option_clips:
+        o_clip.close()
     txt_ans.close()
     voice_clip_1.close()
     voice_clip_2.close()

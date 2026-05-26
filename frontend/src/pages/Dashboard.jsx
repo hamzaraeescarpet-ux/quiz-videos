@@ -148,40 +148,107 @@ export default function Dashboard() {
       try {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-        let fullText = '';
+        
+        let fullLines = [];
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
-          const pageText = textContent.items.map(item => item.str).join(' ');
-          fullText += pageText + ' ';
+          
+          // Reconstruct lines based on y-coordinate to preserve structural order
+          let lastY = null;
+          let currentLine = '';
+          const items = textContent.items;
+          
+          for (let item of items) {
+            const y = item.transform ? item.transform[5] : null;
+            if (lastY !== null && y !== null && Math.abs(y - lastY) > 5) {
+              fullLines.push(currentLine.trim());
+              currentLine = '';
+            }
+            currentLine += item.str + ' ';
+            if (y !== null) lastY = y;
+          }
+          if (currentLine) {
+            fullLines.push(currentLine.trim());
+          }
         }
         
-        // Simple heuristic to split text into rows (Requires structured PDF)
-        const questions = fullText.split(/Q\d*:|Question\d*:/i).slice(1);
+        const fullText = fullLines.join('\n');
+        
+        // Split text into lines and group into structured question blocks
+        const blocks = [];
+        const lines = fullText.split('\n');
+        let currentBlock = null;
+
+        lines.forEach(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return;
+          
+          // Support multiple start formats: "Q1:", "Question 1:", "1.", "1)" or "1-"
+          const isNewQ = /^(?:Q\d*[:\.]|Question\d*[:\.]|\d+[\.\)\-]\s+)/i.test(trimmed);
+          
+          if (isNewQ) {
+            if (currentBlock) blocks.push(currentBlock);
+            currentBlock = trimmed;
+          } else {
+            if (currentBlock) {
+              currentBlock += '\n' + trimmed;
+            } else {
+              currentBlock = trimmed; // fallback first line
+            }
+          }
+        });
+        if (currentBlock) blocks.push(currentBlock);
+
         const parsedRows = [];
         
-        questions.forEach((qBlock, idx) => {
+        blocks.forEach((block, idx) => {
           try {
-            const qMatch = qBlock.split(/A\)|A\.|Option A/i)[0]?.trim();
-            const aMatch = qBlock.match(/(?:A\)|A\.|Option A)(.*?)(?:B\)|B\.|Option B)/i)?.[1]?.trim();
-            const bMatch = qBlock.match(/(?:B\)|B\.|Option B)(.*?)(?:C\)|C\.|Option C)/i)?.[1]?.trim();
-            const cMatch = qBlock.match(/(?:C\)|C\.|Option C)(.*?)(?:D\)|D\.|Option D)/i)?.[1]?.trim();
-            const dMatch = qBlock.match(/(?:D\)|D\.|Option D)(.*?)(?:Ans:|Answer:|Correct:)/i)?.[1]?.trim();
-            const ansMatch = qBlock.match(/(?:Ans:|Answer:|Correct:)(.*?)(?:$|Q\d*:|Question)/i)?.[1]?.trim();
-
-            if (qMatch && aMatch && ansMatch) {
-              parsedRows.push({
-                id: Date.now() + idx,
-                question: qMatch,
-                option1: aMatch || '',
-                option2: bMatch || '',
-                option3: cMatch || '',
-                option4: dMatch || '',
-                answer: ansMatch || ''
-              });
+            // Remove starting markers like Q1: or 1.
+            let cleanBlock = block.replace(/^(?:Q\d*[:\.]|Question\d*[:\.]|\d+[\.\)\-]\s*)/i, '').trim();
+            
+            // Extract the question part before option A
+            const qSplit = cleanBlock.split(/(?:\s+|\n|^)(?:A\)|A\.|Option A|\[A\])/i);
+            const question = qSplit[0]?.trim();
+            
+            if (question) {
+              // Parse A, B, C, D options using patterns
+              const optA = cleanBlock.match(/(?:A\)|A\.|Option A|\[A\])\s*(.*?)\s*(?:B\)|B\.|Option B|\[B\])/i)?.[1]?.trim();
+              const optB = cleanBlock.match(/(?:B\)|B\.|Option B|\[B\])\s*(.*?)\s*(?:C\)|C\.|Option C|\[C\])/i)?.[1]?.trim();
+              const optC = cleanBlock.match(/(?:C\)|C\.|Option C|\[C\])\s*(.*?)\s*(?:D\)|D\.|Option D|\[D\])/i)?.[1]?.trim();
+              const optD = cleanBlock.match(/(?:D\)|D\.|Option D|\[D\])\s*(.*?)\s*(?:Ans:|Answer:|Correct:|Correct Answer:)/i)?.[1]?.trim();
+              
+              const optD_fallback = optD ? optD : cleanBlock.match(/(?:D\)|D\.|Option D|\[D\])\s*(.*)/i)?.[1]?.trim();
+              
+              let answer = cleanBlock.match(/(?:Ans:|Answer:|Correct:|Correct Answer:)\s*(.*)/i)?.[1]?.trim();
+              
+              // Try to locate answer in the fallback option D string if ans-tag is inside it
+              if (!answer && optD_fallback) {
+                const ansMatch = optD_fallback.match(/(?:Ans:|Answer:|Correct:|Correct Answer:)\s*(.*)/i);
+                if (ansMatch) {
+                  answer = ansMatch[1]?.trim();
+                }
+              }
+              
+              let finalOptD = optD || optD_fallback || '';
+              if (answer && finalOptD.includes(answer)) {
+                finalOptD = finalOptD.split(/(?:Ans:|Answer:|Correct:|Correct Answer:)/i)[0]?.trim();
+              }
+              
+              if (question && optA) {
+                parsedRows.push({
+                  id: Date.now() + idx,
+                  question: question,
+                  option1: optA || '',
+                  option2: optB || '',
+                  option3: optC || '',
+                  option4: finalOptD || '',
+                  answer: answer || ''
+                });
+              }
             }
           } catch (e) {
-            console.log("Failed to parse block", e);
+            console.log("Failed parsing block", e);
           }
         });
         
@@ -189,7 +256,7 @@ export default function Dashboard() {
           setRows(parsedRows.slice(0, 100));
           alert(`Successfully extracted ${parsedRows.length} questions from PDF!`);
         } else {
-          alert("Could not extract questions. Please ensure the PDF follows this exact text format:\nQ: What is 2+2? A) 1 B) 2 C) 3 D) 4 Ans: 4");
+          alert("Could not extract questions. Please ensure the PDF follows this format:\n1. What is 2+2? A) 1 B) 2 C) 3 D) 4 Ans: 4");
         }
       } catch (error) {
         console.error("Error reading PDF", error);
