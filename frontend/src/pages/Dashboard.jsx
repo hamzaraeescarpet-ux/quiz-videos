@@ -7,8 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Setting up pdf.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Setting up pdf.js worker correctly with https and modern .mjs extension for v5
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 export default function Dashboard() {
   const { currentUser, login, credits, isPremium, consumeCredits } = useAuth();
@@ -18,6 +18,13 @@ export default function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [rows, setRows] = useState([{ id: 1, question: '', option1: '', option2: '', option3: '', option4: '', answer: '' }]);
   const [logoFile, setLogoFile] = useState(null);
+  
+  // Custom Box Color state
+  const [boxColor, setBoxColor] = useState('#E74C3C');
+  // Custom Background Videos list state
+  const [customBgFiles, setCustomBgFiles] = useState([]);
+  // Quota full modal state
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
   
   const [sessionId, setSessionId] = useState(() => localStorage.getItem('current_session_id') || null);
   const [status, setStatus] = useState(null); // 'Processing', 'Completed', 'Interrupted', 'Failed'
@@ -272,13 +279,12 @@ export default function Dashboard() {
     if (!isValid) return alert("Please fill all fields in the rows.");
     
     if (!isPremium && rows.length > credits) {
-      alert(`You only have ${credits} credits left. You are trying to generate ${rows.length} videos.`);
-      navigate('/pricing');
+      setShowQuotaModal(true);
       return;
     }
 
     if (!consumeCredits(rows.length)) {
-       navigate('/pricing');
+       setShowQuotaModal(true);
        return;
     }
 
@@ -286,9 +292,17 @@ export default function Dashboard() {
     formData.append('questions', JSON.stringify(rows));
     formData.append('category', selectedCategory);
     formData.append('email', currentUser.email); // Send email for automation
+    formData.append('box_color', boxColor); // Send the selected color
     
     if (logoFile) {
       formData.append('logo', logoFile);
+    }
+
+    // Append custom background videos if uploaded
+    if (customBgFiles && customBgFiles.length > 0) {
+      customBgFiles.forEach(file => {
+        formData.append('custom_bg_videos', file);
+      });
     }
 
     try {
@@ -402,20 +416,90 @@ export default function Dashboard() {
       <section className="bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 shadow-xl space-y-6 md:space-y-8 relative z-10">
         <h2 className="text-lg md:text-xl font-semibold text-brand-300">2. Input Data & Branding</h2>
         
-        {/* Branding */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Upload Custom Logo (Optional)</label>
-          <div 
-            {...getLogoProps()} 
-            className="border-2 border-dashed border-dark-600 rounded-xl p-6 md:p-8 text-center cursor-pointer hover:border-brand-500 transition-colors bg-dark-900/50 flex flex-col items-center justify-center"
-          >
-            <input {...getLogoInputProps()} />
-            <ImageIcon className="mx-auto h-10 w-10 md:h-12 md:w-12 text-gray-400 mb-3" />
-            {logoFile ? (
-              <p className="text-brand-400 font-medium text-sm md:text-base break-all">Selected: {logoFile.name}</p>
-            ) : (
-              <p className="text-gray-400 text-sm md:text-base">Tap or drag a custom logo here</p>
-            )}
+        {/* Branding & Visual Customizations */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Custom Logo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Upload Custom Logo (Optional)</label>
+            <div 
+              {...getLogoProps()} 
+              className="border-2 border-dashed border-dark-600 rounded-xl p-6 md:p-8 text-center cursor-pointer hover:border-brand-500 transition-colors bg-dark-900/50 flex flex-col items-center justify-center h-[180px]"
+            >
+              <input {...getLogoInputProps()} />
+              <ImageIcon className="mx-auto h-8 w-8 text-gray-400 mb-3" />
+              {logoFile ? (
+                <p className="text-brand-400 font-medium text-sm break-all">Selected: {logoFile.name}</p>
+              ) : (
+                <p className="text-gray-400 text-sm">Tap or drag a custom logo here</p>
+              )}
+            </div>
+          </div>
+
+          {/* Custom Background Video Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Upload Custom Background Videos (Optional)</label>
+            <label className="border-2 border-dashed border-dark-600 rounded-xl p-6 md:p-8 text-center cursor-pointer hover:border-brand-500 transition-colors bg-dark-900/50 flex flex-col items-center justify-center h-[180px] w-full">
+              <input 
+                type="file" 
+                accept="video/*" 
+                multiple 
+                className="hidden" 
+                onChange={(e) => {
+                  const files = Array.from(e.target.files);
+                  setCustomBgFiles(files);
+                }} 
+              />
+              <FileText className="mx-auto h-8 w-8 text-gray-400 mb-3" />
+              {customBgFiles.length > 0 ? (
+                <p className="text-brand-400 font-medium text-sm break-all">
+                  {customBgFiles.length} Background video(s) selected
+                </p>
+              ) : (
+                <p className="text-gray-400 text-sm">Tap to upload one or multiple background videos</p>
+              )}
+            </label>
+          </div>
+        </div>
+
+        {/* Video Box Colors Selection */}
+        <div className="bg-dark-900/40 p-4 rounded-xl border border-dark-700">
+          <label className="block text-sm font-medium text-gray-300 mb-3">Choose Video Text Box Theme Color</label>
+          <div className="flex flex-wrap items-center gap-3">
+            {[
+              { hex: '#E74C3C', label: 'Vibrant Red (Default)' },
+              { hex: '#3498DB', label: 'Ocean Blue' },
+              { hex: '#2ECC71', label: 'Lime Green' },
+              { hex: '#9B59B6', label: 'Royal Purple' },
+              { hex: '#E67E22', label: 'Sunset Orange' },
+              { hex: '#2C3E50', label: 'Classic Slate' }
+            ].map(item => (
+              <button
+                key={item.hex}
+                type="button"
+                onClick={() => setBoxColor(item.hex)}
+                style={{ backgroundColor: item.hex }}
+                className={`w-10 h-10 rounded-full border-2 transition-all relative transform hover:scale-110 active:scale-95 ${boxColor === item.hex ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-80'}`}
+                title={item.label}
+              >
+                {boxColor === item.hex && (
+                  <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold font-mono">✓</span>
+                )}
+              </button>
+            ))}
+            
+            {/* Custom native HTML color picker */}
+            <div className="flex items-center gap-2 border-l border-dark-600 pl-4 ml-2">
+              <span className="text-xs text-gray-400 font-medium">Custom Color:</span>
+              <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-dark-500 cursor-pointer">
+                <input
+                  type="color"
+                  value={boxColor}
+                  onChange={(e) => setBoxColor(e.target.value)}
+                  className="absolute inset-[-4px] w-[48px] h-[48px] cursor-pointer p-0 border-0"
+                />
+              </div>
+              <span className="text-xs font-mono text-gray-300 font-bold bg-dark-800 px-2 py-1 rounded border border-dark-600 uppercase">{boxColor}</span>
+            </div>
           </div>
         </div>
 
@@ -548,6 +632,42 @@ export default function Dashboard() {
           </div>
         )}
       </section>
+
+      {/* Quota Exhausted Modal Alert */}
+      {showQuotaModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-dark-800 border border-dark-700 p-6 md:p-8 rounded-2xl max-w-md w-[90%] text-center shadow-2xl space-y-6 animate-in zoom-in duration-300">
+            <div className="w-16 h-16 bg-brand-500/10 text-brand-500 rounded-full flex items-center justify-center mx-auto border border-brand-500/20">
+              <span className="text-3xl">⏰</span>
+            </div>
+            
+            <div>
+              <h3 className="text-xl font-extrabold text-white mb-2">Today's quota is full!</h3>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Please come back tomorrow to get **5 more free videos**, or subscribe to Premium right now for unlimited generation!
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setShowQuotaModal(false);
+                  navigate('/pricing');
+                }}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-brand-600 to-brand-400 text-white font-bold text-sm md:text-base hover:from-brand-500 hover:to-brand-300 transition-all shadow-lg shadow-brand-500/20"
+              >
+                Subscribe to Premium
+              </button>
+              <button
+                onClick={() => setShowQuotaModal(false)}
+                className="flex-1 py-3 px-4 rounded-xl bg-dark-700 hover:bg-dark-600 text-white font-semibold text-sm md:text-base transition-all border border-dark-600"
+              >
+                Okay, I'll wait
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

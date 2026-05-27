@@ -65,7 +65,18 @@ async def generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2):
         generate_voice(speech_2, audio_path_2)
     )
 
-def create_video_from_row(row, category, custom_logo_path, output_dir):
+def hex_to_rgb(hex_str, default_rgb):
+    if not hex_str:
+        return default_rgb
+    hex_str = hex_str.lstrip('#')
+    try:
+        if len(hex_str) == 6:
+            return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+        return default_rgb
+    except Exception:
+        return default_rgb
+
+def create_video_from_row(row, category, custom_logo_path, output_dir, box_color=None, custom_bg_paths=None):
     vid_id = str(row.get('id', random.randint(1000, 9999)))
     q_text = str(row.get('question', ''))
     opt1_val = str(row.get('option1', '')).strip()
@@ -89,17 +100,20 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
         correct_idx = 4
         correct_label = "D"
 
-    # 1) Background pick dynamically from category
-    category_path = os.path.join(BG_VIDEO_FOLDER, category)
-    try:
-        if not os.path.exists(category_path):
-            category_path = BG_VIDEO_FOLDER # fallback
-        bg_files = [f for f in os.listdir(category_path) if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))]
-        if not bg_files:
-            raise Exception(f"No background files found in {category_path}")
-        bg_video_path = os.path.join(category_path, random.choice(bg_files))
-    except Exception as e:
-        raise Exception(f"Error finding background: {e}")
+    # 1) Background pick dynamically
+    if custom_bg_paths and len(custom_bg_paths) > 0:
+        bg_video_path = random.choice(custom_bg_paths)
+    else:
+        category_path = os.path.join(BG_VIDEO_FOLDER, category)
+        try:
+            if not os.path.exists(category_path):
+                category_path = BG_VIDEO_FOLDER # fallback
+            bg_files = [f for f in os.listdir(category_path) if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))]
+            if not bg_files:
+                raise Exception(f"No background files found in {category_path}")
+            bg_video_path = os.path.join(category_path, random.choice(bg_files))
+        except Exception as e:
+            raise Exception(f"Error finding background: {e}")
 
     # 2) Audio generation
     audio_path_1 = os.path.join(TEMP_FOLDER, f"temp_q_{vid_id}.mp3")
@@ -164,13 +178,17 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
     # 4) Text setup
     font_to_use = FONT_PATH if os.path.exists(FONT_PATH) else 'Arial'
     
-    # Beautiful Question Card (Red Rounded Rectangle with Bright Red Outlined border matching the second image)
+    # Simple plain theme color (Vibrant stylish red "#E74C3C" by default, or user custom color)
+    theme_color = box_color if box_color else "#E74C3C"
+    theme_rgb = hex_to_rgb(theme_color, (231, 76, 60))
+    
+    # Beautiful Question Card using plain theme color with solid white border (6px)
     txt_q = create_rounded_text(
-        q_text, fontsize=70, txt_color='white', bg_color=(192, 10, 20, 255), font_path=font_to_use,
-        size=(880, None), align='center', padding=35, radius=35, border_color=(255, 80, 80, 255), border_width=10
+        q_text, fontsize=70, txt_color='white', bg_color=theme_rgb + (255,), font_path=font_to_use,
+        size=(880, None), align='center', padding=35, radius=35, border_color=(255, 255, 255, 255), border_width=6
     ).set_position(('center', 220)).set_duration(total_duration).crossfadein(0.5)
 
-    # High-quality Red Option Cards (A, B, C, D) fully rounded like capsules with White Borders
+    # High-quality dynamic Option Cards (A, B, C, D) fully rounded like capsules with White Borders
     opt_labels = ["A", "B", "C", "D"]
     opt_vals = [opt1_val, opt2_val, opt3_val, opt4_val]
     y_coords = [680, 830, 980, 1130]
@@ -180,30 +198,30 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
         opt_text = f"  {label})  {val}"
         
         if idx == correct_idx:
-            # Active red normal card with White Border before reveal
+            # Active normal card before reveal with thick white border (padding=45 for thicker look)
             normal_before = create_rounded_text(
-                opt_text, fontsize=52, txt_color='white', bg_color=(200, 20, 20, 255), font_path=font_to_use,
-                size=(880, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 255), border_width=5
+                opt_text, fontsize=52, txt_color='white', bg_color=theme_rgb + (255,), font_path=font_to_use,
+                size=(880, None), align='West', padding=45, radius=-1, border_color=(255, 255, 255, 255), border_width=5
             ).set_position(('center', y)).set_start(0.5).set_duration(reveal_time - 0.5).crossfadein(0.3)
             
-            # Highlighted green card with White Border after reveal
+            # Active green card after reveal with thick white border
             green_after = create_rounded_text(
                 opt_text, fontsize=52, txt_color='white', bg_color=(46, 204, 113, 255), font_path=font_to_use,
-                size=(880, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 255), border_width=5
+                size=(880, None), align='West', padding=45, radius=-1, border_color=(255, 255, 255, 255), border_width=5
             ).set_position(('center', y)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.2)
             
             option_clips.extend([normal_before, green_after])
         else:
-            # Normal red option card with White Border before reveal
+            # Normal card before reveal with thick white border
             normal_before = create_rounded_text(
-                opt_text, fontsize=52, txt_color='white', bg_color=(200, 20, 20, 255), font_path=font_to_use,
-                size=(880, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 255), border_width=5
+                opt_text, fontsize=52, txt_color='white', bg_color=theme_rgb + (255,), font_path=font_to_use,
+                size=(880, None), align='West', padding=45, radius=-1, border_color=(255, 255, 255, 255), border_width=5
             ).set_position(('center', y)).set_start(0.5).set_duration(reveal_time - 0.5).crossfadein(0.3)
             
-            # Dimmed red card with semi-transparent White Border after reveal
+            # Dimmed card after reveal (to highlight the correct answer) - keeps theme color but with transparency
             dimmed_after = create_rounded_text(
-                opt_text, fontsize=52, txt_color='#d0d0d0', bg_color=(130, 20, 20, 100), font_path=font_to_use,
-                size=(880, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 100), border_width=5
+                opt_text, fontsize=52, txt_color='#d0d0d0', bg_color=theme_rgb + (100,), font_path=font_to_use,
+                size=(880, None), align='West', padding=45, radius=-1, border_color=(255, 255, 255, 100), border_width=5
             ).set_position(('center', y)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.2)
             
             option_clips.extend([normal_before, dimmed_after])

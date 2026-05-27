@@ -15,6 +15,7 @@ from typing import List, Optional
 import json
 import uuid
 import shutil
+import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Boolean
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -51,6 +52,14 @@ class VideoJob(Base):
     completed_so_far = Column(Integer, default=0)
     zip_file_path = Column(String, nullable=True)
 
+class Feedback(Base):
+    __tablename__ = "feedbacks"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, index=True)
+    rating = Column(Integer)
+    comment = Column(String)
+    submitted_at = Column(String)
+
 Base.metadata.create_all(bind=engine)
 
 # Paths (Adjusted for root)
@@ -59,8 +68,10 @@ BG_DIR = os.path.join(BASE_DIR, "backgrounds")
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 FRONTEND_DIST = os.path.join(BASE_DIR, "frontend", "dist")
+TEMP_FOLDER = os.path.join(BASE_DIR, "temp")
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(TEMP_FOLDER, exist_ok=True)
 
 class QuestionRow(BaseModel):
     id: int
@@ -82,7 +93,15 @@ def get_categories():
 
 from video_generator import create_video_from_row
 
-def process_video_batch(session_id: str, questions: List[dict], category: str, logo_path: str = None, user_email: str = None):
+def process_video_batch(
+    session_id: str, 
+    questions: List[dict], 
+    category: str, 
+    logo_path: str = None, 
+    user_email: str = None,
+    box_color: str = None,
+    custom_bg_paths: List[str] = None
+):
     db = SessionLocal()
     job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
     
@@ -97,7 +116,7 @@ def process_video_batch(session_id: str, questions: List[dict], category: str, l
                 break
                 
             try:
-                output_file = create_video_from_row(row, category, logo_path, session_output_dir)
+                output_file = create_video_from_row(row, category, logo_path, session_output_dir, box_color, custom_bg_paths)
                 if output_file:
                     job.completed_so_far += 1
                     db.commit()
@@ -165,6 +184,16 @@ Keep growing your viral factory!
         job.zip_file_path = zip_path
         db.commit()
         db.close()
+        
+        # Clean custom backgrounds to free up storage
+        if custom_bg_paths:
+            for path in custom_bg_paths:
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                except Exception:
+                    pass
+                    
         if session_id in active_sessions:
             del active_sessions[session_id]
 
@@ -174,7 +203,9 @@ async def generate_bulk(
     questions: str = Form(...), 
     category: str = Form(...),
     logo: Optional[UploadFile] = File(None),
-    email: Optional[str] = Form(None)
+    email: Optional[str] = Form(None),
+    box_color: Optional[str] = Form(None),
+    custom_bg_videos: Optional[List[UploadFile]] = File(None)
 ):
     questions_list = json.loads(questions)
     
@@ -182,6 +213,16 @@ async def generate_bulk(
         raise HTTPException(status_code=400, detail="No questions provided")
         
     session_id = str(uuid.uuid4())
+    
+    # Save custom background videos locally
+    custom_bg_paths = []
+    if custom_bg_videos:
+        for bg_vid in custom_bg_videos:
+            if bg_vid.filename:
+                bg_path = os.path.join(TEMP_FOLDER, f"custom_bg_{session_id}_{uuid.uuid4().hex}_{bg_vid.filename}")
+                with open(bg_path, "wb") as f:
+                    f.write(await bg_vid.read())
+                custom_bg_paths.append(bg_path)
     
     logo_path = None
     if logo and logo.filename:
@@ -200,7 +241,16 @@ async def generate_bulk(
     db.close()
     
     active_sessions[session_id] = "run"
-    background_tasks.add_task(process_video_batch, session_id, questions_list, category, logo_path, email)
+    background_tasks.add_task(
+        process_video_batch, 
+        session_id, 
+        questions_list, 
+        category, 
+        logo_path, 
+        email, 
+        box_color, 
+        custom_bg_paths
+    )
     
     return {"session_id": session_id, "message": "Generation started"}
 
@@ -271,6 +321,46 @@ def test_email(email: str = Form(...)):
     except Exception as e:
         import traceback
         return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
+class FeedbackSchema(BaseModel):
+    email: str
+    rating: int
+    comment: str
+
+@app.post("/api/feedback")
+def submit_feedback(fb: FeedbackSchema):
+    db = SessionLocal()
+    new_fb = Feedback(
+        email=fb.email,
+        rating=fb.rating,
+        comment=fb.comment,
+        submitted_at=datetime.date.today().isoformat()
+    )
+    db.add(new_fb)
+    db.commit()
+    db.close()
+    return {"message": "Feedback submitted successfully"}
+
+@app.get("/api/admin/feedbacks")
+def get_feedbacks(email: str):
+    # Only allow the site owner
+    if email not in ["hamzaraeescarpet@gmail.com"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    db = SessionLocal()
+    fbs = db.query(Feedback).order_by(Feedback.id.desc()).all()
+    
+    # Format feedbacks for easy display
+    formatted = []
+    for item in fbs:
+        formatted.append({
+            "id": item.id,
+            "email": item.email,
+            "rating": item.rating,
+            "comment": item.comment,
+            "submitted_at": item.submitted_at
+        })
+    db.close()
+    return {"feedbacks": formatted}
 
 # Serve React Frontend (For Hugging Face Spaces & Production)
 if os.path.exists(FRONTEND_DIST):

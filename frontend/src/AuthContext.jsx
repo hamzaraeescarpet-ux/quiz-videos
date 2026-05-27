@@ -22,8 +22,18 @@ export function AuthProvider({ children }) {
           setIsPremium(true);
         } else {
           setIsPremium(false);
-          const savedCredits = localStorage.getItem(`credits_${user.uid}`);
-          setCredits(savedCredits !== null ? parseInt(savedCredits) : 5);
+          const todayStr = new Date().toLocaleDateString('en-US'); // e.g. "5/27/2026"
+          const savedDate = localStorage.getItem(`quota_date_${user.uid}`);
+          
+          if (savedDate !== todayStr) {
+            // Day changed! Reset daily credits to 5
+            localStorage.setItem(`quota_date_${user.uid}`, todayStr);
+            localStorage.setItem(`credits_${user.uid}`, 5);
+            setCredits(5);
+          } else {
+            const savedCredits = localStorage.getItem(`credits_${user.uid}`);
+            setCredits(savedCredits !== null ? parseInt(savedCredits) : 5);
+          }
         }
       } else {
         setIsPremium(false);
