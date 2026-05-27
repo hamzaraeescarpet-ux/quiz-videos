@@ -202,7 +202,7 @@ def create_video_from_row(row, category, custom_logo_path, output_dir):
             
             # Dimmed red card with semi-transparent White Border after reveal
             dimmed_after = create_rounded_text(
-                opt_text, fontsize=52, txt_color=(200, 200, 200), bg_color=(130, 20, 20, 100), font_path=font_to_use,
+                opt_text, fontsize=52, txt_color='#d0d0d0', bg_color=(130, 20, 20, 100), font_path=font_to_use,
                 size=(880, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 100), border_width=5
             ).set_position(('center', y)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.2)
             
