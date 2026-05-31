@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useDropzone } from 'react-dropzone';
-import { UploadCloud, Play, Square, Download, Trash2, Plus, Image as ImageIcon, FileText } from 'lucide-react';
+import { UploadCloud, Play, Square, Download, Trash2, Plus, Image as ImageIcon, FileText, MessageSquare, FileSpreadsheet, Zap, DollarSign } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
@@ -547,38 +547,67 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* How It Works Section */}
+      {/* How To Launch Your Viral Channel Section */}
       <section className="bg-dark-800 p-6 md:p-8 rounded-xl border border-dark-700 shadow-xl space-y-8 mt-12">
         <div className="text-center space-y-2">
-          <h2 className="text-2xl md:text-3xl font-extrabold text-white">How It Works 🚀</h2>
-          <p className="text-gray-400 text-sm md:text-base max-w-xl mx-auto">Create highly engaging vertical quiz short videos in 3 simple steps.</p>
+          <h2 className="text-2xl md:text-3xl font-extrabold text-white flex items-center justify-center gap-2">
+            🔄 How To Launch Your Viral Channel in 4 Simple Steps
+          </h2>
+          <p className="text-gray-400 text-sm md:text-base max-w-2xl mx-auto">
+            Our optimized ChatGPT-to-CSV workflow allows you to pump out high-retention short content at scale.
+          </p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-4">
+          {/* Step 1 */}
           <div className="bg-dark-900/60 p-6 rounded-xl border border-dark-700/60 flex flex-col justify-between hover:border-brand-500/50 transition-all relative overflow-hidden group">
             <span className="absolute right-4 top-4 text-4xl font-extrabold text-dark-800 select-none group-hover:text-brand-500/10 transition-colors">01</span>
             <div className="space-y-3 z-10">
-              <div className="w-10 h-10 rounded-lg bg-brand-500/10 border border-brand-500/25 flex items-center justify-center text-brand-400 text-lg">💡</div>
-              <h3 className="text-base font-bold text-gray-200">Step 1: Choose Your Niche</h3>
-              <p className="text-xs text-gray-400 leading-relaxed">Pick from high-retention categories like US Trivia, Mind Riddles, or Hollywood Quizzes.</p>
+              <div className="w-10 h-10 rounded-lg bg-brand-500/10 border border-brand-500/25 flex items-center justify-center text-brand-400">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] uppercase tracking-wider text-brand-400 font-bold">Step 1: 🤖 ChatGPT</span>
+              <h3 className="text-sm font-bold text-gray-200">Pick Your Niche & Prompt</h3>
+              <p className="text-xs text-gray-400 leading-relaxed">Go to ChatGPT, choose your favorite niche (like US Trivia, History, or Riddles), and ask it to generate unlimited quiz questions based on your topic.</p>
             </div>
           </div>
           
+          {/* Step 2 */}
           <div className="bg-dark-900/60 p-6 rounded-xl border border-dark-700/60 flex flex-col justify-between hover:border-brand-500/50 transition-all relative overflow-hidden group">
             <span className="absolute right-4 top-4 text-4xl font-extrabold text-dark-800 select-none group-hover:text-brand-500/10 transition-colors">02</span>
             <div className="space-y-3 z-10">
-              <div className="w-10 h-10 rounded-lg bg-brand-500/10 border border-brand-500/25 flex items-center justify-center text-brand-400 text-lg">🤖</div>
-              <h3 className="text-base font-bold text-gray-200">Step 2: Automate Content</h3>
-              <p className="text-xs text-gray-400 leading-relaxed">Our system automatically injects engaging visual progress bars, premium natural narration, and copyright-free backgrounds.</p>
+              <div className="w-10 h-10 rounded-lg bg-brand-500/10 border border-brand-500/25 flex items-center justify-center text-brand-400">
+                <FileSpreadsheet className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] uppercase tracking-wider text-brand-400 font-bold">Step 2: 📊 Spreadsheets</span>
+              <h3 className="text-sm font-bold text-gray-200">Create & Download CSV</h3>
+              <p className="text-xs text-gray-400 leading-relaxed">Organize those ChatGPT responses into a simple spreadsheet and download it as a .csv file. No manual typing or complex formatting needed.</p>
             </div>
           </div>
           
+          {/* Step 3 */}
           <div className="bg-dark-900/60 p-6 rounded-xl border border-dark-700/60 flex flex-col justify-between hover:border-brand-500/50 transition-all relative overflow-hidden group">
             <span className="absolute right-4 top-4 text-4xl font-extrabold text-dark-800 select-none group-hover:text-brand-500/10 transition-colors">03</span>
             <div className="space-y-3 z-10">
-              <div className="w-10 h-10 rounded-lg bg-brand-500/10 border border-brand-500/25 flex items-center justify-center text-brand-400 text-lg">⚡</div>
-              <h3 className="text-base font-bold text-gray-200">Step 3: 1-Click Export</h3>
-              <p className="text-xs text-gray-400 leading-relaxed">Generate up to 100+ highly viral vertical quiz videos per day instantly to dominate your feed.</p>
+              <div className="w-10 h-10 rounded-lg bg-brand-500/10 border border-brand-500/25 flex items-center justify-center text-brand-400">
+                <Zap className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] uppercase tracking-wider text-brand-400 font-bold">Step 3: 🚀 Bulk Render</span>
+              <h3 className="text-sm font-bold text-gray-200">1-Click Bulk Generation</h3>
+              <p className="text-xs text-gray-400 leading-relaxed">Upload your CSV file to QuizViral AI. Our system instantly auto-injects premium narration, dynamic progress bars, and high-retention backgrounds to render 100+ vertical videos at once.</p>
+            </div>
+          </div>
+          
+          {/* Step 4 */}
+          <div className="bg-dark-900/60 p-6 rounded-xl border border-dark-700/60 flex flex-col justify-between hover:border-brand-500/50 transition-all relative overflow-hidden group">
+            <span className="absolute right-4 top-4 text-4xl font-extrabold text-dark-800 select-none group-hover:text-brand-500/10 transition-colors">04</span>
+            <div className="space-y-3 z-10">
+              <div className="w-10 h-10 rounded-lg bg-brand-500/10 border border-brand-500/25 flex items-center justify-center text-brand-400">
+                <DollarSign className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] uppercase tracking-wider text-brand-400 font-bold">Step 4: 💰 Post & Earn</span>
+              <h3 className="text-sm font-bold text-gray-200">Schedule, Dominate & Earn</h3>
+              <p className="text-xs text-gray-400 leading-relaxed">Post these high-retention 9:16 videos on Facebook Reels, YouTube Shorts, and Instagram. Sit back and unlock massive passive income via the Facebook Performance Bonus and monetization programs!</p>
             </div>
           </div>
         </div>
