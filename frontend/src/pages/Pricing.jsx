@@ -13,8 +13,8 @@ export default function Pricing() {
     script.onload = () => {
       if (window.Paddle) {
         window.Paddle.Initialize({ 
-          seller: 348907,
-          environment: 'production' // Set to production as requested
+          token: 'live_56eeba45e39e5067a60984c4aa6', // Set the secure public client token
+          environment: 'production'
         });
       }
     };
