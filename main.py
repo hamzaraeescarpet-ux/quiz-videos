@@ -182,6 +182,13 @@ Keep growing your viral factory!
         zip_path = os.path.join(OUTPUT_DIR, f"{session_id}.zip")
         shutil.make_archive(zip_path.replace('.zip', ''), 'zip', session_output_dir)
         job.zip_file_path = zip_path
+        
+        # Update user's generated videos count in SQLite
+        if user_email and job.completed_so_far > 0:
+            user_rec = db.query(User).filter(User.username == user_email).first()
+            if user_rec:
+                user_rec.videos_generated_count += job.completed_so_far
+                
         db.commit()
         db.close()
         
@@ -361,6 +368,48 @@ def get_feedbacks(email: str):
         })
     db.close()
     return {"feedbacks": formatted}
+
+class UserRegisterSchema(BaseModel):
+    email: str
+
+@app.post("/api/register-user")
+def register_user(user: UserRegisterSchema):
+    db = SessionLocal()
+    db_user = db.query(User).filter(User.username == user.email).first()
+    if not db_user:
+        # Check if they are premium
+        is_prem = user.email in ["hamzaraeescarpet@gmail.com"]
+        db_user = User(
+            username=user.email,
+            videos_generated_count=0,
+            is_premium=is_prem
+        )
+        db.add(db_user)
+        db.commit()
+    db.close()
+    return {"message": "User registered successfully"}
+
+@app.get("/api/admin/users")
+def get_users(email: str):
+    if email not in ["hamzaraeescarpet@gmail.com"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    db = SessionLocal()
+    users = db.query(User).order_by(User.id.desc()).all()
+    formatted = []
+    for u in users:
+        # Extra safety check for premium status
+        is_prem = u.username in ["hamzaraeescarpet@gmail.com"]
+        if is_prem != u.is_premium:
+            u.is_premium = is_prem
+            db.commit()
+        formatted.append({
+            "id": u.id,
+            "email": u.username,
+            "videos_count": u.videos_generated_count,
+            "is_premium": u.is_premium
+        })
+    db.close()
+    return {"users": formatted}
 
 # Serve React Frontend (For Hugging Face Spaces & Production)
 if os.path.exists(FRONTEND_DIST):

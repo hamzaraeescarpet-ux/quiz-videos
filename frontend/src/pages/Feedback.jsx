@@ -1,25 +1,35 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../AuthContext';
-import { MessageSquare, Star, Send, Trash2, Calendar, Mail, AlertTriangle } from 'lucide-react';
+import { MessageSquare, Star, Send, Trash2, Calendar, Mail, AlertTriangle, Users, Download, Copy, Check } from 'lucide-react';
 
 export default function Feedback() {
-  const { currentUser, isPremium } = useAuth();
+  const { currentUser } = useAuth();
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Admin feedbacks state
+  // Admin states
   const [feedbacks, setFeedbacks] = useState([]);
+  const [registeredUsers, setRegisteredUsers] = useState([]);
+  const [activeTab, setActiveTab] = useState('feedbacks'); // 'feedbacks' or 'emails'
+  const [copied, setCopied] = useState(false);
+
   const isAdmin = currentUser && currentUser.email === 'hamzaraeescarpet@gmail.com';
 
   useEffect(() => {
     if (isAdmin) {
+      // Fetch feedbacks
       axios.get(`/api/admin/feedbacks?email=${currentUser.email}`)
         .then(res => setFeedbacks(res.data.feedbacks || []))
         .catch(err => console.error("Error loading feedbacks", err));
+
+      // Fetch registered marketing emails
+      axios.get(`/api/admin/users?email=${currentUser.email}`)
+        .then(res => setRegisteredUsers(res.data.users || []))
+        .catch(err => console.error("Error loading users", err));
     }
   }, [isAdmin, currentUser]);
 
@@ -46,7 +56,6 @@ export default function Feedback() {
       setComment('');
       setRating(5);
       
-      // If admin submitted feedback, refresh list
       if (isAdmin) {
         const res = await axios.get(`/api/admin/feedbacks?email=${currentUser.email}`);
         setFeedbacks(res.data.feedbacks || []);
@@ -57,6 +66,29 @@ export default function Feedback() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Copy all emails helper
+  const copyAllEmails = () => {
+    const emailList = registeredUsers.map(u => u.email).join(', ');
+    navigator.clipboard.writeText(emailList);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // Download CSV helper
+  const downloadCSV = () => {
+    const headers = 'ID,Email,Videos Generated,Is Premium\n';
+    const csvContent = registeredUsers.map(u => `${u.id},${u.email},${u.videos_count},${u.is_premium}`).join('\n');
+    const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'quizviral_users_marketing.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -139,46 +171,116 @@ export default function Feedback() {
           )}
         </section>
 
-        {/* Administrator Feedbacks Board (Visible only to hamzaraeescarpet@gmail.com) */}
+        {/* Administrator Dashboard Board (Visible only to hamzaraeescarpet@gmail.com) */}
         {isAdmin && (
           <section className="bg-dark-800 p-6 md:p-8 rounded-2xl border border-dark-700 shadow-xl space-y-6">
-            <div className="flex justify-between items-center border-b border-dark-700 pb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-dark-700 pb-4 gap-4">
               <h2 className="text-xl font-extrabold text-brand-300 flex items-center gap-2">
-                👑 Admin Feedback Dashboard
+                👑 Admin Management Board
               </h2>
-              <span className="bg-brand-500/20 text-brand-400 text-xs font-bold px-2.5 py-1 rounded-full">
-                {feedbacks.length} Submissions
-              </span>
+              
+              {/* Tab Selector */}
+              <div className="flex bg-dark-900 p-1 rounded-lg border border-dark-700">
+                <button
+                  onClick={() => setActiveTab('feedbacks')}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'feedbacks' ? 'bg-brand-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                >
+                  Feedbacks ({feedbacks.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('emails')}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'emails' ? 'bg-brand-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                >
+                  Marketing Emails ({registeredUsers.length})
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-              {feedbacks.length > 0 ? feedbacks.map((item) => (
-                <div key={item.id} className="bg-dark-900/50 p-4 rounded-xl border border-dark-700 space-y-3 relative hover:border-dark-600 transition-all">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-brand-400" />
-                      <span className="text-sm font-bold text-gray-200 break-all">{item.email}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-400">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {item.submitted_at}
+            {/* TAB 1: USER FEEDBACKS */}
+            {activeTab === 'feedbacks' && (
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                {feedbacks.length > 0 ? feedbacks.map((item) => (
+                  <div key={item.id} className="bg-dark-900/50 p-4 rounded-xl border border-dark-700 space-y-3 relative hover:border-dark-600 transition-all">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-brand-400" />
+                        <span className="text-sm font-bold text-gray-200 break-all">{item.email}</span>
                       </div>
-                      <div className="flex items-center">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star key={star} className={`w-3.5 h-3.5 ${item.rating >= star ? 'text-yellow-500 fill-current' : 'text-gray-700'}`} />
-                        ))}
+                      <div className="flex items-center gap-3 text-xs text-gray-400">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {item.submitted_at}
+                        </div>
+                        <div className="flex items-center">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star key={star} className={`w-3.5 h-3.5 ${item.rating >= star ? 'text-yellow-500 fill-current' : 'text-gray-700'}`} />
+                          ))}
+                        </div>
                       </div>
                     </div>
+                    <p className="text-gray-300 text-sm bg-dark-950 p-3 rounded-lg border border-dark-800 leading-relaxed break-words whitespace-pre-wrap">
+                      {item.comment}
+                    </p>
                   </div>
-                  <p className="text-gray-300 text-sm bg-dark-950 p-3 rounded-lg border border-dark-800 leading-relaxed break-words whitespace-pre-wrap">
-                    {item.comment}
-                  </p>
+                )) : (
+                  <p className="text-gray-500 text-sm text-center py-6">No feedbacks submitted yet.</p>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: REGISTERED EMAILS (MARKETING) */}
+            {activeTab === 'emails' && (
+              <div className="space-y-6">
+                {/* Actions Toolbar */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={copyAllEmails}
+                    className="bg-dark-700 hover:bg-dark-600 text-white font-bold text-xs px-4 py-2.5 rounded-lg border border-dark-600 flex items-center gap-2 transition-all"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 text-brand-400" />}
+                    {copied ? 'Copied to Clipboard!' : 'Copy All Emails'}
+                  </button>
+                  <button
+                    onClick={downloadCSV}
+                    className="bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-md shadow-brand-500/10"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Download Users CSV
+                  </button>
                 </div>
-              )) : (
-                <p className="text-gray-500 text-sm text-center py-6">No feedbacks submitted yet.</p>
-              )}
-            </div>
+
+                {/* Table Grid */}
+                <div className="overflow-x-auto rounded-lg border border-dark-700 max-h-[400px] overflow-y-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs uppercase bg-dark-900 text-gray-300 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3">ID</th>
+                        <th className="px-4 py-3">Email Address</th>
+                        <th className="px-4 py-3 text-center">Videos Made</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dark-700/60 bg-dark-950/40">
+                      {registeredUsers.length > 0 ? registeredUsers.map((user) => (
+                        <tr key={user.id} className="hover:bg-dark-900/30 transition-colors">
+                          <td className="px-4 py-3 font-mono text-xs text-gray-500">#{user.id}</td>
+                          <td className="px-4 py-3 font-medium text-gray-200">{user.email}</td>
+                          <td className="px-4 py-3 text-center text-brand-400 font-bold font-mono">{user.videos_count}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${user.is_premium ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-700/20 text-gray-400'}`}>
+                              {user.is_premium ? 'Premium' : 'Free'}
+                            </span>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan="4" className="px-4 py-8 text-center text-gray-500 text-sm">No registered users collected yet.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </section>
         )}
       </div>

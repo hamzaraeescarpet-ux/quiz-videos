@@ -5,6 +5,8 @@ import Pricing from './pages/Pricing';
 import Feedback from './pages/Feedback';
 import AboutUs from './pages/AboutUs';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import RefundPolicy from './pages/RefundPolicy';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import { AuthProvider } from './AuthContext';
@@ -23,6 +25,8 @@ function App() {
               <Route path="/feedback" element={<Feedback />} />
               <Route path="/about" element={<AboutUs />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/refunds" element={<RefundPolicy />} />
             </Routes>
           </main>
           <Footer />

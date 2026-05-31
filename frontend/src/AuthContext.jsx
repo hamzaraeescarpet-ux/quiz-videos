@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { auth, signInWithGoogle, logOut } from './firebase';
+import axios from 'axios';
 
 const AuthContext = createContext();
 
@@ -18,15 +19,31 @@ export function AuthProvider({ children }) {
     const unsubscribe = auth.onAuthStateChanged(user => {
       setCurrentUser(user);
       if (user) {
+        // Register user email in database for marketing analytics
+        axios.post('/api/hf/register-user', { email: user.email })
+          .catch(err => console.error("Error registering user", err));
+
         if (PREMIUM_USERS_LIST.includes(user.email)) {
           setIsPremium(true);
-        } else {
-          setIsPremium(false);
-          const todayStr = new Date().toLocaleDateString('en-US'); // e.g. "5/27/2026"
+          const todayStr = new Date().toLocaleDateString('en-US'); // e.g. "5/28/2026"
           const savedDate = localStorage.getItem(`quota_date_${user.uid}`);
           
           if (savedDate !== todayStr) {
-            // Day changed! Reset daily credits to 5
+            // Day changed! Reset daily premium credits to 100
+            localStorage.setItem(`quota_date_${user.uid}`, todayStr);
+            localStorage.setItem(`credits_${user.uid}`, 100);
+            setCredits(100);
+          } else {
+            const savedCredits = localStorage.getItem(`credits_${user.uid}`);
+            setCredits(savedCredits !== null ? parseInt(savedCredits) : 100);
+          }
+        } else {
+          setIsPremium(false);
+          const todayStr = new Date().toLocaleDateString('en-US'); // e.g. "5/28/2026"
+          const savedDate = localStorage.getItem(`quota_date_${user.uid}`);
+          
+          if (savedDate !== todayStr) {
+            // Day changed! Reset daily free credits to 5
             localStorage.setItem(`quota_date_${user.uid}`, todayStr);
             localStorage.setItem(`credits_${user.uid}`, 5);
             setCredits(5);
@@ -45,7 +62,6 @@ export function AuthProvider({ children }) {
   }, []);
 
   const consumeCredits = (amount) => {
-    if (isPremium) return true;
     if (credits >= amount) {
       const newCredits = credits - amount;
       setCredits(newCredits);
