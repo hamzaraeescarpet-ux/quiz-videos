@@ -37,10 +37,10 @@ export default function Navbar() {
                   key={link.path}
                   to={link.path}
                   className={clsx(
-                    'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200',
+                    'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-all duration-200 border',
                     isActive 
-                      ? 'bg-brand-900/50 text-brand-400' 
-                      : 'text-gray-300 hover:bg-dark-700 hover:text-white'
+                      ? 'bg-brand-100 dark:bg-brand-900/50 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-800/40 shadow-sm' 
+                      : 'text-gray-600 dark:text-gray-300 border-transparent hover:bg-gray-100 dark:hover:bg-dark-700 hover:text-gray-900 dark:hover:text-white'
                   )}
                 >
                   <Icon className="w-4 h-4" />
@@ -51,13 +51,13 @@ export default function Navbar() {
             
             {/* Desktop Auth Buttons */}
             {currentUser ? (
-              <div className="flex items-center gap-3 ml-4 border-l border-dark-600 pl-4">
-                <span className="text-sm text-gray-300 font-medium truncate max-w-[150px]">
+              <div className="flex items-center gap-3 ml-4 border-l border-gray-200 dark:border-dark-600 pl-4">
+                <span className="text-sm text-gray-600 dark:text-gray-300 font-medium truncate max-w-[150px]">
                   {currentUser.email}
                 </span>
                 <button 
                   onClick={logout}
-                  className="bg-dark-700 hover:bg-red-500/20 hover:text-red-400 text-gray-300 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
+                  className="bg-gray-100 dark:bg-dark-700 hover:bg-red-500/10 hover:text-red-600 dark:hover:bg-red-500/20 dark:hover:text-red-400 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
                 >
                   Sign Out
                 </button>
@@ -76,7 +76,7 @@ export default function Navbar() {
           <div className="md:hidden flex items-center">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 rounded-md p-2"
+              className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 rounded-md p-2"
             >
               {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -86,7 +86,7 @@ export default function Navbar() {
 
       {/* Mobile Menu */}
       {isOpen && (
-        <div className="md:hidden bg-dark-800 border-t border-dark-700">
+        <div className="md:hidden bg-white dark:bg-dark-800 border-t border-gray-200 dark:border-dark-700">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             {navLinks.map((link) => {
               const Icon = link.icon;
@@ -97,10 +97,10 @@ export default function Navbar() {
                   to={link.path}
                   onClick={() => setIsOpen(false)}
                   className={clsx(
-                    'flex items-center gap-2 px-3 py-3 rounded-md text-base font-medium transition-all duration-200',
+                    'flex items-center gap-2 px-3 py-3 rounded-md text-base font-semibold transition-all duration-200 border',
                     isActive 
-                      ? 'bg-brand-900/50 text-brand-400' 
-                      : 'text-gray-300 hover:bg-dark-700 hover:text-white'
+                      ? 'bg-brand-100 dark:bg-brand-900/50 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-800/40 shadow-sm' 
+                      : 'text-gray-600 dark:text-gray-300 border-transparent hover:bg-gray-100 dark:hover:bg-dark-700 hover:text-gray-900 dark:hover:text-white'
                   )}
                 >
                   <Icon className="w-5 h-5" />
@@ -110,13 +110,13 @@ export default function Navbar() {
             })}
             
             {/* Mobile Auth Buttons */}
-            <div className="border-t border-dark-700 pt-4 pb-2 mt-4 px-3">
+            <div className="border-t border-gray-200 dark:border-dark-700 pt-4 pb-2 mt-4 px-3">
               {currentUser ? (
                 <div className="flex flex-col gap-3">
-                  <span className="text-sm text-gray-400">Signed in as {currentUser.email}</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Signed in as {currentUser.email}</span>
                   <button 
                     onClick={() => { logout(); setIsOpen(false); }}
-                    className="w-full bg-dark-700 text-left text-red-400 px-3 py-2 rounded-md font-medium"
+                    className="w-full bg-gray-100 dark:bg-dark-700 text-left text-red-500 dark:text-red-400 px-3 py-2 rounded-md font-medium"
                   >
                     Sign Out
                   </button>

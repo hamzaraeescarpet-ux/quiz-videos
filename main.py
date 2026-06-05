@@ -51,6 +51,7 @@ class VideoJob(Base):
     total_expected = Column(Integer, default=0)
     completed_so_far = Column(Integer, default=0)
     zip_file_path = Column(String, nullable=True)
+    user_email = Column(String, nullable=True)
 
 class Feedback(Base):
     __tablename__ = "feedbacks"
@@ -69,9 +70,62 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 FRONTEND_DIST = os.path.join(BASE_DIR, "frontend", "dist")
 TEMP_FOLDER = os.path.join(BASE_DIR, "temp")
+BG_CACHE_DIR = os.path.join(BASE_DIR, "backgrounds_cache")
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(TEMP_FOLDER, exist_ok=True)
+os.makedirs(BG_CACHE_DIR, exist_ok=True)
+
+import time
+import urllib.request
+import urllib.parse
+import hashlib
+import json
+
+def download_and_cache_video(url: str) -> str:
+    # Generate a unique stable filename from the URL hash
+    url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
+    parsed = urllib.parse.urlparse(url)
+    ext = os.path.splitext(parsed.path)[1]
+    if not ext:
+        ext = ".mp4"
+    filename = f"bg_{url_hash}{ext}"
+    local_path = os.path.join(BG_CACHE_DIR, filename)
+    
+    if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+        return local_path
+        
+    print(f"Downloading background video: {url} -> {local_path}", flush=True)
+    try:
+        urllib.request.urlretrieve(url, local_path)
+        return local_path
+    except Exception as e:
+        print(f"Error downloading background video {url}: {e}", flush=True)
+        return None
+
+def cleanup_old_zip_files():
+    """Delete any zip files in the output directory that are older than 24 hours."""
+    try:
+        now = time.time()
+        for filename in os.listdir(OUTPUT_DIR):
+            if filename.endswith(".zip"):
+                filepath = os.path.join(OUTPUT_DIR, filename)
+                file_age = now - os.path.getmtime(filepath)
+                if file_age > 86400: # 24 hours in seconds
+                    print(f"AUTOMATION: Cleaning up old zip file: {filepath}", flush=True)
+                    try:
+                        os.remove(filepath)
+                    except Exception:
+                        pass
+                    # Also delete the folder directory of that session if it exists
+                    session_dir = os.path.join(OUTPUT_DIR, filename.replace(".zip", ""))
+                    if os.path.exists(session_dir) and os.path.isdir(session_dir):
+                        try:
+                            shutil.rmtree(session_dir)
+                        except Exception:
+                            pass
+    except Exception as e:
+        print(f"Error during zip file cleanup: {e}", flush=True)
 
 class QuestionRow(BaseModel):
     id: int
@@ -86,6 +140,15 @@ active_sessions = {}
 
 @app.get("/api/categories")
 def get_categories():
+    config_path = os.path.join(BASE_DIR, "backgrounds_config.json")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                data = json.load(f)
+            return {"categories": list(data.keys())}
+        except Exception as e:
+            print(f"Error loading backgrounds_config.json: {e}", flush=True)
+
     if not os.path.exists(BG_DIR):
         return {"categories": []}
     categories = [d for d in os.listdir(BG_DIR) if os.path.isdir(os.path.join(BG_DIR, d))]
@@ -108,6 +171,24 @@ def process_video_batch(
     session_output_dir = os.path.join(OUTPUT_DIR, session_id)
     os.makedirs(session_output_dir, exist_ok=True)
     
+    import random
+    PREMIUM_COLORS = [
+        "#E74C3C", "#3498DB", "#2C3E50", "#8E44AD", "#16A085", 
+        "#27AE60", "#D35400", "#C0392B", "#2980B9", "#130f40", 
+        "#6F1E51", "#1B1464", "#0652DD", "#833471", "#6D213C", "#1E3799"
+    ]
+    
+    # Load backgrounds_config.json URLs for this category
+    config_path = os.path.join(BASE_DIR, "backgrounds_config.json")
+    bg_urls = []
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                config_data = json.load(f)
+            bg_urls = config_data.get(category, [])
+        except Exception as e:
+            print(f"Error loading background config inside batch: {e}", flush=True)
+            
     try:
         for idx, row in enumerate(questions):
             if session_id in active_sessions and active_sessions[session_id] == "stop":
@@ -115,8 +196,20 @@ def process_video_batch(
                 db.commit()
                 break
                 
+            # Pick background video: either custom uploads or cache from category config URLs
+            row_bg_paths = None
+            if custom_bg_paths and len(custom_bg_paths) > 0:
+                row_bg_paths = custom_bg_paths
+            elif bg_urls:
+                random_url = random.choice(bg_urls)
+                local_bg_file = download_and_cache_video(random_url)
+                if local_bg_file:
+                    row_bg_paths = [local_bg_file]
+
+            # Randomly select a high-contrast theme color for each individual video
+            selected_color = random.choice(PREMIUM_COLORS)
             try:
-                output_file = create_video_from_row(row, category, logo_path, session_output_dir, box_color, custom_bg_paths)
+                output_file = create_video_from_row(row, category, logo_path, session_output_dir, selected_color, row_bg_paths)
                 if output_file:
                     job.completed_so_far += 1
                     db.commit()
@@ -219,6 +312,9 @@ async def generate_bulk(
     if len(questions_list) == 0:
         raise HTTPException(status_code=400, detail="No questions provided")
         
+    # Run automatic clean-up of expired download zips (> 24 hours) in backgrounds
+    background_tasks.add_task(cleanup_old_zip_files)
+
     session_id = str(uuid.uuid4())
     
     # Save custom background videos locally
@@ -241,7 +337,8 @@ async def generate_bulk(
     new_job = VideoJob(
         session_id=session_id,
         total_expected=len(questions_list),
-        status="Processing"
+        status="Processing",
+        user_email=email
     )
     db.add(new_job)
     db.commit()
@@ -292,6 +389,19 @@ def download_zip(session_id: str):
         raise HTTPException(status_code=404, detail="ZIP file not ready or found")
         
     return FileResponse(job.zip_file_path, media_type="application/zip", filename=f"QuizViral_Videos_{session_id}.zip")
+
+@app.get("/api/jobs")
+def get_user_jobs(email: str):
+    db = SessionLocal()
+    jobs = db.query(VideoJob).filter(VideoJob.user_email == email).order_by(VideoJob.id.desc()).all()
+    job_list = [{
+        "session_id": j.session_id,
+        "status": j.status,
+        "completed_so_far": j.completed_so_far,
+        "total_expected": j.total_expected
+    } for j in jobs]
+    db.close()
+    return {"jobs": job_list}
 
 @app.get("/api/logs")
 def get_logs():

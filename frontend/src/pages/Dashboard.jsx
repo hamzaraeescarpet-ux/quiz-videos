@@ -268,41 +268,26 @@ export default function Dashboard() {
       </header>
 
       {/* Step 1: Category Dropdown & Custom Videos area */}
-      <section className="bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 shadow-xl relative z-20">
+      <section className="bg-white dark:bg-dark-800 p-4 md:p-6 rounded-xl border border-gray-200 dark:border-dark-700 shadow-xl relative z-20">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
           <h2 className="text-lg md:text-xl font-semibold text-brand-300">1. Choose Template Category</h2>
-          
-          {/* Account Status Card to make daily quota limit visually clear */}
-          {currentUser && (
-            <div className="bg-dark-900 px-3 py-1.5 rounded-lg border border-dark-700 flex items-center gap-2 text-xs">
-              <span className="text-gray-400 font-medium">Account Status:</span>
-              <span className={`font-bold ${isPremium ? 'text-amber-400 flex items-center gap-1' : 'text-brand-400'}`}>
-                {isPremium ? '👑 Premium' : '🌟 Free Plan'}
-              </span>
-              <span className="text-dark-500">|</span>
-              <span className="text-gray-400">Daily Quota:</span>
-              <span className="text-white font-mono font-bold bg-dark-800 px-1.5 py-0.5 rounded border border-dark-600">
-                {credits} / {isPremium ? 100 : 5} Left
-              </span>
-            </div>
-          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           <div className="relative w-full">
             <button
               onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-              className="w-full bg-dark-900 border border-dark-600 hover:border-brand-500 text-white px-4 py-3 rounded-lg flex items-center justify-between transition-all"
+              className="w-full bg-white dark:bg-dark-900 border border-gray-300 dark:border-dark-600 hover:border-brand-500 text-gray-800 dark:text-white px-4 py-3 rounded-lg flex items-center justify-between transition-all shadow-sm"
             >
               <div className="flex items-center gap-3">
                 <span className="text-xl">{getCategoryIcon(selectedCategory)}</span>
-                <span className="font-medium">{selectedCategory || "Select Category"}</span>
+                <span className="font-semibold">{selectedCategory || "Select Category"}</span>
               </div>
               <svg className={`w-5 h-5 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
             </button>
 
             {isCategoryDropdownOpen && (
-              <div className="absolute top-full left-0 mt-2 w-full bg-dark-800 border border-dark-600 rounded-lg shadow-2xl overflow-hidden z-50">
+              <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-600 rounded-lg shadow-2xl overflow-hidden z-50">
                 {categories.length > 0 ? categories.map(cat => (
                   <button
                     key={cat}
@@ -310,10 +295,10 @@ export default function Dashboard() {
                       setSelectedCategory(cat);
                       setIsCategoryDropdownOpen(false);
                     }}
-                    className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-dark-700 transition-colors ${selectedCategory === cat ? 'bg-brand-900/30 border-l-2 border-brand-500' : ''}`}
+                    className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-dark-700 text-gray-700 dark:text-gray-200 transition-colors ${selectedCategory === cat ? 'bg-brand-100 dark:bg-brand-900/30 border-l-2 border-brand-500' : ''}`}
                   >
                     <span className="text-xl">{getCategoryIcon(cat)}</span>
-                    <span className="font-medium text-gray-200">{cat}</span>
+                    <span className="font-semibold">{cat}</span>
                   </button>
                 )) : (
                   <div className="px-4 py-3 text-gray-500 text-sm">No categories found.</div>
@@ -358,61 +343,25 @@ export default function Dashboard() {
       </section>
 
       {/* Step 2: Data & Media */}
-      <section className="bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 shadow-xl space-y-6 md:space-y-8 relative z-10">
+      <section className="bg-white dark:bg-dark-800 p-4 md:p-6 rounded-xl border border-gray-200 dark:border-dark-700 shadow-xl space-y-6 md:space-y-8 relative z-10">
         <h2 className="text-lg md:text-xl font-semibold text-brand-300">2. Input Data & Branding</h2>
         
         {/* Branding & Visual Customizations */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="w-full">
           {/* Custom Logo */}
           <div className="w-full">
-            <label className="block text-sm font-semibold text-gray-300 mb-2">Upload Custom Logo (Optional)</label>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Upload Custom Logo (Optional)</label>
             <div 
               {...getLogoProps()} 
-              className="border-2 border-dashed border-dark-600 rounded-xl p-4 text-center cursor-pointer hover:border-brand-500 transition-colors bg-dark-900/50 flex flex-col items-center justify-center h-[120px]"
+              className="border-2 border-dashed border-gray-300 dark:border-dark-600 rounded-xl p-4 text-center cursor-pointer hover:border-brand-500 transition-colors bg-gray-50 dark:bg-dark-900/50 flex flex-col items-center justify-center h-[120px]"
             >
               <input {...getLogoInputProps()} />
               <ImageIcon className="mx-auto h-6 w-6 text-gray-400 mb-2" />
               {logoFile ? (
-                <p className="text-brand-400 font-bold text-xs break-all">Selected: {logoFile.name}</p>
+                <p className="text-brand-600 dark:text-brand-400 font-bold text-xs break-all">Selected: {logoFile.name}</p>
               ) : (
                 <p className="text-gray-400 text-xs font-medium">Tap or drag a custom logo here</p>
               )}
-            </div>
-          </div>
-
-          {/* Elegant Rainbow Color Picker Panel (Single Rainbow Button for Desktop & Mobile) */}
-          <div className="bg-dark-900/60 p-4 rounded-xl border border-dark-700/80 shadow-md flex flex-col justify-center">
-            <label className="block text-sm font-semibold text-gray-200 mb-3">Choose Video Text Box Theme Color</label>
-            <div className="flex items-center gap-4">
-              {/* Single multi-color rainbow circle button */}
-              <div 
-                className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-white cursor-pointer shadow-lg hover:scale-110 active:scale-95 transition-all flex items-center justify-center"
-                style={{ background: 'conic-gradient(from 0deg, red, yellow, green, cyan, blue, magenta, red)' }}
-                title="Tap to select custom color"
-              >
-                <input
-                  type="color"
-                  value={boxColor}
-                  onChange={(e) => setBoxColor(e.target.value)}
-                  className="absolute inset-0 w-full h-full cursor-pointer opacity-0"
-                />
-                {/* Small inner dot showing currently selected color for feedback */}
-                <div 
-                  style={{ backgroundColor: boxColor }}
-                  className="w-6 h-6 rounded-full border-2 border-white pointer-events-none shadow"
-                />
-              </div>
-              
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-gray-400 font-semibold uppercase">Selected Theme Color</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-mono text-gray-200 font-bold bg-dark-800 px-3 py-1.5 rounded-lg border border-dark-600 uppercase tracking-wider">{boxColor}</span>
-                  <div 
-                    style={{ backgroundColor: boxColor }}
-                    className="w-5 h-5 rounded border border-dark-600 shadow"
-                  />
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -420,9 +369,9 @@ export default function Dashboard() {
         {/* Data Table */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h3 className="font-medium text-gray-200">Questions Data</h3>
+            <h3 className="font-medium text-gray-700 dark:text-gray-200">Questions Data</h3>
             <div className="flex w-full sm:w-auto items-center gap-3">
-              <label className="flex-1 sm:flex-none cursor-pointer bg-dark-700 hover:bg-dark-600 text-white px-3 py-2 md:py-1.5 rounded-md text-sm md:text-sm transition-colors flex items-center justify-center gap-2">
+              <label className="flex-1 sm:flex-none cursor-pointer bg-gray-100 hover:bg-gray-200 dark:bg-dark-700 dark:hover:bg-dark-600 text-gray-700 dark:text-white px-3 py-2 md:py-1.5 rounded-md text-sm md:text-sm transition-colors border border-gray-200 dark:border-dark-600 flex items-center justify-center gap-2">
                 <FileText className="w-4 h-4" />
                 Upload CSV
                 <input type="file" accept=".csv, text/csv" className="hidden" onChange={handleFileUpload} />
@@ -433,9 +382,9 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <div className="overflow-x-auto rounded-lg border border-dark-600 shadow-sm w-full touch-pan-x">
+          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-dark-600 shadow-sm w-full touch-pan-x">
             <table className="w-full text-sm text-left min-w-[800px]">
-              <thead className="text-xs text-gray-300 uppercase bg-dark-900">
+              <thead className="text-xs text-gray-600 dark:text-gray-300 uppercase bg-gray-100 dark:bg-dark-900">
                 <tr>
                   <th className="px-3 py-3 w-[20%]">Question</th>
                   <th className="px-3 py-3 w-[14%]">Opt A</th>
@@ -448,13 +397,13 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {rows.map((row, idx) => (
-                  <tr key={row.id} className="bg-dark-800 border-b border-dark-700 hover:bg-dark-700/50">
-                    <td className="p-2"><input className="w-full bg-dark-900 border border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-500" placeholder="Question..." value={row.question} onChange={e => handleRowChange(idx, 'question', e.target.value)} /></td>
-                    <td className="p-2"><input className="w-full bg-dark-900 border border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-500" placeholder="Option A" value={row.option1} onChange={e => handleRowChange(idx, 'option1', e.target.value)} /></td>
-                    <td className="p-2"><input className="w-full bg-dark-900 border border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-500" placeholder="Option B" value={row.option2} onChange={e => handleRowChange(idx, 'option2', e.target.value)} /></td>
-                    <td className="p-2"><input className="w-full bg-dark-900 border border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-500" placeholder="Option C" value={row.option3} onChange={e => handleRowChange(idx, 'option3', e.target.value)} /></td>
-                    <td className="p-2"><input className="w-full bg-dark-900 border border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-500" placeholder="Option D" value={row.option4} onChange={e => handleRowChange(idx, 'option4', e.target.value)} /></td>
-                    <td className="p-2"><input className="w-full bg-dark-900 border border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-500" placeholder="Correct Answer" value={row.answer} onChange={e => handleRowChange(idx, 'answer', e.target.value)} /></td>
+                  <tr key={row.id} className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 hover:bg-gray-50 dark:hover:bg-dark-700/50">
+                    <td className="p-2"><input className="w-full bg-white dark:bg-dark-900 border border-gray-300 dark:border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100" placeholder="Question..." value={row.question} onChange={e => handleRowChange(idx, 'question', e.target.value)} /></td>
+                    <td className="p-2"><input className="w-full bg-white dark:bg-dark-900 border border-gray-300 dark:border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100" placeholder="Option A" value={row.option1} onChange={e => handleRowChange(idx, 'option1', e.target.value)} /></td>
+                    <td className="p-2"><input className="w-full bg-white dark:bg-dark-900 border border-gray-300 dark:border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100" placeholder="Option B" value={row.option2} onChange={e => handleRowChange(idx, 'option2', e.target.value)} /></td>
+                    <td className="p-2"><input className="w-full bg-white dark:bg-dark-900 border border-gray-300 dark:border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100" placeholder="Option C" value={row.option3} onChange={e => handleRowChange(idx, 'option3', e.target.value)} /></td>
+                    <td className="p-2"><input className="w-full bg-white dark:bg-dark-900 border border-gray-300 dark:border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100" placeholder="Option D" value={row.option4} onChange={e => handleRowChange(idx, 'option4', e.target.value)} /></td>
+                    <td className="p-2"><input className="w-full bg-white dark:bg-dark-900 border border-gray-300 dark:border-dark-600 rounded px-2 py-2 md:py-1.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100" placeholder="Correct Answer" value={row.answer} onChange={e => handleRowChange(idx, 'answer', e.target.value)} /></td>
                     <td className="p-2 text-center">
                       <button onClick={() => removeRow(idx)} className="text-red-400 hover:text-red-300 transition-colors p-2 rounded-full hover:bg-red-500/10">
                         <Trash2 className="w-4 h-4 mx-auto" />
@@ -476,7 +425,12 @@ export default function Dashboard() {
             className="w-full md:max-w-md py-4 px-4 rounded-xl bg-gradient-to-r from-brand-600 to-brand-400 text-white font-bold text-base md:text-lg hover:from-brand-500 hover:to-brand-300 transition-all shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transform hover:scale-105 active:scale-95"
           >
             <Play className="fill-current w-5 h-5" />
-            {isPremium ? `Generate Bulk Videos (${credits} Credits Left Today)` : `Generate Bulk Videos (${credits} Credits Left)`}
+            {!currentUser 
+              ? 'Generate Bulk Videos' 
+              : isPremium 
+                ? 'Generate Bulk Videos' 
+                : `Generate Bulk Videos (${credits} Credits Left)`
+            }
           </button>
         ) : (
           <div className="w-full space-y-6">
@@ -548,12 +502,13 @@ export default function Dashboard() {
       </section>
 
       {/* How To Launch Your Viral Channel Section */}
-      <section className="bg-dark-800 p-6 md:p-8 rounded-xl border border-dark-700 shadow-xl space-y-8 mt-12">
+      {/* Step 3: How it Works Section */}
+      <section className="bg-white dark:bg-dark-800 p-6 md:p-8 rounded-xl border border-gray-200 dark:border-dark-700 shadow-xl space-y-8 mt-12">
         <div className="text-center space-y-2">
-          <h2 className="text-2xl md:text-3xl font-extrabold text-white flex items-center justify-center gap-2">
+          <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white flex items-center justify-center gap-2">
             🔄 How To Launch Your Viral Channel in 4 Simple Steps
           </h2>
-          <p className="text-gray-400 text-sm md:text-base max-w-2xl mx-auto">
+          <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base max-w-2xl mx-auto">
             Our optimized ChatGPT-to-CSV workflow allows you to pump out high-retention short content at scale.
           </p>
         </div>
@@ -614,10 +569,10 @@ export default function Dashboard() {
       </section>
 
       {/* Frequently Asked Questions (FAQ) Accordion dropdown Section */}
-      <section className="bg-dark-800 p-6 md:p-8 rounded-xl border border-dark-700 shadow-xl space-y-6 mt-12">
+      <section className="bg-white dark:bg-dark-800 p-6 md:p-8 rounded-xl border border-gray-200 dark:border-dark-700 shadow-xl space-y-6 mt-12">
         <div className="text-center space-y-2">
-          <h2 className="text-2xl md:text-3xl font-extrabold text-white">Frequently Asked Questions 💬</h2>
-          <p className="text-gray-400 text-sm md:text-base max-w-xl mx-auto">Get answers to the most common questions about monetization, daily limits, and more.</p>
+          <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white">Frequently Asked Questions 💬</h2>
+          <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base max-w-xl mx-auto">Get answers to the most common questions about monetization, daily limits, and more.</p>
         </div>
         
         <div className="space-y-3 max-w-3xl mx-auto pt-4">
@@ -639,19 +594,19 @@ export default function Dashboard() {
               ans: "Zero experience needed. Our automated dashboard handles scripts, visuals, and timing in 1-click."
             }
           ].map((item, idx) => (
-            <div key={idx} className="bg-dark-900 rounded-xl border border-dark-700/60 overflow-hidden transition-all">
+            <div key={idx} className="bg-gray-50 dark:bg-dark-900 rounded-xl border border-gray-200 dark:border-dark-700/60 overflow-hidden transition-all">
               <button 
                 onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
-                className="w-full text-left px-5 py-4 flex items-center justify-between text-sm md:text-base font-bold text-gray-200 hover:bg-dark-800 transition-colors"
+                className="w-full text-left px-5 py-4 flex items-center justify-between text-sm md:text-base font-bold text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-800 transition-colors"
               >
                 <span>{item.q}</span>
-                <span className="text-brand-400 text-lg transition-transform duration-300 transform">
+                <span className="text-brand-600 dark:text-brand-400 text-lg transition-transform duration-300 transform">
                   {activeFaq === idx ? '−' : '+'}
                 </span>
               </button>
               
               {activeFaq === idx && (
-                <div className="px-5 pb-5 pt-1 text-xs md:text-sm text-gray-400 border-t border-dark-800/80 leading-relaxed animate-in slide-in-from-top duration-300">
+                <div className="px-5 pb-5 pt-1 text-xs md:text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-dark-800/80 leading-relaxed animate-in slide-in-from-top duration-300">
                   {item.ans}
                 </div>
               )}

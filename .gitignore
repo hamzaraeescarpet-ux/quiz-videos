@@ -12,3 +12,4 @@ frontend/dist/
 
 .vercel
 .env*.local
+backgrounds_cache/

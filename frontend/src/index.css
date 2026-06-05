@@ -67,25 +67,6 @@
     font-family: ui-sans-serif, system-ui, sans-serif;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
-
-  /* Automatically adapt text colors dynamically without breaking white-text buttons */
-  .text-gray-100, .text-gray-200, .text-gray-300 {
-    color: var(--text-primary);
-  }
-  .text-gray-400 {
-    color: var(--text-secondary) !important;
-  }
-  
-  /* Darken category and section titles in Light Mode, keeping them bright in Dark Mode */
-  .text-brand-300 {
-    color: var(--brand-700) !important;
-  }
-  
-  @media (prefers-color-scheme: dark) {
-    .text-brand-300 {
-      color: var(--brand-300) !important;
-    }
-  }
   
   /* Adapt inputs, textareas, selects */
   input, textarea, select {
@@ -128,4 +109,25 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border-hover);
+}
+
+/* TOP-LEVEL SPECIFICITY OVERRIDES TO GURANTEE TAILWIND V4 UTILITY ADAPTATION */
+
+/* Automatically adapt text colors dynamically without breaking white-text buttons */
+.text-gray-100, .text-gray-200, .text-gray-300 {
+  color: var(--text-primary) !important;
+}
+.text-gray-400 {
+  color: var(--text-secondary) !important;
+}
+
+/* Make headers and section titles super high contrast deep violet in Light Mode, and soft bright violet in Dark Mode */
+.text-brand-300 {
+  color: var(--brand-800) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .text-brand-300 {
+    color: var(--brand-300) !important;
+  }
 }

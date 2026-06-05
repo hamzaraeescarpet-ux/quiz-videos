@@ -22,12 +22,12 @@ export default function Feedback() {
   useEffect(() => {
     if (isAdmin) {
       // Fetch feedbacks
-      axios.get(`/api/admin/feedbacks?email=${currentUser.email}`)
+      axios.get(`/api/hf/admin/feedbacks?email=${currentUser.email}`)
         .then(res => setFeedbacks(res.data.feedbacks || []))
         .catch(err => console.error("Error loading feedbacks", err));
 
       // Fetch registered marketing emails
-      axios.get(`/api/admin/users?email=${currentUser.email}`)
+      axios.get(`/api/hf/admin/users?email=${currentUser.email}`)
         .then(res => setRegisteredUsers(res.data.users || []))
         .catch(err => console.error("Error loading users", err));
     }
@@ -47,7 +47,7 @@ export default function Feedback() {
     setLoading(true);
     setErrorMsg('');
     try {
-      await axios.post('/api/feedback', {
+      await axios.post('/api/hf/feedback', {
         email: currentUser.email,
         rating,
         comment
@@ -57,7 +57,7 @@ export default function Feedback() {
       setRating(5);
       
       if (isAdmin) {
-        const res = await axios.get(`/api/admin/feedbacks?email=${currentUser.email}`);
+        const res = await axios.get(`/api/hf/admin/feedbacks?email=${currentUser.email}`);
         setFeedbacks(res.data.feedbacks || []);
       }
     } catch (err) {
