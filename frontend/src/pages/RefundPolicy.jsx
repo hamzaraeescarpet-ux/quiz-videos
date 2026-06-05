@@ -18,6 +18,11 @@ export default function RefundPolicy() {
         <p>
           You can instantly cancel your premium plan membership at any time directly through the dashboard. There are absolutely no hidden fees, cancellation penalties, or contracts. Once cancelled, your premium access will continue until the end of your current billing period, and no further charges will be made.
         </p>
+
+        <h2 className="text-xl font-bold text-brand-300">Refund Inquiries</h2>
+        <p>
+          If you have billing inquiries or require support with subscription cancellation, please email us directly at <a href="mailto:Hamzaraeescarpet@gmail.com" className="text-brand-400 hover:underline">Hamzaraeescarpet@gmail.com</a>.
+        </p>
       </section>
     </div>
   );

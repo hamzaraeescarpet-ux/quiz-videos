@@ -1,29 +1,8 @@
-import { useEffect } from 'react';
 import { Check } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 
 export default function Pricing() {
   const { currentUser, isPremium, credits, login } = useAuth();
-
-  useEffect(() => {
-    // Load Paddle.js dynamically
-    const script = document.createElement('script');
-    script.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
-    script.async = true;
-    script.onload = () => {
-      if (window.Paddle) {
-        window.Paddle.Initialize({ 
-          token: 'live_56eeba45e39e5067a60984c4aa6', // Set the secure public client token
-          environment: 'production'
-        });
-      }
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
 
   const handleCheckout = (planType) => {
     if (!currentUser) {
@@ -32,25 +11,12 @@ export default function Pricing() {
       return;
     }
 
-    if (window.Paddle) {
-      window.Paddle.Checkout.open({
-        items: [
-          {
-            priceId: 'pri_01ksyx8mzzm3w41kxs3vdym7kr', // Paddle Price ID for $4.99
-            quantity: 1
-          }
-        ],
-        customer: {
-          email: currentUser.email
-        },
-        customData: {
-          email: currentUser.email,
-          plan: planType
-        }
-      });
-    } else {
-      alert("Billing system is loading, please try again in a moment!");
-    }
+    // Redirect to Ko-fi checkout page.
+    // We pass the email in query parameters. Ko-fi donation page supports custom messages or pre-filling names.
+    // To identify users, we will instruct them on Ko-fi, or match by their PayPal/Ko-fi payer email during webhook trigger.
+    // Let's redirect them to your public Ko-fi page where they can checkout.
+    const kofiUrl = `https://ko-fi.com/quizviralai?email=${encodeURIComponent(currentUser.email)}`;
+    window.open(kofiUrl, '_blank');
   };
 
   const plans = [
@@ -66,13 +32,13 @@ export default function Pricing() {
     },
     {
       name: 'Yearly Unlimited',
-      price: '$49.99',
+      price: '$9.99',
       period: '/yr',
       description: 'Best value! Generate unlimited videos all year.',
       features: ['Everything in Monthly', 'Save over 15% compared to monthly', 'Cancel anytime', 'Premium templates unlock'],
       cta: 'Subscribe Yearly',
       popular: false,
-      planType: 'yearly' // Redirects to same standard payment or prompt for yearly
+      planType: 'yearly'
     }
   ];
 
@@ -139,7 +105,7 @@ export default function Pricing() {
             </button>
             {!isPremium && (
               <p className="text-xs text-center text-gray-500 mt-3">
-                Secure checkout powered by Paddle. Cancel anytime.
+                Secure checkout powered by Ko-fi & PayPal.
               </p>
             )}
           </div>

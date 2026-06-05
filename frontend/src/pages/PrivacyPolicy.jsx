@@ -28,6 +28,11 @@ export default function PrivacyPolicy() {
         <p>
           Our site includes links to third-party services. We are not responsible for the privacy practices or contents of those external platforms. We encourage users to read the privacy statements of every website they visit.
         </p>
+
+        <h2 className="text-xl font-bold text-brand-300">5. Contact Support</h2>
+        <p>
+          For any privacy questions or data deletion requests, please contact our support team directly at <a href="mailto:Hamzaraeescarpet@gmail.com" className="text-brand-400 hover:underline">Hamzaraeescarpet@gmail.com</a>.
+        </p>
       </section>
     </div>
   );

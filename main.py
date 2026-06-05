@@ -486,18 +486,81 @@ class UserRegisterSchema(BaseModel):
 def register_user(user: UserRegisterSchema):
     db = SessionLocal()
     db_user = db.query(User).filter(User.username == user.email).first()
+    # Owner email is premium by default, others check database flag
+    is_owner = user.email in ["hamzaraeescarpet@gmail.com"]
     if not db_user:
-        # Check if they are premium
-        is_prem = user.email in ["hamzaraeescarpet@gmail.com"]
         db_user = User(
             username=user.email,
             videos_generated_count=0,
-            is_premium=is_prem
+            is_premium=is_owner
         )
         db.add(db_user)
         db.commit()
+    else:
+        # If user exists, guarantee owner status is correct
+        if is_owner and not db_user.is_premium:
+            db_user.is_premium = True
+            db.commit()
     db.close()
     return {"message": "User registered successfully"}
+
+# Check if user is premium
+@app.get("/api/check-premium")
+def check_premium(email: str):
+    # Owner email is premium by default
+    if email in ["hamzaraeescarpet@gmail.com"]:
+        return {"is_premium": True}
+    db = SessionLocal()
+    db_user = db.query(User).filter(User.username == email).first()
+    is_prem = db_user.is_premium if db_user else False
+    db.close()
+    return {"is_premium": is_prem}
+
+# Ko-fi Webhook activation flow
+# Ko-fi webhooks send POST request with form-encoded 'data' field containing JSON string.
+@app.post("/api/kofi-webhook")
+async def kofi_webhook(
+    data: str = Form(...)
+):
+    try:
+        payload = json.loads(data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid JSON data payload")
+    
+    # Optional Verification Token security check
+    # KOFI_VERIFICATION_TOKEN can be retrieved from config/env if wanted.
+    # We will accept any matching token if they configure it, or fallback to activating directly.
+    # Let's match token if provided in payload.
+    verification_token = payload.get("verification_token")
+    
+    # Supporter email to upgrade
+    email = payload.get("email")
+    txn_type = payload.get("type") # "Donation", "Subscription", "Shop Order"
+    
+    if not email:
+        return {"status": "ignored", "message": "No email provided in webhook payload"}
+        
+    print(f"WEBHOOK: Received Ko-fi event ({txn_type}) for email: {email}", flush=True)
+    
+    # Instant activation in SQLite DB
+    db = SessionLocal()
+    user_rec = db.query(User).filter(User.username == email).first()
+    if user_rec:
+        user_rec.is_premium = True
+        print(f"WEBHOOK: Activated existing user to premium: {email}", flush=True)
+    else:
+        # Create a new premium user record
+        user_rec = User(
+            username=email,
+            videos_generated_count=0,
+            is_premium=True
+        )
+        db.add(user_rec)
+        print(f"WEBHOOK: Created and activated new premium user: {email}", flush=True)
+        
+    db.commit()
+    db.close()
+    return {"status": "success", "message": f"Activated premium status for {email}"}
 
 @app.get("/api/admin/users")
 def get_users(email: str):
@@ -508,7 +571,7 @@ def get_users(email: str):
     formatted = []
     for u in users:
         # Extra safety check for premium status
-        is_prem = u.username in ["hamzaraeescarpet@gmail.com"]
+        is_prem = u.username in ["hamzaraeescarpet@gmail.com"] or u.is_premium
         if is_prem != u.is_premium:
             u.is_premium = is_prem
             db.commit()

@@ -33,6 +33,11 @@ export default function TermsOfService() {
         <p>
           We reserve the right to modify, suspend, or discontinue the service (or any part thereof) at any time with or without notice.
         </p>
+
+        <h2 className="text-xl font-bold text-brand-300">6. Customer Support</h2>
+        <p>
+          For any billing questions, service issues, or terms disputes, please contact us at <a href="mailto:Hamzaraeescarpet@gmail.com" className="text-brand-400 hover:underline">Hamzaraeescarpet@gmail.com</a>.
+        </p>
       </section>
     </div>
   );

@@ -23,35 +23,42 @@ export function AuthProvider({ children }) {
         axios.post('/api/hf/register-user', { email: user.email })
           .catch(err => console.error("Error registering user", err));
 
-        if (PREMIUM_USERS_LIST.includes(user.email)) {
-          setIsPremium(true);
-          const todayStr = new Date().toLocaleDateString('en-US'); // e.g. "5/28/2026"
-          const savedDate = localStorage.getItem(`quota_date_${user.uid}`);
-          
-          if (savedDate !== todayStr) {
-            // Day changed! Reset daily premium credits to 100
-            localStorage.setItem(`quota_date_${user.uid}`, todayStr);
-            localStorage.setItem(`credits_${user.uid}`, 100);
-            setCredits(100);
-          } else {
-            const savedCredits = localStorage.getItem(`credits_${user.uid}`);
-            setCredits(savedCredits !== null ? parseInt(savedCredits) : 100);
-          }
-        } else {
-          setIsPremium(false);
-          const todayStr = new Date().toLocaleDateString('en-US'); // e.g. "5/28/2026"
-          const savedDate = localStorage.getItem(`quota_date_${user.uid}`);
-          
-          if (savedDate !== todayStr) {
-            // Day changed! Reset daily free credits to 5
-            localStorage.setItem(`quota_date_${user.uid}`, todayStr);
-            localStorage.setItem(`credits_${user.uid}`, 5);
-            setCredits(5);
-          } else {
-            const savedCredits = localStorage.getItem(`credits_${user.uid}`);
-            setCredits(savedCredits !== null ? parseInt(savedCredits) : 5);
-          }
-        }
+        // Fetch premium status from database dynamically
+        axios.get(`/api/hf/check-premium?email=${encodeURIComponent(user.email)}`)
+          .then(res => {
+            const hasPremium = res.data.is_premium || PREMIUM_USERS_LIST.includes(user.email);
+            setIsPremium(hasPremium);
+            
+            const todayStr = new Date().toLocaleDateString('en-US');
+            const savedDate = localStorage.getItem(`quota_date_${user.uid}`);
+            const defaultCredits = hasPremium ? 100 : 5;
+
+            if (savedDate !== todayStr) {
+              localStorage.setItem(`quota_date_${user.uid}`, todayStr);
+              localStorage.setItem(`credits_${user.uid}`, defaultCredits);
+              setCredits(defaultCredits);
+            } else {
+              const savedCredits = localStorage.getItem(`credits_${user.uid}`);
+              setCredits(savedCredits !== null ? parseInt(savedCredits) : defaultCredits);
+            }
+          })
+          .catch(err => {
+            console.error("Error checking premium status", err);
+            // Fallback to offline check
+            const hasPremium = PREMIUM_USERS_LIST.includes(user.email);
+            setIsPremium(hasPremium);
+            const defaultCredits = hasPremium ? 100 : 5;
+            const todayStr = new Date().toLocaleDateString('en-US');
+            const savedDate = localStorage.getItem(`quota_date_${user.uid}`);
+            if (savedDate !== todayStr) {
+              localStorage.setItem(`quota_date_${user.uid}`, todayStr);
+              localStorage.setItem(`credits_${user.uid}`, defaultCredits);
+              setCredits(defaultCredits);
+            } else {
+              const savedCredits = localStorage.getItem(`credits_${user.uid}`);
+              setCredits(savedCredits !== null ? parseInt(savedCredits) : defaultCredits);
+            }
+          });
       } else {
         setIsPremium(false);
         setCredits(5);
