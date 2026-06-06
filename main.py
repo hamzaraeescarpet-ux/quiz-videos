@@ -590,12 +590,6 @@ async def kofi_webhook(
     data: str = Form(...)
 ):
     try:
-        with open("error_logs.txt", "a") as f:
-            f.write(f"WEBHOOK RAW DATA: {data[:500]}\n")
-    except Exception:
-        pass
-
-    try:
         payload = json.loads(data)
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid JSON data payload")
