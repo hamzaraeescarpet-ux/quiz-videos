@@ -525,6 +525,7 @@ def send_facebook_capi_event(email: str, amount: float, currency: str):
     
     pixel_id = os.environ.get("FB_PIXEL_ID")
     access_token = os.environ.get("FB_ACCESS_TOKEN")
+    test_code = os.environ.get("FB_TEST_EVENT_CODE")
     
     if not pixel_id or not access_token:
         print("FB_PIXEL_ID or FB_ACCESS_TOKEN not set in environment variables. Skipping Facebook Conversions API event.", flush=True)
@@ -553,6 +554,9 @@ def send_facebook_capi_event(email: str, amount: float, currency: str):
             ]
         }
         
+        if test_code:
+            payload["test_event_code"] = test_code.strip()
+            
         url = f"https://graph.facebook.com/v17.0/{pixel_id}/events?access_token={access_token}"
         data = json.dumps(payload).encode('utf-8')
         
