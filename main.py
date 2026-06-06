@@ -528,7 +528,10 @@ def send_facebook_capi_event(email: str, amount: float, currency: str):
     test_code = os.environ.get("FB_TEST_EVENT_CODE")
     
     if not pixel_id or not access_token:
-        print("FB_PIXEL_ID or FB_ACCESS_TOKEN not set in environment variables. Skipping Facebook Conversions API event.", flush=True)
+        log_msg = f"FB CAPI Skipped: pixel_id={pixel_id}, access_token={'set' if access_token else 'not set'}\n"
+        print(log_msg, flush=True)
+        with open("error_logs.txt", "a") as f:
+            f.write(log_msg)
         return
         
     try:
@@ -556,6 +559,8 @@ def send_facebook_capi_event(email: str, amount: float, currency: str):
         
         if test_code:
             payload["test_event_code"] = test_code.strip()
+            with open("error_logs.txt", "a") as f:
+                f.write(f"FB CAPI: Using test event code={test_code.strip()}\n")
             
         url = f"https://graph.facebook.com/v17.0/{pixel_id}/events?access_token={access_token}"
         data = json.dumps(payload).encode('utf-8')
@@ -568,10 +573,17 @@ def send_facebook_capi_event(email: str, amount: float, currency: str):
         
         with urllib.request.urlopen(req) as response:
             res_body = response.read().decode('utf-8')
-            print(f"FB CAPI Success: {res_body}", flush=True)
+            log_msg = f"FB CAPI Success: {res_body}\n"
+            print(log_msg, flush=True)
+            with open("error_logs.txt", "a") as f:
+                f.write(log_msg)
             
     except Exception as e:
-        print(f"FB CAPI Error: {e}", flush=True)
+        import traceback
+        log_msg = f"FB CAPI Error: {e}\n{traceback.format_exc()}\n"
+        print(log_msg, flush=True)
+        with open("error_logs.txt", "a") as f:
+            f.write(log_msg)
 
 @app.post("/api/kofi-webhook")
 async def kofi_webhook(
