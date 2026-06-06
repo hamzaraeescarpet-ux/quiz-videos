@@ -114,7 +114,7 @@ export default function Dashboard() {
   };
 
   const addRow = () => {
-    if (rows.length < 100) {
+    if (rows.length < 150) {
       setRows([...rows, { id: Date.now(), question: '', option1: '', option2: '', option3: '', option4: '', answer: '' }]);
     }
   };
@@ -151,7 +151,7 @@ export default function Dashboard() {
             });
           }
         }
-        if (parsedRows.length > 0) setRows(parsedRows.slice(0, 100));
+        if (parsedRows.length > 0) setRows(parsedRows.slice(0, 150));
       };
       reader.readAsText(file);
     }
@@ -549,7 +549,7 @@ export default function Dashboard() {
               </div>
               <span className="text-[10px] uppercase tracking-wider text-brand-400 font-bold">Step 3: 🚀 Bulk Render</span>
               <h3 className="text-sm font-bold text-gray-200">1-Click Bulk Generation</h3>
-              <p className="text-xs text-gray-400 leading-relaxed">Upload your CSV file to QuizViral AI. Our system instantly auto-injects premium narration, dynamic progress bars, and high-retention backgrounds to render 100+ vertical videos at once.</p>
+              <p className="text-xs text-gray-400 leading-relaxed">Upload your CSV file to QuizViral AI. Our system instantly auto-injects premium narration, dynamic progress bars, and high-retention backgrounds to render bulk vertical videos at once.</p>
             </div>
           </div>
           
@@ -583,7 +583,7 @@ export default function Dashboard() {
             },
             {
               q: "What is the daily cap for video generation?",
-              ans: "Premium members can generate up to 100 high-quality vertical quiz videos every single day."
+              ans: "Premium members get access to a high daily video generation quota designed for massive scale and bulk workflows."
             },
             {
               q: "Is there a refund policy?",

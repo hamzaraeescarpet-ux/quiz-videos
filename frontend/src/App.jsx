@@ -7,6 +7,7 @@ import AboutUs from './pages/AboutUs';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import RefundPolicy from './pages/RefundPolicy';
+import Success from './pages/Success';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import { AuthProvider } from './AuthContext';
@@ -27,6 +28,7 @@ function App() {
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/refunds" element={<RefundPolicy />} />
+              <Route path="/success" element={<Success />} />
             </Routes>
           </main>
           <Footer />

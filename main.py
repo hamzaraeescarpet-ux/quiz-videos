@@ -517,6 +517,58 @@ def check_premium(email: str):
     return {"is_premium": is_prem}
 
 # Ko-fi Webhook activation flow
+# Helper to send Facebook Conversions API event
+def send_facebook_capi_event(email: str, amount: float, currency: str):
+    import hashlib
+    import time
+    import urllib.request
+    
+    pixel_id = os.environ.get("FB_PIXEL_ID")
+    access_token = os.environ.get("FB_ACCESS_TOKEN")
+    
+    if not pixel_id or not access_token:
+        print("FB_PIXEL_ID or FB_ACCESS_TOKEN not set in environment variables. Skipping Facebook Conversions API event.", flush=True)
+        return
+        
+    try:
+        # Normalize and hash the email address (sha256)
+        cleaned_email = email.strip().lower()
+        hashed_email = hashlib.sha256(cleaned_email.encode('utf-8')).hexdigest()
+        
+        # Build the Facebook CAPI request payload
+        payload = {
+            "data": [
+                {
+                    "event_name": "Purchase",
+                    "event_time": int(time.time()),
+                    "action_source": "website",
+                    "user_data": {
+                        "em": [hashed_email]
+                    },
+                    "custom_data": {
+                        "value": amount,
+                        "currency": currency if currency else "USD"
+                    }
+                }
+            ]
+        }
+        
+        url = f"https://graph.facebook.com/v17.0/{pixel_id}/events?access_token={access_token}"
+        data = json.dumps(payload).encode('utf-8')
+        
+        req = urllib.request.Request(
+            url, 
+            data=data, 
+            headers={'Content-Type': 'application/json'}
+        )
+        
+        with urllib.request.urlopen(req) as response:
+            res_body = response.read().decode('utf-8')
+            print(f"FB CAPI Success: {res_body}", flush=True)
+            
+    except Exception as e:
+        print(f"FB CAPI Error: {e}", flush=True)
+
 # Ko-fi webhooks send POST request with form-encoded 'data' field containing JSON string.
 @app.post("/api/kofi-webhook")
 async def kofi_webhook(
@@ -560,6 +612,19 @@ async def kofi_webhook(
         
     db.commit()
     db.close()
+
+    # Try sending Facebook CAPI Event
+    try:
+        amount_val = 0.0
+        try:
+            amount_val = float(payload.get("amount", "0"))
+        except ValueError:
+            pass
+        currency_val = payload.get("currency", "USD")
+        send_facebook_capi_event(email, amount_val, currency_val)
+    except Exception as ex:
+        print(f"Failed to process Facebook CAPI event: {ex}", flush=True)
+
     return {"status": "success", "message": f"Activated premium status for {email}"}
 
 @app.get("/api/admin/users")

@@ -26,7 +26,7 @@ export default function TermsOfService() {
 
         <h2 className="text-xl font-bold text-brand-300">4. Subscriptions and Limits</h2>
         <p>
-          Premium subscriptions provide users with up to 100 high-quality vertical quiz video generations daily. Accounts are monitored to prevent scraping, resource abuse, or redistribution of proprietary automated backend pipelines.
+          Premium subscriptions provide users with a high daily quota of vertical quiz video generations. Accounts are monitored to prevent scraping, resource abuse, or redistribution of proprietary automated backend pipelines.
         </p>
 
         <h2 className="text-xl font-bold text-brand-300">5. Modifications to Service</h2>

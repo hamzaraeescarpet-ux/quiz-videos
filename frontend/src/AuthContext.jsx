@@ -72,10 +72,33 @@ export function AuthProvider({ children }) {
     if (credits >= amount) {
       const newCredits = credits - amount;
       setCredits(newCredits);
-      localStorage.setItem(`credits_${currentUser.uid}`, newCredits);
+      if (currentUser) {
+        localStorage.setItem(`credits_${currentUser.uid}`, newCredits);
+      }
       return true;
     }
     return false;
+  };
+
+  const refreshUserStatus = async () => {
+    if (!auth.currentUser) return false;
+    const user = auth.currentUser;
+    try {
+      const res = await axios.get(`/api/hf/check-premium?email=${encodeURIComponent(user.email)}`);
+      const hasPremium = res.data.is_premium || PREMIUM_USERS_LIST.includes(user.email);
+      setIsPremium(hasPremium);
+      
+      const todayStr = new Date().toLocaleDateString('en-US');
+      const defaultCredits = hasPremium ? 100 : 5;
+      
+      localStorage.setItem(`quota_date_${user.uid}`, todayStr);
+      localStorage.setItem(`credits_${user.uid}`, defaultCredits);
+      setCredits(defaultCredits);
+      return hasPremium;
+    } catch (err) {
+      console.error("Error refreshing premium status", err);
+      return false;
+    }
   };
 
   const value = {
@@ -83,6 +106,7 @@ export function AuthProvider({ children }) {
     isPremium,
     credits,
     consumeCredits,
+    refreshUserStatus,
     login: signInWithGoogle,
     logout: logOut
   };

@@ -11,6 +11,16 @@ export default function Pricing() {
       return;
     }
 
+    // Track InitiateCheckout event in Facebook Pixel
+    if (window.fbq) {
+      window.fbq('track', 'InitiateCheckout', {
+        value: planType === 'yearly' ? 9.99 : 4.99,
+        currency: 'USD',
+        content_name: planType === 'yearly' ? 'Yearly Unlimited' : 'Monthly Unlimited',
+        content_category: 'Subscription'
+      });
+    }
+
     // Redirect to Ko-fi checkout page.
     // We pass the email in query parameters. Ko-fi donation page supports custom messages or pre-filling names.
     // To identify users, we will instruct them on Ko-fi, or match by their PayPal/Ko-fi payer email during webhook trigger.
@@ -51,7 +61,7 @@ export default function Pricing() {
         <p className="text-lg md:text-xl text-gray-400">
           {isPremium 
             ? "You are currently on the Unlimited Premium Plan! Enjoy your unrestricted access."
-            : `You have ${credits} credits remaining today. Upgrade now to generate up to 100 videos every day!`}
+            : `You have ${credits} credits remaining today. Upgrade now to generate unlimited videos!`}
         </p>
       </header>
 
@@ -74,9 +84,9 @@ export default function Pricing() {
             <div className="mb-8">
               <h3 className="text-xl font-bold text-gray-200 mb-2">{plan.name}</h3>
               <p className="text-gray-400 text-sm h-10">{plan.description}</p>
-              <div className="mt-4 flex items-baseline text-5xl font-extrabold text-white">
+              <div className="mt-4 flex items-baseline text-5xl font-extrabold text-gray-900 dark:text-white">
                 {plan.price}
-                {plan.period && <span className="ml-1 text-xl font-medium text-gray-400">{plan.period}</span>}
+                {plan.period && <span className="ml-1 text-xl font-medium text-gray-500 dark:text-gray-400">{plan.period}</span>}
               </div>
             </div>
 
@@ -93,15 +103,16 @@ export default function Pricing() {
 
             <button 
               onClick={() => handleCheckout(plan.planType)}
-              className={`w-full py-3 rounded-xl font-bold transition-all text-center block shadow ${
+              disabled={isPremium}
+              className={`w-full py-3 rounded-xl font-bold transition-all text-center block border ${
                 isPremium 
-                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed pointer-events-none'
+                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 cursor-default'
                   : plan.popular 
-                    ? 'bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-500/25' 
-                    : 'bg-dark-700 hover:bg-dark-600 text-white'
+                    ? 'bg-brand-600 hover:bg-brand-750 text-white border-brand-600 hover:border-brand-700 shadow-lg shadow-brand-500/25' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border-gray-200 dark:bg-dark-700 dark:hover:bg-dark-600 dark:text-white dark:border-dark-600 shadow-sm'
               }`}
             >
-              {isPremium ? 'Currently Active' : plan.cta}
+              {isPremium ? 'Currently Active ✓' : plan.cta}
             </button>
             {!isPremium && (
               <p className="text-xs text-center text-gray-500 mt-3">
