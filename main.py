@@ -573,11 +573,16 @@ def send_facebook_capi_event(email: str, amount: float, currency: str):
     except Exception as e:
         print(f"FB CAPI Error: {e}", flush=True)
 
-# Ko-fi webhooks send POST request with form-encoded 'data' field containing JSON string.
 @app.post("/api/kofi-webhook")
 async def kofi_webhook(
     data: str = Form(...)
 ):
+    try:
+        with open("error_logs.txt", "a") as f:
+            f.write(f"WEBHOOK RAW DATA: {data[:500]}\n")
+    except Exception:
+        pass
+
     try:
         payload = json.loads(data)
     except Exception as e:
