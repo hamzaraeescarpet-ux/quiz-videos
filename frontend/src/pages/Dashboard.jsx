@@ -444,7 +444,7 @@ export default function Dashboard() {
                 </p>
                 {status === 'Processing' && (
                   <p className="text-brand-400 text-xs mt-2 italic">
-                    Sit back and relax, your bulk videos are being generated. We will email you once they are ready to download!
+                    Your bulk generation is rendering. Just minimize this tab and come back after some time; your bulk videos will be generated.
                   </p>
                 )}
               </div>
