@@ -250,13 +250,13 @@ export default function Dashboard() {
   const getCategoryIcon = (cat) => {
     const lower = cat.toLowerCase();
     if (lower.includes('minecraft')) return '⛏️';
-    if (lower.includes('satisfy')) return '🫧';
     if (lower.includes('nature')) return '🌲';
     if (lower.includes('space')) return '🚀';
-    if (lower.includes('gta')) return '🚗';
+    if (lower.includes('gta') || lower.includes('car')) return '🚗';
     if (lower.includes('subway')) return '🏃';
     if (lower.includes('asmr')) return '🔪';
     if (lower.includes('custom')) return '🎥';
+    if (lower.includes('mix')) return '🔀';
     return '✨';
   };
 
