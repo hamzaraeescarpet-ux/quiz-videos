@@ -37,7 +37,7 @@ export default function Pricing() {
       description: 'Generate unlimited videos for a month.',
       features: ['Unlimited bulk video generation', 'Bypass the 5 credits limit', 'Custom logo branding', '1080p high quality', 'Priority rendering speed'],
       cta: 'Subscribe Monthly',
-      popular: true,
+      popular: false,
       planType: 'monthly'
     },
     {
@@ -47,7 +47,7 @@ export default function Pricing() {
       description: 'Best value! Generate unlimited videos all year.',
       features: ['Everything in Monthly', 'Save over 15% compared to monthly', 'Cancel anytime', 'Premium templates unlock'],
       cta: 'Subscribe Yearly',
-      popular: false,
+      popular: true,
       planType: 'yearly'
     }
   ];
