@@ -97,10 +97,51 @@ def download_and_cache_video(url: str) -> str:
         
     print(f"Downloading background video: {url} -> {local_path}", flush=True)
     try:
-        urllib.request.urlretrieve(url, local_path)
+        # Check if it's a Google Drive link
+        gd_id = None
+        if "drive.google.com" in url or "docs.google.com" in url:
+            if "/file/d/" in url:
+                parts = url.split("/file/d/")
+                if len(parts) > 1:
+                    gd_id = parts[1].split("/")[0].split("?")[0]
+            elif "id=" in url:
+                parsed_qs = urllib.parse.parse_qs(parsed.query)
+                if "id" in parsed_qs:
+                    gd_id = parsed_qs["id"][0]
+
+        if gd_id:
+            print(f"Detected Google Drive URL with file ID: {gd_id}. Downloading with requests...", flush=True)
+            import requests
+            session = requests.Session()
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            gd_url = "https://docs.google.com/uc?export=download"
+            res = session.get(gd_url, params={'id': gd_id}, headers=headers, stream=True)
+            
+            token = None
+            for key, value in res.cookies.items():
+                if key.startswith('download_warning'):
+                    token = value
+                    break
+                    
+            if token:
+                res = session.get(gd_url, params={'id': gd_id, 'confirm': token}, headers=headers, stream=True)
+                
+            res.raise_for_status()
+            with open(local_path, "wb") as f:
+                for chunk in res.iter_content(chunk_size=65536):
+                    if chunk:
+                        f.write(chunk)
+        else:
+            urllib.request.urlretrieve(url, local_path)
+            
         return local_path
     except Exception as e:
         print(f"Error downloading background video {url}: {e}", flush=True)
+        if os.path.exists(local_path):
+            try:
+                os.remove(local_path)
+            except Exception:
+                pass
         return None
 
 def cleanup_old_zip_files():
