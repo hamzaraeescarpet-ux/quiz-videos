@@ -76,6 +76,15 @@ def hex_to_rgb(hex_str, default_rgb):
     except Exception:
         return default_rgb
 
+def safe_print(msg):
+    try:
+        print(msg, flush=True)
+    except Exception:
+        try:
+            print(msg.encode('ascii', errors='replace').decode('ascii'), flush=True)
+        except Exception:
+            pass
+
 def create_video_from_row(row, category, custom_logo_path, output_dir, box_color=None, custom_bg_paths=None):
     vid_id = str(row.get('id', random.randint(1000, 9999)))
     q_text = str(row.get('question', ''))
@@ -104,14 +113,48 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     if custom_bg_paths and len(custom_bg_paths) > 0:
         bg_video_path = random.choice(custom_bg_paths)
     else:
+        bg_video_path = None
         category_path = os.path.join(BG_VIDEO_FOLDER, category)
         try:
-            if not os.path.exists(category_path):
-                category_path = BG_VIDEO_FOLDER # fallback
-            bg_files = [f for f in os.listdir(category_path) if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))]
-            if not bg_files:
-                raise Exception(f"No background files found in {category_path}")
-            bg_video_path = os.path.join(category_path, random.choice(bg_files))
+            # Step A: Try to find video files directly in the specific category directory
+            if os.path.exists(category_path) and os.path.isdir(category_path):
+                bg_files = [f for f in os.listdir(category_path) if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))]
+                if bg_files:
+                    bg_video_path = os.path.join(category_path, random.choice(bg_files))
+            
+            # Step B: If not found in the category directory, search recursively in BG_VIDEO_FOLDER
+            if not bg_video_path:
+                safe_print(f"Fallback: No videos directly in category '{category}' folder ({category_path}). Searching recursively in {BG_VIDEO_FOLDER}...")
+                all_fallback_videos = []
+                for root_dir, dirs, files in os.walk(BG_VIDEO_FOLDER):
+                    for file in files:
+                        if file.lower().endswith((".mp4", ".mov", ".mkv", ".webm")):
+                            all_fallback_videos.append(os.path.join(root_dir, file))
+                
+                if all_fallback_videos:
+                    bg_video_path = random.choice(all_fallback_videos)
+                    safe_print(f"Fallback selected recursive video: {bg_video_path}")
+            
+            # Step C: If still not found, check in backgrounds_cache
+            if not bg_video_path:
+                cache_dir = os.path.join(BASE_DIR, "backgrounds_cache")
+                safe_print(f"Fallback: Searching in cache directory {cache_dir}...")
+                if os.path.exists(cache_dir) and os.path.isdir(cache_dir):
+                    cache_files = [f for f in os.listdir(cache_dir) if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))]
+                    if cache_files:
+                        bg_video_path = os.path.join(cache_dir, random.choice(cache_files))
+                        safe_print(f"Fallback selected cache video: {bg_video_path}")
+            
+            # Step D: If still not found, look in BASE_DIR root for any mp4 files
+            if not bg_video_path:
+                safe_print(f"Fallback: Searching in root directory {BASE_DIR}...")
+                root_files = [f for f in os.listdir(BASE_DIR) if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))]
+                if root_files:
+                    bg_video_path = os.path.join(BASE_DIR, random.choice(root_files))
+                    safe_print(f"Fallback selected root video: {bg_video_path}")
+            
+            if not bg_video_path:
+                raise Exception(f"No background files found anywhere. Checked {category_path}, recursive {BG_VIDEO_FOLDER}, cache, and root.")
         except Exception as e:
             raise Exception(f"Error finding background: {e}")
 
