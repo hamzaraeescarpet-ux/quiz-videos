@@ -215,7 +215,9 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
 
     # 3) Video base
     clip = VideoFileClip(bg_video_path).fx(loop, duration=total_duration)
-    clip = clip.resize(height=1920).crop(x1=clip.w / 2 - 540, y1=0, width=1080, height=1920)
+    # Skip expensive CPU resize/crop operations if the video is already 1080x1920
+    if clip.w != 1080 or clip.h != 1920:
+        clip = clip.resize(height=1920).crop(x1=clip.w / 2 - 540, y1=0, width=1080, height=1920)
     clip = clip.set_audio(final_audio)
 
     # 4) Text setup
