@@ -20,12 +20,12 @@ export default function Navbar() {
     <nav className="bg-dark-800 border-b border-dark-700 sticky top-0 z-50 shadow-lg">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
             <Sparkles className="w-8 h-8 text-brand-500" />
             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-brand-600">
               QuizViral AI
             </span>
-          </div>
+          </Link>
           
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center gap-4">

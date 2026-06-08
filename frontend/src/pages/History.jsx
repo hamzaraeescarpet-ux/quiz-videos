@@ -13,10 +13,50 @@ export default function History() {
       setLoading(true);
       axios.get(`/api/hf/jobs?email=${currentUser.email}`)
         .then(res => {
-          setJobs(res.data.jobs || []);
+          const backendJobs = res.data.jobs || [];
+          const localHistory = JSON.parse(localStorage.getItem('quizviral_jobs_history') || '[]');
+          const userLocalHistory = localHistory.filter(job => job.user_email === currentUser.email);
+          
+          // Merge lists using session_id as the unique key
+          const mergedJobsMap = {};
+          
+          // Put local jobs first
+          userLocalHistory.forEach(job => {
+            mergedJobsMap[job.session_id] = {
+              ...job,
+              completed_so_far: job.completed_so_far || 0,
+              total_expected: job.total_expected || 0
+            };
+          });
+          
+          // Overwrite/add with backend jobs
+          backendJobs.forEach(job => {
+            mergedJobsMap[job.session_id] = {
+              ...mergedJobsMap[job.session_id], // keep local fields like created_at
+              ...job
+            };
+          });
+          
+          // Convert map back to list, sorted by created_at timestamp
+          const sortedJobs = Object.values(mergedJobsMap).sort((a, b) => {
+            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return timeB - timeA;
+          });
+          
+          setJobs(sortedJobs);
         })
         .catch(err => {
           console.error("Error loading history", err);
+          // If backend is down or DB resets, fallback to local history
+          const localHistory = JSON.parse(localStorage.getItem('quizviral_jobs_history') || '[]');
+          const userLocalHistory = localHistory.filter(job => job.user_email === currentUser.email);
+          const sortedJobs = userLocalHistory.sort((a, b) => {
+            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return timeB - timeA;
+          });
+          setJobs(sortedJobs);
         })
         .finally(() => {
           setLoading(false);

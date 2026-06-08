@@ -58,12 +58,45 @@ export default function Dashboard() {
         axios.get(`/api/hf/status/${sessionId}`).then(res => {
           setStatus(res.data.status);
           setProgress({ current: res.data.completed_so_far, total: res.data.total_expected });
+          
+          // Update local history status
+          try {
+            const localHistory = JSON.parse(localStorage.getItem('quizviral_jobs_history') || '[]');
+            const updated = localHistory.map(job => {
+              if (job.session_id === sessionId) {
+                return {
+                  ...job,
+                  status: res.data.status,
+                  completed_so_far: res.data.completed_so_far,
+                  total_expected: res.data.total_expected
+                };
+              }
+              return job;
+            });
+            localStorage.setItem('quizviral_jobs_history', JSON.stringify(updated));
+          } catch (e) {
+            console.error("Failed to update local history status", e);
+          }
         }).catch(err => {
           console.error(err);
           // If the backend lost the session (e.g. server restarted), clear it locally
           if (err.response && err.response.status === 404) {
              setStatus('Failed');
              localStorage.removeItem('current_session_id');
+             
+             // Update local history as Failed
+             try {
+               const localHistory = JSON.parse(localStorage.getItem('quizviral_jobs_history') || '[]');
+               const updated = localHistory.map(job => {
+                 if (job.session_id === sessionId) {
+                   return { ...job, status: 'Failed' };
+                 }
+                 return job;
+               });
+               localStorage.setItem('quizviral_jobs_history', JSON.stringify(updated));
+             } catch (e) {
+               console.error(e);
+             }
           }
         });
       }, 2000);
@@ -205,6 +238,22 @@ export default function Dashboard() {
       const newSessionId = res.data.session_id;
       setSessionId(newSessionId);
       localStorage.setItem('current_session_id', newSessionId);
+      
+      // Save to local history to survive backend restarts
+      try {
+        const localHistory = JSON.parse(localStorage.getItem('quizviral_jobs_history') || '[]');
+        const newJob = {
+          session_id: newSessionId,
+          status: 'Processing',
+          completed_so_far: 0,
+          total_expected: rows.length,
+          user_email: currentUser.email,
+          created_at: new Date().toISOString()
+        };
+        localStorage.setItem('quizviral_jobs_history', JSON.stringify([newJob, ...localHistory]));
+      } catch (e) {
+        console.error("Failed to save job to local history", e);
+      }
     } catch (err) {
       console.error(err);
       alert("Failed to start generation.");
@@ -218,8 +267,23 @@ export default function Dashboard() {
         await axios.post(`/api/hf/stop-generation/${sessionId}`);
         setStatus('Interrupted');
         localStorage.removeItem('current_session_id');
+        
+        // Update local history status to Interrupted
+        try {
+          const localHistory = JSON.parse(localStorage.getItem('quizviral_jobs_history') || '[]');
+          const updated = localHistory.map(job => {
+            if (job.session_id === sessionId) {
+              return { ...job, status: 'Interrupted' };
+            }
+            return job;
+          });
+          localStorage.setItem('quizviral_jobs_history', JSON.stringify(updated));
+        } catch (e) {
+          console.error(e);
+        }
       } catch (err) {
         console.error(err);
+        alert("Failed to stop generation.");
       }
     }
   };
