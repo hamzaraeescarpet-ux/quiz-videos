@@ -383,9 +383,6 @@ def process_video_batch(
                 if user_email:
                     print(f"\n[{user_email}] AUTOMATION: Sending email -> 'Sit back and relax, your bulk videos are ready to download!'", flush=True)
                     try:
-                        import json
-                        import urllib.request
-
                         mailer_url = "https://quizviral-nine.vercel.app/api/mailer"
                         download_link = "https://quizviral-nine.vercel.app"
                         body = f"""Hello Creator,
