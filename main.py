@@ -302,13 +302,26 @@ def process_video_batch(
     # Load backgrounds_config.json URLs for this category
     config_path = os.path.join(BASE_DIR, "backgrounds_config.json")
     bg_urls = []
+    info_msg = f"INFO: Started process_video_batch. session_id={session_id}, category={category}, config_path_exists={os.path.exists(config_path)}"
+    try:
+        with open("error_logs.txt", "a") as f:
+            f.write(info_msg + "\n")
+    except Exception:
+        pass
+
     if os.path.exists(config_path):
         try:
             with open(config_path, "r") as f:
                 config_data = json.load(f)
             bg_urls = config_data.get(category, [])
+            keys_msg = f"INFO: config loaded. Keys available: {list(config_data.keys())}. Number of URLs for {category}: {len(bg_urls)}"
+            with open("error_logs.txt", "a") as f:
+                f.write(keys_msg + "\n")
         except Exception as e:
-            print(f"Error loading background config inside batch: {e}", flush=True)
+            err_load_msg = f"ERROR: loading background config: {e}"
+            print(err_load_msg, flush=True)
+            with open("error_logs.txt", "a") as f:
+                f.write(err_load_msg + "\n")
             
     try:
         for idx, row in enumerate(questions):
@@ -323,9 +336,28 @@ def process_video_batch(
                 row_bg_paths = custom_bg_paths
             elif bg_urls:
                 random_url = random.choice(bg_urls)
+                dl_start_msg = f"INFO: Selected random url={random_url}. Starting download..."
+                try:
+                    with open("error_logs.txt", "a") as f:
+                        f.write(dl_start_msg + "\n")
+                except Exception:
+                    pass
                 local_bg_file = download_and_cache_video(random_url)
+                dl_end_msg = f"INFO: download_and_cache_video result={local_bg_file}"
+                try:
+                    with open("error_logs.txt", "a") as f:
+                        f.write(dl_end_msg + "\n")
+                except Exception:
+                    pass
                 if local_bg_file:
                     row_bg_paths = [local_bg_file]
+            else:
+                no_urls_msg = f"INFO: bg_urls is empty. custom_bg_paths={custom_bg_paths}"
+                try:
+                    with open("error_logs.txt", "a") as f:
+                        f.write(no_urls_msg + "\n")
+                except Exception:
+                    pass
 
             # Randomly select a high-contrast theme color for each individual video
             selected_color = random.choice(PREMIUM_COLORS)
