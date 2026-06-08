@@ -611,7 +611,7 @@ def submit_feedback(fb: FeedbackSchema):
 @app.get("/api/admin/feedbacks")
 def get_feedbacks(email: str):
     # Only allow the site owner
-    if email not in ["hamzaraeescarpet@gmail.com"]:
+    if email not in ["hamzaraeescarpet@gmail.com", "hamzarais2023@gmail.com"]:
         raise HTTPException(status_code=403, detail="Unauthorized")
     db = SessionLocal()
     fbs = db.query(Feedback).order_by(Feedback.id.desc()).all()
@@ -637,7 +637,7 @@ def register_user(user: UserRegisterSchema):
     db = SessionLocal()
     db_user = db.query(User).filter(User.username == user.email).first()
     # Owner email is premium by default, others check database flag
-    is_owner = user.email in ["hamzaraeescarpet@gmail.com"]
+    is_owner = user.email in ["hamzaraeescarpet@gmail.com", "hamzarais2023@gmail.com"]
     if not db_user:
         db_user = User(
             username=user.email,
@@ -658,7 +658,7 @@ def register_user(user: UserRegisterSchema):
 @app.get("/api/check-premium")
 def check_premium(email: str):
     # Owner email is premium by default
-    if email in ["hamzaraeescarpet@gmail.com"]:
+    if email in ["hamzaraeescarpet@gmail.com", "hamzarais2023@gmail.com"]:
         return {"is_premium": True}
     db = SessionLocal()
     db_user = db.query(User).filter(User.username == email).first()
@@ -794,14 +794,14 @@ async def kofi_webhook(
 
 @app.get("/api/admin/users")
 def get_users(email: str):
-    if email not in ["hamzaraeescarpet@gmail.com"]:
+    if email not in ["hamzaraeescarpet@gmail.com", "hamzarais2023@gmail.com"]:
         raise HTTPException(status_code=403, detail="Unauthorized")
     db = SessionLocal()
     users = db.query(User).order_by(User.id.desc()).all()
     formatted = []
     for u in users:
         # Extra safety check for premium status
-        is_prem = u.username in ["hamzaraeescarpet@gmail.com"] or u.is_premium
+        is_prem = u.username in ["hamzaraeescarpet@gmail.com", "hamzarais2023@gmail.com"] or u.is_premium
         if is_prem != u.is_premium:
             u.is_premium = is_prem
             db.commit()

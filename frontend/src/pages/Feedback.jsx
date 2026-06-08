@@ -17,7 +17,7 @@ export default function Feedback() {
   const [activeTab, setActiveTab] = useState('feedbacks'); // 'feedbacks' or 'emails'
   const [copied, setCopied] = useState(false);
 
-  const isAdmin = currentUser && currentUser.email === 'hamzaraeescarpet@gmail.com';
+  const isAdmin = currentUser && ['hamzaraeescarpet@gmail.com', 'hamzarais2023@gmail.com'].includes(currentUser.email);
 
   useEffect(() => {
     if (isAdmin) {
