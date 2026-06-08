@@ -248,6 +248,26 @@ def get_categories():
     categories = [d for d in os.listdir(BG_DIR) if os.path.isdir(os.path.join(BG_DIR, d))]
     return {"categories": categories}
 
+@app.get("/api/debug-logs")
+def get_debug_logs():
+    res = {}
+    if os.path.exists("error_logs.txt"):
+        with open("error_logs.txt", "r", encoding="utf-8") as f:
+            res["error_logs"] = f.read()
+    else:
+        res["error_logs"] = "No error_logs.txt found"
+        
+    # Also grab stdout/stderr from server if possible, or print directory structure
+    try:
+        cache_dir = os.path.join(BASE_DIR, "backgrounds_cache")
+        res["cache_exists"] = os.path.exists(cache_dir)
+        if res["cache_exists"]:
+            res["cache_files"] = os.listdir(cache_dir)
+    except Exception as e:
+        res["cache_error"] = str(e)
+        
+    return res
+
 from video_generator import create_video_from_row
 
 def process_video_batch(
