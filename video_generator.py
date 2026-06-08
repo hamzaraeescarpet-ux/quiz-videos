@@ -85,6 +85,79 @@ def safe_print(msg):
         except Exception:
             pass
 
+def resolve_local_fallback_bg(category, tried_paths):
+    category_path = os.path.join(BG_VIDEO_FOLDER, category)
+    
+    # Step A: Category direct files
+    if os.path.exists(category_path) and os.path.isdir(category_path):
+        bg_files = [os.path.join(category_path, f) for f in os.listdir(category_path) if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))]
+        available = [p for p in bg_files if p not in tried_paths]
+        if available:
+            return random.choice(available)
+            
+    # Step B: Recursive search in backgrounds/
+    all_fallback_videos = []
+    for root_dir, dirs, files in os.walk(BG_VIDEO_FOLDER):
+        for file in files:
+            if file.lower().endswith((".mp4", ".mov", ".mkv", ".webm")):
+                path = os.path.join(root_dir, file)
+                if path not in tried_paths:
+                    all_fallback_videos.append(path)
+    if all_fallback_videos:
+        return random.choice(all_fallback_videos)
+        
+    # Step C: cache directory
+    cache_dir = os.path.join(BASE_DIR, "backgrounds_cache")
+    if os.path.exists(cache_dir) and os.path.isdir(cache_dir):
+        cache_files = [os.path.join(cache_dir, f) for f in os.listdir(cache_dir) if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))]
+        available = [os.path.join(cache_dir, f) for f in cache_files if os.path.join(cache_dir, f) not in tried_paths]
+        if available:
+            return random.choice(available)
+            
+    # Step D: root directory
+    root_files = [os.path.join(BASE_DIR, f) for f in os.listdir(BASE_DIR) if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))]
+    available = [p for p in root_files if p not in tried_paths]
+    if available:
+        return random.choice(available)
+        
+    return None
+
+def load_bg_clip_safely(bg_video_path, category, custom_bg_paths=None):
+    tried_paths = set()
+    
+    while True:
+        if not bg_video_path or bg_video_path in tried_paths:
+            # Pick from custom_bg_paths first (excluding tried ones)
+            available_custom = [p for p in (custom_bg_paths or []) if p not in tried_paths]
+            if available_custom:
+                bg_video_path = random.choice(available_custom)
+            else:
+                bg_video_path = resolve_local_fallback_bg(category, tried_paths)
+                
+        if not bg_video_path:
+            raise Exception("No valid background video files could be resolved.")
+            
+        safe_print(f"Attempting to load background video clip: {bg_video_path}")
+        tried_paths.add(bg_video_path)
+        
+        try:
+            clip = VideoFileClip(bg_video_path, audio=False)
+            fps = clip.fps
+            if not fps or fps <= 0:
+                raise ValueError("Video file has invalid FPS metadata.")
+            # Success!
+            return clip, bg_video_path
+        except Exception as e:
+            safe_print(f"Error loading background clip {bg_video_path}: {e}. Deleting bad file and falling back...")
+            # Delete corrupted file if it exists
+            if os.path.exists(bg_video_path):
+                try:
+                    os.remove(bg_video_path)
+                    safe_print(f"Deleted corrupted background file: {bg_video_path}")
+                except Exception as del_err:
+                    safe_print(f"Could not delete corrupted file {bg_video_path}: {del_err}")
+            bg_video_path = None
+
 def create_video_from_row(row, category, custom_logo_path, output_dir, box_color=None, custom_bg_paths=None):
     vid_id = str(row.get('id', random.randint(1000, 9999)))
     q_text = str(row.get('question', ''))
@@ -214,7 +287,8 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     final_audio = CompositeAudioClip(final_audio_list).set_duration(total_duration)
 
     # 3) Video base
-    clip = VideoFileClip(bg_video_path, audio=False).fx(loop, duration=total_duration)
+    clip, resolved_path = load_bg_clip_safely(bg_video_path, category, custom_bg_paths)
+    clip = clip.fx(loop, duration=total_duration)
     # Skip expensive CPU resize/crop operations if the video is already 1080x1920
     if clip.w != 1080 or clip.h != 1920:
         clip = clip.resize(height=1920).crop(x1=clip.w / 2 - 540, y1=0, width=1080, height=1920)

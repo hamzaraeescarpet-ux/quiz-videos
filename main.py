@@ -82,6 +82,22 @@ import urllib.parse
 import hashlib
 import json
 
+def is_valid_video_file(path: str) -> bool:
+    if not os.path.exists(path):
+        return False
+    size = os.path.getsize(path)
+    if size < 50000:  # 50 KB is a safe minimum for a vertical background video
+        return False
+    try:
+        # Read the first 100 bytes to check for HTML/JSON error text instead of raw media
+        with open(path, "rb") as f:
+            header = f.read(100).lower()
+        if b"<!doctype" in header or b"<html" in header or b"{" in header or b"[" in header:
+            return False
+    except Exception:
+        return False
+    return True
+
 def download_and_cache_video(url: str) -> str:
     # Auto-convert Dropbox links from dl=0 (preview page) to raw=1 (direct download link)
     if "dropbox.com" in url:
@@ -103,8 +119,14 @@ def download_and_cache_video(url: str) -> str:
     filename = f"bg_{url_hash}{ext}"
     local_path = os.path.join(BG_CACHE_DIR, filename)
     
-    if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+    if is_valid_video_file(local_path):
         return local_path
+    else:
+        if os.path.exists(local_path):
+            try:
+                os.remove(local_path)
+            except Exception:
+                pass
         
     print(f"Downloading background video: {url} -> {local_path}", flush=True)
     try:
@@ -143,7 +165,27 @@ def download_and_cache_video(url: str) -> str:
                     if chunk:
                         f.write(chunk)
         else:
-            urllib.request.urlretrieve(url, local_path)
+            import requests
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+            print(f"Downloading non-GD video from: {url} using requests...", flush=True)
+            res = requests.get(url, headers=headers, stream=True, timeout=45)
+            res.raise_for_status()
+            
+            # Check content type
+            content_type = res.headers.get("content-type", "").lower()
+            if "text/html" in content_type:
+                raise ValueError("Downloaded URL returned HTML page, not a direct video stream.")
+                
+            with open(local_path, "wb") as f:
+                for chunk in res.iter_content(chunk_size=65536):
+                    if chunk:
+                        f.write(chunk)
+                        
+        # Post-download validation
+        if not is_valid_video_file(local_path):
+            raise ValueError("Downloaded file is empty or contains an invalid format (corrupt video file).")
             
         return local_path
     except Exception as e:
