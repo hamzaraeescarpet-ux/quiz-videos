@@ -34,8 +34,14 @@ export default function Pricing() {
       name: 'Monthly Unlimited',
       price: '$4.99',
       period: '/mo',
-      description: 'Generate unlimited videos for a month.',
-      features: ['Unlimited bulk video generation', 'Bypass the 5 credits limit', 'Custom logo branding', '1080p high quality', 'Priority rendering speed'],
+      description: 'Supercharge your content creation for a single month.',
+      features: [
+        '🎬 Unlimited Video Generation - Generate as many viral quiz videos as you want all month.',
+        '⚡ No Credit Limits - Fully bypass the 5 daily credit limit for continuous creation.',
+        '🎨 Custom Branding - Upload your own logo and remove all watermarks.',
+        '📺 High Definition Render - Clean 1080p videos ready to post on TikTok, Reels, & Shorts.',
+        '🚀 Priority Rendering Speed - Faster compile times compared to the free tier.'
+      ],
       cta: 'Subscribe Monthly',
       popular: false,
       planType: 'monthly'
@@ -44,13 +50,14 @@ export default function Pricing() {
       name: 'Yearly Unlimited',
       price: '$9.99',
       period: '/yr',
-      description: 'Best value! Generate unlimited videos all year.',
+      description: 'Pay for 2 months, get 12! Best value for creators.',
       features: [
-        'Unlimited vertical video rendering (12 Months Access)', 
-        'Unlocks all premium templates & layouts', 
-        'VIP priority rendering queue (Fastest compile speed)', 
-        'Massive 83% savings (Save over $50 compared to monthly)', 
-        'Custom logo branding & priority support'
+        '🔥 Pay for 2 Months, Get 12! - Access the premium suite for an entire year (Save 83% instantly).',
+        '🚀 VIP Priority Engine - The absolute fastest rendering queue with zero queue wait times.',
+        '🎨 Elite Layout Pass - Full access to all premium templates, styles, and vertical backgrounds.',
+        '💎 Massive Savings - Keep $50+ in your pocket compared to the monthly subscription.',
+        '🌟 Complete Brand Ownership - Full custom branding, zero watermarks, and custom assets.',
+        '👑 VIP Customer Care - Priority 24/7 dedicated support & direct feature requests to developers.'
       ],
       cta: 'Subscribe Yearly',
       popular: true,
@@ -82,8 +89,8 @@ export default function Pricing() {
             }`}
           >
             {plan.popular && (
-              <div className="absolute top-0 right-1/2 translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-brand-600 to-brand-400 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
-                Most Popular
+              <div className="absolute top-0 right-1/2 translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-brand-600 to-brand-400 text-white px-4 py-1 rounded-full text-xs font-bold shadow-lg tracking-wide whitespace-nowrap">
+                ✨ Best Value - Save 83%
               </div>
             )}
             
@@ -97,14 +104,25 @@ export default function Pricing() {
             </div>
 
             <ul className="mb-8 space-y-4 flex-grow">
-              {plan.features.map(feature => (
-                <li key={feature} className="flex items-center gap-3 text-gray-300 text-sm">
-                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-brand-900/50 flex items-center justify-center text-brand-400">
-                    <Check className="w-3 h-3" />
-                  </div>
-                  {feature}
-                </li>
-              ))}
+              {plan.features.map(feature => {
+                const parts = feature.split(' - ');
+                return (
+                  <li key={feature} className="flex items-start gap-3 text-gray-300 text-sm leading-relaxed">
+                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-brand-900/50 flex items-center justify-center text-brand-400 mt-0.5">
+                      <Check className="w-3 h-3" />
+                    </div>
+                    <span>
+                      {parts.length > 1 ? (
+                        <>
+                          <strong className="text-white font-semibold">{parts[0]}</strong> — <span className="text-gray-400">{parts[1]}</span>
+                        </>
+                      ) : (
+                        feature
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
 
             <button 
@@ -114,7 +132,7 @@ export default function Pricing() {
                 isPremium 
                   ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 cursor-default'
                   : plan.popular 
-                    ? 'bg-brand-600 hover:bg-brand-750 text-white border-brand-600 hover:border-brand-700 shadow-lg shadow-brand-500/25' 
+                    ? 'bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-650 text-white border-brand-600 hover:border-brand-700 shadow-lg shadow-brand-500/25 transform active:scale-98' 
                     : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border-gray-200 dark:bg-dark-700 dark:hover:bg-dark-600 dark:text-white dark:border-dark-600 shadow-sm'
               }`}
             >
@@ -131,3 +149,4 @@ export default function Pricing() {
     </div>
   );
 }
+
