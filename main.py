@@ -83,6 +83,17 @@ import hashlib
 import json
 
 def download_and_cache_video(url: str) -> str:
+    # Auto-convert Dropbox links from dl=0 (preview page) to raw=1 (direct download link)
+    if "dropbox.com" in url:
+        if "dl=0" in url:
+            url = url.replace("dl=0", "raw=1")
+        elif "dl=1" not in url and "raw=1" not in url:
+            if "?" in url:
+                url = url + "&raw=1"
+            else:
+                url = url + "?raw=1"
+        print(f"Dropbox URL auto-converted to raw download link: {url}", flush=True)
+
     # Generate a unique stable filename from the URL hash
     url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
     parsed = urllib.parse.urlparse(url)
