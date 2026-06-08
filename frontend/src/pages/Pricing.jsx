@@ -90,13 +90,13 @@ export default function Pricing() {
           >
             {plan.popular && (
               <div className="absolute top-0 right-1/2 translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-brand-600 to-brand-400 text-white px-4 py-1 rounded-full text-xs font-bold shadow-lg tracking-wide whitespace-nowrap">
-                ✨ Best Value - Save 83%
+                ✨ Most Popular - Save 83%
               </div>
             )}
             
             <div className="mb-8">
-              <h3 className="text-xl font-bold text-gray-200 mb-2">{plan.name}</h3>
-              <p className="text-gray-400 text-sm h-10">{plan.description}</p>
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">{plan.name}</h3>
+              <p className="text-gray-600 dark:text-gray-400 text-sm h-10">{plan.description}</p>
               <div className="mt-4 flex items-baseline text-5xl font-extrabold text-gray-900 dark:text-white">
                 {plan.price}
                 {plan.period && <span className="ml-1 text-xl font-medium text-gray-500 dark:text-gray-400">{plan.period}</span>}
@@ -107,14 +107,14 @@ export default function Pricing() {
               {plan.features.map(feature => {
                 const parts = feature.split(' - ');
                 return (
-                  <li key={feature} className="flex items-start gap-3 text-gray-300 text-sm leading-relaxed">
-                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-brand-900/50 flex items-center justify-center text-brand-400 mt-0.5">
+                  <li key={feature} className="flex items-start gap-3 text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
+                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-brand-100 dark:bg-brand-900/50 flex items-center justify-center text-brand-650 dark:text-brand-400 mt-0.5">
                       <Check className="w-3 h-3" />
                     </div>
                     <span>
                       {parts.length > 1 ? (
                         <>
-                          <strong className="text-white font-semibold">{parts[0]}</strong> — <span className="text-gray-400">{parts[1]}</span>
+                          <strong className="text-gray-900 dark:text-white font-semibold">{parts[0]}</strong> — <span className="text-gray-600 dark:text-gray-400">{parts[1]}</span>
                         </>
                       ) : (
                         feature
