@@ -45,7 +45,7 @@ export default function Pricing() {
       price: '$9.99',
       period: '/yr',
       description: 'Best value! Generate unlimited videos all year.',
-      features: ['Everything in Monthly', 'Save over 15% compared to monthly', 'Cancel anytime', 'Premium templates unlock'],
+      features: ['Everything in Monthly', 'Save over 80% compared to monthly', 'Cancel anytime', 'Premium templates unlock'],
       cta: 'Subscribe Yearly',
       popular: true,
       planType: 'yearly'
