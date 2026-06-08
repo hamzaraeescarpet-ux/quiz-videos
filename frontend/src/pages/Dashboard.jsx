@@ -28,6 +28,37 @@ export default function Dashboard() {
   const [status, setStatus] = useState(null); // 'Processing', 'Completed', 'Interrupted', 'Failed'
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [displayPercent, setDisplayPercent] = useState(0);
+  const [isStopping, setIsStopping] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  // Track time elapsed during rendering to show news ticker after 2 minutes (120s)
+  useEffect(() => {
+    let timer;
+    if (status === 'Processing') {
+      timer = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => clearInterval(timer);
+  }, [status]);
+
+  useEffect(() => {
+    if (sessionId && status === 'Processing') {
+      try {
+        const localHistory = JSON.parse(localStorage.getItem('quizviral_jobs_history') || '[]');
+        const currentJob = localHistory.find(j => j.session_id === sessionId);
+        if (currentJob && currentJob.created_at) {
+          const startedAt = new Date(currentJob.created_at).getTime();
+          const diffSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+          setElapsedSeconds(diffSeconds);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [sessionId, status]);
 
   useEffect(() => {
     // If we mount and already have a session, we assume it might be processing
@@ -58,6 +89,11 @@ export default function Dashboard() {
         axios.get(`/api/hf/status/${sessionId}`).then(res => {
           setStatus(res.data.status);
           setProgress({ current: res.data.completed_so_far, total: res.data.total_expected });
+          
+          if (['Completed', 'Failed', 'Interrupted'].includes(res.data.status)) {
+            localStorage.removeItem('current_session_id');
+            setIsStopping(false);
+          }
           
           // Update local history status
           try {
@@ -264,9 +300,8 @@ export default function Dashboard() {
   const stopGeneration = async () => {
     if (sessionId) {
       try {
+        setIsStopping(true);
         await axios.post(`/api/hf/stop-generation/${sessionId}`);
-        setStatus('Interrupted');
-        localStorage.removeItem('current_session_id');
         
         // Update local history status to Interrupted
         try {
@@ -284,6 +319,7 @@ export default function Dashboard() {
       } catch (err) {
         console.error(err);
         alert("Failed to stop generation.");
+        setIsStopping(false);
       }
     }
   };
@@ -297,6 +333,8 @@ export default function Dashboard() {
     setSessionId(null);
     setProgress({ current: 0, total: 0 });
     setDisplayPercent(0);
+    setIsStopping(false);
+    setElapsedSeconds(0);
     setRows([{ id: Date.now(), question: '', option1: '', option2: '', option3: '', option4: '', answer: '' }]);
     localStorage.removeItem('current_session_id');
   };
@@ -515,10 +553,24 @@ export default function Dashboard() {
               {status === 'Processing' && (
                 <button 
                   onClick={stopGeneration}
-                  className="w-full sm:w-auto bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white px-4 py-2 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 text-sm"
+                  disabled={isStopping}
+                  className={`w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 text-sm ${
+                    isStopping 
+                      ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/50 cursor-not-allowed'
+                      : 'bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white'
+                  }`}
                 >
-                  <Square className="fill-current w-4 h-4" />
-                  Stop & Download
+                  {isStopping ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-500 border-t-transparent" />
+                      Stopping (Saving ZIP)...
+                    </>
+                  ) : (
+                    <>
+                      <Square className="fill-current w-4 h-4" />
+                      Stop & Download
+                    </>
+                  )}
                 </button>
               )}
             </div>
@@ -535,6 +587,33 @@ export default function Dashboard() {
                 {displayPercent}%
               </span>
             </div>
+
+            {/* News Ticker Ticker (Shown after 2 minutes / 120s of active rendering) */}
+            {status === 'Processing' && elapsedSeconds > 120 && (
+              <div className="w-full overflow-hidden bg-brand-500/5 border border-brand-500/20 rounded-lg py-2 mt-2 relative">
+                <style dangerouslySetInnerHTML={{__html: `
+                  @keyframes ticker-marquee {
+                    0% { transform: translate3d(100%, 0, 0); }
+                    100% { transform: translate3d(-100%, 0, 0); }
+                  }
+                  .ticker-wrap {
+                    display: flex;
+                    width: 100%;
+                  }
+                  .ticker-move {
+                    display: inline-block;
+                    white-space: nowrap;
+                    padding-left: 100%;
+                    animation: ticker-marquee 35s linear infinite;
+                  }
+                `}} />
+                <div className="ticker-wrap">
+                  <div className="ticker-move text-xs md:text-sm font-semibold text-brand-300">
+                    💡 If you feel the rendering is taking too long, feel free to stop it. You will get a ZIP file containing all the videos finished so far, and you can generate the remaining ones later.
+                  </div>
+                </div>
+              </div>
+            )}
 
             {(status === 'Completed' || status === 'Interrupted') && (
               <div className="flex flex-col sm:flex-row justify-center pt-2 md:pt-4 gap-4">

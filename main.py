@@ -423,8 +423,19 @@ Keep growing your viral factory!
         
     finally:
         zip_path = os.path.join(OUTPUT_DIR, f"{session_id}.zip")
-        shutil.make_archive(zip_path.replace('.zip', ''), 'zip', session_output_dir)
-        job.zip_file_path = zip_path
+        try:
+            print(f"Creating zip file: {zip_path} from folder: {session_output_dir}", flush=True)
+            shutil.make_archive(zip_path.replace('.zip', ''), 'zip', session_output_dir)
+            job.zip_file_path = zip_path
+        except Exception as zip_err:
+            import traceback
+            zip_err_msg = f"ZIP creation failed: {zip_err}\n{traceback.format_exc()}"
+            print(zip_err_msg, flush=True)
+            try:
+                with open("error_logs.txt", "a") as f:
+                    f.write(zip_err_msg + "\n")
+            except Exception:
+                pass
         
         # Update user's generated videos count in SQLite
         if user_email and job.completed_so_far > 0:
