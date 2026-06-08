@@ -214,7 +214,7 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     final_audio = CompositeAudioClip(final_audio_list).set_duration(total_duration)
 
     # 3) Video base
-    clip = VideoFileClip(bg_video_path).fx(loop, duration=total_duration)
+    clip = VideoFileClip(bg_video_path, audio=False).fx(loop, duration=total_duration)
     # Skip expensive CPU resize/crop operations if the video is already 1080x1920
     if clip.w != 1080 or clip.h != 1920:
         clip = clip.resize(height=1920).crop(x1=clip.w / 2 - 540, y1=0, width=1080, height=1920)
