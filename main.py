@@ -189,7 +189,14 @@ def download_and_cache_video(url: str) -> str:
             
         return local_path
     except Exception as e:
-        print(f"Error downloading background video {url}: {e}", flush=True)
+        import traceback
+        download_err_msg = f"Error downloading background video {url}: {e}\n{traceback.format_exc()}"
+        print(download_err_msg, flush=True)
+        try:
+            with open("error_logs.txt", "a") as f:
+                f.write(download_err_msg + "\n")
+        except Exception:
+            pass
         if os.path.exists(local_path):
             try:
                 os.remove(local_path)
