@@ -610,7 +610,7 @@ export default function Dashboard() {
                 `}} />
                 <div className="ticker-wrap">
                   <div className="ticker-move text-xs md:text-sm font-semibold text-brand-300">
-                    💡 If you feel the rendering is taking too long, feel free to stop it. You will get a ZIP file containing all the videos finished so far, and you can generate the remaining ones later.
+                    💡 If you feel the rendering is taking too long, feel free to stop it. You will get a ZIP file containing all the videos finished so far, and you can generate the remaining ones later or you Just minimize this tab and come back after some time; your bulk videos will be generated.
                   </div>
                 </div>
               </div>

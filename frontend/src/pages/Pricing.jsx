@@ -101,6 +101,17 @@ export default function Pricing() {
                 {plan.price}
                 {plan.period && <span className="ml-1 text-xl font-medium text-gray-500 dark:text-gray-400">{plan.period}</span>}
               </div>
+              {plan.planType === 'yearly' && (
+                <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs font-semibold animate-pulse flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                    <span>⚡ URGENT: Launch Deal Ending Tonight!</span>
+                  </div>
+                  <p className="text-gray-450 dark:text-gray-400 font-normal">
+                    This $9.99/yr promotional price is only valid until 12:00 AM midnight tonight. Afterwards, it will increase to <strong>$49.99/yr</strong>.
+                  </p>
+                </div>
+              )}
             </div>
 
             <ul className="mb-8 space-y-4 flex-grow">
