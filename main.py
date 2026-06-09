@@ -334,7 +334,13 @@ def process_video_batch(
             row_bg_paths = None
             category_local_path = os.path.join(BASE_DIR, "backgrounds", category)
             local_bg_files = []
-            if os.path.exists(category_local_path) and os.path.isdir(category_local_path):
+            if category == "Mix":
+                # Collect all local background videos recursively from all categories
+                for root_dir, _, files in os.walk(os.path.join(BASE_DIR, "backgrounds")):
+                    for file in files:
+                        if file.lower().endswith((".mp4", ".mov", ".mkv", ".webm")):
+                            local_bg_files.append(os.path.join(root_dir, file))
+            elif os.path.exists(category_local_path) and os.path.isdir(category_local_path):
                 local_bg_files = [
                     os.path.join(category_local_path, f)
                     for f in os.listdir(category_local_path)
