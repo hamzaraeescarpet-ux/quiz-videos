@@ -330,10 +330,21 @@ def process_video_batch(
                 db.commit()
                 break
                 
-            # Pick background video: either custom uploads or cache from category config URLs
+            # Pick background video: either custom uploads, local backgrounds, or cache from category config URLs
             row_bg_paths = None
+            category_local_path = os.path.join(BASE_DIR, "backgrounds", category)
+            local_bg_files = []
+            if os.path.exists(category_local_path) and os.path.isdir(category_local_path):
+                local_bg_files = [
+                    os.path.join(category_local_path, f)
+                    for f in os.listdir(category_local_path)
+                    if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))
+                ]
+
             if custom_bg_paths and len(custom_bg_paths) > 0:
                 row_bg_paths = custom_bg_paths
+            elif local_bg_files:
+                row_bg_paths = [random.choice(local_bg_files)]
             elif bg_urls:
                 random_url = random.choice(bg_urls)
                 dl_start_msg = f"INFO: Selected random url={random_url}. Starting download..."

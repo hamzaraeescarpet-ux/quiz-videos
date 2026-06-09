@@ -13,7 +13,4 @@ frontend/dist/
 .vercel
 .env*.local
 backgrounds_cache/
-backgrounds/**/*.mp4
-backgrounds/**/*.mov
-backgrounds/**/*.mkv
-backgrounds/**/*.webm
+
