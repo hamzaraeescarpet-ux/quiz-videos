@@ -291,7 +291,18 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     clip = clip.fx(loop, duration=total_duration)
     # Skip expensive CPU resize/crop operations if the video is already 1080x1920
     if clip.w != 1080 or clip.h != 1920:
-        clip = clip.resize(height=1920).crop(x1=clip.w / 2 - 540, y1=0, width=1080, height=1920)
+        target_ratio = 1080 / 1920
+        clip_ratio = clip.w / clip.h
+        if clip_ratio > target_ratio:
+            # Video is wider than target (landscape or less vertical)
+            clip = clip.resize(height=1920)
+            x1 = (clip.w - 1080) / 2
+            clip = clip.crop(x1=x1, y1=0, width=1080, height=1920)
+        else:
+            # Video is narrower than target (more vertical)
+            clip = clip.resize(width=1080)
+            y1 = (clip.h - 1920) / 2
+            clip = clip.crop(x1=0, y1=y1, width=1080, height=1920)
     clip = clip.set_audio(final_audio)
 
     # 4) Text setup
@@ -366,7 +377,7 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
             circular_mask_np = (dist_from_center <= radius) * 1.0
             mask_clip = ImageClip(circular_mask_np, ismask=True)
 
-            logo_clip_final = logo_clip.set_mask(mask_clip).set_position((900, 40)).set_duration(total_duration).fadein(1.0)
+            logo_clip_final = logo_clip.set_mask(mask_clip).set_position((840, 40)).set_duration(total_duration).fadein(1.0)
         except Exception as e:
             print(f"Logo Processing Warning: {e}")
 

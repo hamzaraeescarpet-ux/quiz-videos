@@ -327,7 +327,6 @@ def process_video_batch(
         for idx, row in enumerate(questions):
             if session_id in active_sessions and active_sessions[session_id] == "stop":
                 job.status = "Interrupted"
-                db.commit()
                 break
                 
             # Pick background video: either custom uploads, local backgrounds, or cache from category config URLs

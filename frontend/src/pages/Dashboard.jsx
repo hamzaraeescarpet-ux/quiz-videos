@@ -33,32 +33,32 @@ export default function Dashboard() {
 
   // Track time elapsed during rendering to show news ticker after 2 minutes (120s)
   useEffect(() => {
-    let timer;
-    if (status === 'Processing') {
-      timer = setInterval(() => {
-        setElapsedSeconds(prev => prev + 1);
-      }, 1000);
-    } else {
+    if (status !== 'Processing') {
       setElapsedSeconds(0);
+      return;
     }
-    return () => clearInterval(timer);
-  }, [status]);
 
-  useEffect(() => {
-    if (sessionId && status === 'Processing') {
-      try {
+    let initialSeconds = 0;
+    try {
+      if (sessionId) {
         const localHistory = JSON.parse(localStorage.getItem('quizviral_jobs_history') || '[]');
         const currentJob = localHistory.find(j => j.session_id === sessionId);
         if (currentJob && currentJob.created_at) {
           const startedAt = new Date(currentJob.created_at).getTime();
-          const diffSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-          setElapsedSeconds(diffSeconds);
+          initialSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
         }
-      } catch (e) {
-        console.error(e);
       }
+    } catch (e) {
+      console.error(e);
     }
-  }, [sessionId, status]);
+    setElapsedSeconds(initialSeconds);
+
+    const timer = setInterval(() => {
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [status, sessionId]);
 
   useEffect(() => {
     // If we mount and already have a session, we assume it might be processing
@@ -593,18 +593,19 @@ export default function Dashboard() {
               <div className="w-full overflow-hidden bg-brand-500/5 border border-brand-500/20 rounded-lg py-2 mt-2 relative">
                 <style dangerouslySetInnerHTML={{__html: `
                   @keyframes ticker-marquee {
-                    0% { transform: translate3d(100%, 0, 0); }
+                    0% { transform: translate3d(0%, 0, 0); }
                     100% { transform: translate3d(-100%, 0, 0); }
                   }
                   .ticker-wrap {
-                    display: flex;
+                    overflow: hidden;
                     width: 100%;
+                    white-space: nowrap;
                   }
                   .ticker-move {
                     display: inline-block;
-                    white-space: nowrap;
                     padding-left: 100%;
                     animation: ticker-marquee 35s linear infinite;
+                    will-change: transform;
                   }
                 `}} />
                 <div className="ticker-wrap">
