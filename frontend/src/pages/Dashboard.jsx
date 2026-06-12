@@ -364,9 +364,27 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
-      <header className="px-2">
-        <h1 className="text-2xl md:text-3xl font-extrabold mb-2">Create Viral Videos</h1>
-        <p className="text-gray-400 text-sm md:text-base">Transform text into highly engaging trivia short videos instantly.</p>
+      <header className="px-2 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-dark-700/60 pb-4 md:pb-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold mb-2">Create Viral Videos</h1>
+          <p className="text-gray-400 text-sm md:text-base">Transform text into highly engaging trivia short videos instantly.</p>
+        </div>
+        <div className="flex-shrink-0">
+          <a 
+            href="https://www.producthunt.com/products/quizviral-ai?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-quizviral-ai" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-block hover:opacity-95 transition-opacity"
+            id="ph-badge-dashboard"
+          >
+            <img 
+              alt="QuizViral AI - Create 100+ Viral Faceless Videos in Just 1-Click! 🤖 | Product Hunt" 
+              width="250" 
+              height="54" 
+              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1169342&theme=light&t=1781246404032" 
+            />
+          </a>
+        </div>
       </header>
 
       {/* Step 1: Category Dropdown & Custom Videos area */}

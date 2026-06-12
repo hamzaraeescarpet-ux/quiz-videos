@@ -14,7 +14,7 @@ export default function Pricing() {
     // Track InitiateCheckout event in Facebook Pixel
     if (window.fbq) {
       window.fbq('track', 'InitiateCheckout', {
-        value: planType === 'yearly' ? 9.99 : 4.99,
+        value: planType === 'yearly' ? 19.99 : 9.99,
         currency: 'USD',
         content_name: planType === 'yearly' ? 'Yearly Unlimited' : 'Monthly Unlimited',
         content_category: 'Subscription'
@@ -32,7 +32,7 @@ export default function Pricing() {
   const plans = [
     {
       name: 'Monthly Unlimited',
-      price: '$4.99',
+      price: '$9.99',
       period: '/mo',
       description: 'Supercharge your content creation for a single month.',
       features: [
@@ -48,7 +48,7 @@ export default function Pricing() {
     },
     {
       name: 'Yearly Unlimited',
-      price: '$9.99',
+      price: '$19.99',
       period: '/yr',
       description: 'Pay for 2 months, get 12! Best value for creators.',
       features: [
@@ -108,7 +108,7 @@ export default function Pricing() {
                     <span>⚡ URGENT: Launch Deal Ending Tonight!</span>
                   </div>
                   <p className="text-gray-450 dark:text-gray-400 font-normal">
-                    This $9.99/yr promotional price is only valid until 12:00 AM midnight tonight. Afterwards, it will increase to <strong>$49.99/yr</strong>.
+                    This $19.99/yr promotional price is only valid until 12:00 AM midnight tonight. Afterwards, it will increase to <strong>$99.99/yr</strong>.
                   </p>
                 </div>
               )}

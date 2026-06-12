@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Layers, History, CreditCard, Sparkles, Menu, X, MessageSquare } from 'lucide-react';
+import { Layers, History, CreditCard, Sparkles, Menu, X, MessageSquare, BookOpen } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../AuthContext';
 
@@ -13,6 +13,7 @@ export default function Navbar() {
     { name: 'Dashboard', path: '/', icon: Layers },
     { name: 'History', path: '/history', icon: History },
     { name: 'Pricing', path: '/pricing', icon: CreditCard },
+    { name: 'Blog', path: '/blog', icon: BookOpen },
     { name: 'Feedback', path: '/feedback', icon: MessageSquare },
   ];
 

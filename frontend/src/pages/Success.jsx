@@ -12,7 +12,7 @@ export default function Success() {
   useEffect(() => {
     // 1. Track Purchase in Facebook Pixel
     const plan = searchParams.get('plan') || 'monthly';
-    const value = plan === 'yearly' ? 9.99 : 4.99;
+    const value = plan === 'yearly' ? 19.99 : 9.99;
     
     if (window.fbq) {
       window.fbq('track', 'Purchase', {
