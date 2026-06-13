@@ -4,7 +4,7 @@ import History from './pages/History';
 import Pricing from './pages/Pricing';
 import Feedback from './pages/Feedback';
 import AboutUs from './pages/AboutUs';
-import PrivacyPolicy from './pages/PrivacyPolicy';
+import PrivacyPolicy from './pages/Privacy';
 import TermsOfService from './pages/TermsOfService';
 import RefundPolicy from './pages/RefundPolicy';
 import Success from './pages/Success';

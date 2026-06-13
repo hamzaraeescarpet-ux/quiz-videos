@@ -567,6 +567,42 @@ def download_zip(session_id: str):
         
     return FileResponse(job.zip_file_path, media_type="application/zip", filename=f"QuizViral_Videos_{session_id}.zip")
 
+@app.get("/api/videos/{session_id}")
+def list_generated_videos(session_id: str):
+    db = SessionLocal()
+    job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
+    db.close()
+    if not job:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session_output_dir = os.path.join(OUTPUT_DIR, session_id)
+    if not os.path.isdir(session_output_dir):
+        raise HTTPException(status_code=404, detail="Generated videos not found")
+
+    videos = sorted(
+        filename for filename in os.listdir(session_output_dir)
+        if filename.lower().endswith(".mp4")
+    )
+    return {"session_id": session_id, "videos": [{"filename": filename} for filename in videos]}
+
+@app.get("/api/videos/{session_id}/{filename}")
+def preview_generated_video(session_id: str, filename: str):
+    db = SessionLocal()
+    job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
+    db.close()
+    if not job:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    safe_filename = os.path.basename(filename)
+    if safe_filename != filename or not safe_filename.lower().endswith(".mp4"):
+        raise HTTPException(status_code=400, detail="Invalid video filename")
+
+    video_path = os.path.join(OUTPUT_DIR, session_id, safe_filename)
+    if not os.path.isfile(video_path):
+        raise HTTPException(status_code=404, detail="Generated video not found")
+
+    return FileResponse(video_path, media_type="video/mp4")
+
 @app.get("/api/jobs")
 def get_user_jobs(email: str):
     db = SessionLocal()

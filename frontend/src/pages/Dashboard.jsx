@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useDropzone } from 'react-dropzone';
-import { UploadCloud, Play, Square, Download, Trash2, Plus, Image as ImageIcon, FileText, MessageSquare, FileSpreadsheet, Zap, DollarSign } from 'lucide-react';
+import { UploadCloud, Play, Square, Download, Trash2, Plus, Image as ImageIcon, FileText, MessageSquare, FileSpreadsheet, Zap, DollarSign, Sparkles, ArrowDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
@@ -30,6 +30,16 @@ export default function Dashboard() {
   const [displayPercent, setDisplayPercent] = useState(0);
   const [isStopping, setIsStopping] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [showGenerateGuide, setShowGenerateGuide] = useState(false);
+  const [generatedVideos, setGeneratedVideos] = useState([]);
+  const generateSectionRef = useRef(null);
+  const [pendingComplete, setPendingComplete] = useState(false);
+  const startTimeRef = useRef(null);
+
+  const demoRows = [
+    { id: 'demo-population', question: 'Which country has the largest population?', option1: 'India', option2: 'China', option3: 'United States', option4: 'Indonesia', answer: 'India' },
+    { id: 'demo-capital', question: 'What is the capital of the USA?', option1: 'New York City', option2: 'Washington, D.C.', option3: 'Los Angeles', option4: 'Chicago', answer: 'Washington, D.C.' }
+  ];
 
   // Track time elapsed during rendering to show news ticker after 2 minutes (120s)
   useEffect(() => {
@@ -61,6 +71,15 @@ export default function Dashboard() {
   }, [status, sessionId]);
 
   useEffect(() => {
+    if (pendingComplete && elapsedSeconds >= 120) {
+      setStatus('Completed');
+      setPendingComplete(false);
+      localStorage.removeItem('current_session_id');
+      setIsStopping(false);
+    }
+  }, [pendingComplete, elapsedSeconds]);
+
+  useEffect(() => {
     // If we mount and already have a session, we assume it might be processing
     if (sessionId && !status) {
       setStatus('Processing');
@@ -80,19 +99,59 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    if (!sessionId || !['Completed', 'Interrupted'].includes(status)) {
+      return;
+    }
+
+    axios.get(`/api/hf/videos/${sessionId}`).then(res => {
+      setGeneratedVideos(res.data.videos || []);
+    }).catch(err => {
+      console.error("Failed to load generated video previews", err);
+      setGeneratedVideos([]);
+    });
+  }, [sessionId, status]);
+
+  useEffect(() => {
     let interval;
     let fakeProgressInterval;
 
     if (sessionId && status === 'Processing') {
+      if (!startTimeRef.current) {
+        let startedAtTime = Date.now();
+        try {
+          const localHistory = JSON.parse(localStorage.getItem('quizviral_jobs_history') || '[]');
+          const currentJob = localHistory.find(j => j.session_id === sessionId);
+          if (currentJob && currentJob.created_at) {
+            startedAtTime = new Date(currentJob.created_at).getTime();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+        startTimeRef.current = startedAtTime;
+      }
+
       // Poll real status every 2 seconds
       interval = setInterval(() => {
         axios.get(`/api/hf/status/${sessionId}`).then(res => {
-          setStatus(res.data.status);
-          setProgress({ current: res.data.completed_so_far, total: res.data.total_expected });
+          const backendStatus = res.data.status;
+          const currentElapsed = Math.floor((Date.now() - (startTimeRef.current || Date.now())) / 1000);
           
-          if (['Completed', 'Failed', 'Interrupted'].includes(res.data.status)) {
-            localStorage.removeItem('current_session_id');
-            setIsStopping(false);
+          if (backendStatus === 'Completed') {
+            setProgress({ current: res.data.completed_so_far, total: res.data.total_expected });
+            if (currentElapsed >= 120) {
+              setStatus('Completed');
+              localStorage.removeItem('current_session_id');
+              setIsStopping(false);
+            } else {
+              setPendingComplete(true);
+            }
+          } else {
+            setStatus(backendStatus);
+            setProgress({ current: res.data.completed_so_far, total: res.data.total_expected });
+            if (['Failed', 'Interrupted'].includes(backendStatus)) {
+              localStorage.removeItem('current_session_id');
+              setIsStopping(false);
+            }
           }
           
           // Update local history status
@@ -102,7 +161,7 @@ export default function Dashboard() {
               if (job.session_id === sessionId) {
                 return {
                   ...job,
-                  status: res.data.status,
+                  status: backendStatus,
                   completed_so_far: res.data.completed_so_far,
                   total_expected: res.data.total_expected
                 };
@@ -147,7 +206,9 @@ export default function Dashboard() {
           const cap = basePercent + chunkSize - 1; // e.g. cap at 19% if base is 0% and chunk is 20%
 
           // If we are completed, snap to 100
-          if (progress.current === progress.total) return 100;
+          if (progress.current === progress.total) {
+            return status === 'Processing' ? 99 : 100;
+          }
           
           // Slowly increment towards the cap
           if (prev < basePercent) return basePercent; // Catch up if behind
@@ -165,7 +226,7 @@ export default function Dashboard() {
       clearInterval(interval);
       clearInterval(fakeProgressInterval);
     };
-  }, [sessionId, status, progress.current, progress.total]);
+  }, [sessionId, status, progress.current, progress.total, pendingComplete]);
 
   const onLogoDrop = useCallback(acceptedFiles => {
     setLogoFile(acceptedFiles[0]);
@@ -186,6 +247,19 @@ export default function Dashboard() {
     if (rows.length < 150) {
       setRows([...rows, { id: Date.now(), question: '', option1: '', option2: '', option3: '', option4: '', answer: '' }]);
     }
+  };
+
+  const fillDemoData = () => {
+    const builtInCategory = categories.find(category => !category.toLowerCase().includes('custom'));
+    if (selectedCategory.toLowerCase().includes('custom') || !selectedCategory) {
+      setSelectedCategory(builtInCategory || 'Mix');
+      setCustomBgFiles([]);
+    }
+    setRows(demoRows);
+    setShowGenerateGuide(true);
+    window.setTimeout(() => {
+      generateSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
   };
 
   const removeRow = (index) => {
@@ -266,6 +340,10 @@ export default function Dashboard() {
     }
 
     try {
+      startTimeRef.current = Date.now();
+      setPendingComplete(false);
+      setShowGenerateGuide(false);
+      setGeneratedVideos([]);
       setStatus('Processing');
       setProgress({ current: 0, total: rows.length });
       setDisplayPercent(0);
@@ -335,8 +413,12 @@ export default function Dashboard() {
     setDisplayPercent(0);
     setIsStopping(false);
     setElapsedSeconds(0);
+    setShowGenerateGuide(false);
+    setGeneratedVideos([]);
     setRows([{ id: Date.now(), question: '', option1: '', option2: '', option3: '', option4: '', answer: '' }]);
     localStorage.removeItem('current_session_id');
+    startTimeRef.current = null;
+    setPendingComplete(false);
   };
 
   // Helper to check if status is complete/failed and clear storage
@@ -472,7 +554,13 @@ export default function Dashboard() {
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h3 className="font-medium text-gray-700 dark:text-gray-200">Questions Data</h3>
-            <div className="flex w-full sm:w-auto items-center gap-3">
+            <div className="flex w-full sm:w-auto flex-wrap items-center gap-3">
+              <button
+                onClick={fillDemoData}
+                className="w-full sm:w-auto bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 px-4 py-2 md:py-1.5 rounded-md text-sm font-extrabold transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 hover:scale-[1.03] active:scale-95 cursor-pointer"
+              >
+                ✨ Try Demo / Test Data
+              </button>
               <label className="flex-1 sm:flex-none cursor-pointer bg-gray-100 hover:bg-gray-200 dark:bg-dark-700 dark:hover:bg-dark-600 text-gray-700 dark:text-white px-3 py-2 md:py-1.5 rounded-md text-sm md:text-sm transition-colors border border-gray-200 dark:border-dark-600 flex items-center justify-center gap-2">
                 <FileText className="w-4 h-4" />
                 Upload CSV
@@ -520,20 +608,33 @@ export default function Dashboard() {
       </section>
 
       {/* Step 3: Generation Control */}
-      <section className="bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 shadow-xl flex flex-col items-center">
+      <section ref={generateSectionRef} className="bg-dark-800 p-4 md:p-6 rounded-xl border border-dark-700 shadow-xl flex flex-col items-center relative">
         {!status ? (
-          <button 
-            onClick={startGeneration}
-            className="w-full md:max-w-md py-4 px-4 rounded-xl bg-gradient-to-r from-brand-600 to-brand-400 text-white font-bold text-base md:text-lg hover:from-brand-500 hover:to-brand-300 transition-all shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transform hover:scale-105 active:scale-95"
-          >
-            <Play className="fill-current w-5 h-5" />
-            {!currentUser 
-              ? 'Generate Bulk Videos' 
-              : isPremium 
-                ? 'Generate Bulk Videos' 
-                : `Generate Bulk Videos (${credits} Credits Left)`
-            }
-          </button>
+          <>
+            {showGenerateGuide && (
+              <motion.div
+                initial={{ opacity: 0, y: -12, scale: 0.96 }}
+                animate={{ opacity: 1, y: [0, 6, 0], scale: 1 }}
+                transition={{ opacity: { duration: 0.25 }, scale: { duration: 0.25 }, y: { duration: 1.25, repeat: Infinity } }}
+                className="mb-4 max-w-md rounded-xl border border-amber-400/60 bg-amber-400 px-4 py-3 text-center text-sm font-extrabold text-slate-950 shadow-xl shadow-amber-500/25"
+              >
+                Awesome! Now click here to generate your videos in 1-click 🚀
+                <ArrowDown className="mx-auto mt-1 h-6 w-6" />
+              </motion.div>
+            )}
+            <button
+              onClick={startGeneration}
+              className={`w-full md:max-w-md py-4 px-4 rounded-xl bg-gradient-to-r from-brand-600 to-brand-400 text-white font-bold text-base md:text-lg hover:from-brand-500 hover:to-brand-300 transition-all shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2 transform hover:scale-105 active:scale-95 ${showGenerateGuide ? 'ring-4 ring-amber-400/70 ring-offset-4 ring-offset-dark-800' : ''}`}
+            >
+              <Play className="fill-current w-5 h-5" />
+              {!currentUser
+                ? 'Generate Bulk Videos'
+                : isPremium
+                  ? 'Generate Bulk Videos'
+                  : `Generate Bulk Videos (${credits} Credits Left)`
+              }
+            </button>
+          </>
         ) : (
           <div className="w-full space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -588,8 +689,47 @@ export default function Dashboard() {
               </span>
             </div>
 
-            {/* News Ticker Ticker (Shown after 2 minutes / 120s of active rendering) */}
-            {status === 'Processing' && elapsedSeconds > 120 && (
+            {status === 'Processing' && elapsedSeconds >= 120 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="w-full overflow-hidden bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-400/30 rounded-xl py-3 px-4 shadow-xl relative"
+              >
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 w-full overflow-hidden">
+                    <span className="flex h-3 w-3 relative shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                    </span>
+                    <div className="ticker-wrap w-full overflow-hidden text-left">
+                      <style dangerouslySetInnerHTML={{__html: `
+                        @keyframes premium-marquee {
+                          0% { transform: translate3d(0%, 0, 0); }
+                          100% { transform: translate3d(-50%, 0, 0); }
+                        }
+                        .premium-ticker-move {
+                          display: inline-block;
+                          white-space: nowrap;
+                          animation: premium-marquee 25s linear infinite;
+                        }
+                      `}} />
+                      <div className="premium-ticker-move text-sm font-extrabold text-amber-300">
+                        Loved the speed? Unlock Unlimited High-Speed Renderings, Premium AI Voices &amp; 500+ backgrounds! &nbsp;&nbsp;&nbsp;&nbsp; ★ &nbsp;&nbsp;&nbsp;&nbsp; Loved the speed? Unlock Unlimited High-Speed Renderings, Premium AI Voices &amp; 500+ backgrounds! &nbsp;&nbsp;&nbsp;&nbsp; ★ &nbsp;&nbsp;&nbsp;&nbsp;
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate('/pricing')}
+                    className="shrink-0 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black text-xs md:text-sm px-4 py-2 rounded-lg transition-all shadow-md shadow-orange-500/30 hover:scale-105 active:scale-95 cursor-pointer"
+                  >
+                    Upgrade to Premium Now
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Legacy rendering-help ticker is intentionally hidden in favor of the premium banner above. */}
+            {status === 'Processing' && elapsedSeconds < 0 && (
               <div className="w-full overflow-hidden bg-brand-500/5 border border-brand-500/20 rounded-lg py-2 mt-2 relative">
                 <style dangerouslySetInnerHTML={{__html: `
                   @keyframes ticker-marquee {
@@ -617,21 +757,36 @@ export default function Dashboard() {
             )}
 
             {(status === 'Completed' || status === 'Interrupted') && (
-              <div className="flex flex-col sm:flex-row justify-center pt-2 md:pt-4 gap-4">
-                <button 
-                  onClick={downloadZip}
-                  className="w-full sm:w-auto bg-green-600 hover:bg-green-500 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-base md:text-lg transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
-                >
-                  <Download className="w-5 h-5" />
-                  Download ZIP
-                </button>
-                <button 
-                  onClick={resetState}
-                  className="w-full sm:w-auto bg-dark-700 hover:bg-dark-600 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-base md:text-lg transition-all flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-5 h-5" />
-                  Start New Bulk
-                </button>
+              <div className="space-y-6 pt-2 md:pt-4">
+                {generatedVideos.length > 0 && (
+                  <div>
+                    <h4 className="mb-4 text-center text-lg font-extrabold text-brand-300">Your Generated Video Previews</h4>
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                      {generatedVideos.map((video, index) => (
+                        <div key={video.filename} className="overflow-hidden rounded-xl border border-dark-600 bg-dark-900 shadow-xl">
+                          <video controls preload="metadata" className="aspect-[9/16] w-full bg-black" src={`/api/hf/videos/${sessionId}/${encodeURIComponent(video.filename)}`} />
+                          <p className="px-3 py-2 text-center text-xs font-bold text-gray-300">Video {index + 1}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-col sm:flex-row justify-center gap-4">
+                  <button
+                    onClick={downloadZip}
+                    className="w-full sm:w-auto bg-green-600 hover:bg-green-500 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-base md:text-lg transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-5 h-5" />
+                    Download ZIP
+                  </button>
+                  <button
+                    onClick={resetState}
+                    className="w-full sm:w-auto bg-dark-700 hover:bg-dark-600 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-base md:text-lg transition-all flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Start New Bulk
+                  </button>
+                </div>
               </div>
             )}
             {status === 'Failed' && (
