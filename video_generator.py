@@ -21,9 +21,12 @@ except Exception:
     pass
 
 def create_rounded_text(text, fontsize, txt_color, bg_color, font_path, size, align='center', radius=40, padding=70, border_color=None, border_width=0):
+    if font_path == 'Arial':
+        font_path = 'Arial-Bold'
     txt_clip = TextClip(
         text, fontsize=fontsize, color=txt_color, font=font_path,
-        method='caption', align=align, size=size
+        method='caption', align=align, size=size,
+        stroke_color=txt_color, stroke_width=1.5
     )
     w, h = txt_clip.size
     bg_w, bg_h = w + padding, h + padding
@@ -111,10 +114,18 @@ def fetch_wikipedia_image(subject):
                     img_url = page_data["original"]["source"]
                     
                     # Convert SVG to PNG if necessary
-                    if img_url.lower().endswith(".svg"):
-                        if "/commons/" in img_url and "/commons/thumb/" not in img_url:
-                            filename = img_url.split("/")[-1]
-                            img_url = img_url.replace("/commons/", "/commons/thumb/") + f"/1024px-{filename}.png"
+                    if img_url.lower().endswith(".svg") and "/thumb/" not in img_url:
+                        try:
+                            parts = img_url.split("/")
+                            if "wikipedia" in parts:
+                                idx = parts.index("wikipedia")
+                                site = parts[idx + 1]
+                                filename = parts[-1]
+                                target_find = f"/wikipedia/{site}/"
+                                target_replace = f"/wikipedia/{site}/thumb/"
+                                img_url = img_url.replace(target_find, target_replace) + f"/1280px-{filename}.png"
+                        except Exception:
+                            pass
                     return img_url
     except Exception as e:
         print(f"Error fetching Wikipedia image for {subject}: {e}", flush=True)
@@ -123,7 +134,7 @@ def fetch_wikipedia_image(subject):
 def create_parallax_background_files(image_path, temp_dir, vid_id):
     img = Image.open(image_path).convert("RGBA")
     
-    # 1. Generate blurred background (1080x1920)
+    # 1. Generate full-screen background (1080x1920)
     bg_w, bg_h = 1080, 1920
     scale = max(bg_w / img.width, bg_h / img.height)
     new_w = int(img.width * scale) + 1
@@ -134,29 +145,13 @@ def create_parallax_background_files(image_path, temp_dir, vid_id):
     top = (new_h - bg_h) // 2
     bg_cropped = bg_resized.crop((left, top, left + bg_w, top + bg_h))
     
-    # Apply Blur + 30% Black Overlay
-    bg_blurred = bg_cropped.filter(ImageFilter.GaussianBlur(radius=45))
-    overlay = Image.new("RGBA", bg_blurred.size, (0, 0, 0, 80))
-    bg_blurred = Image.alpha_composite(bg_blurred, overlay)
+    # Apply 30% Black Overlay for HD look and readability (no blur)
+    overlay = Image.new("RGBA", bg_cropped.size, (0, 0, 0, 80))
+    bg_final = Image.alpha_composite(bg_cropped, overlay)
     
-    # 2. Generate sharp foreground image with white border (8px)
-    max_fg_w, max_fg_h = 800, 450
-    fg_scale = min(max_fg_w / img.width, max_fg_h / img.height)
-    fg_w = int(img.width * fg_scale)
-    fg_h = int(img.height * fg_scale)
-    fg_resized = img.resize((fg_w, fg_h), Image.Resampling.LANCZOS)
-    
-    border_width = 8
-    fg_bordered_w = fg_w + 2 * border_width
-    fg_bordered_h = fg_h + 2 * border_width
-    fg_bordered = Image.new("RGBA", (fg_bordered_w, fg_bordered_h), (255, 255, 255, 255))
-    fg_bordered.paste(fg_resized, (border_width, border_width))
-    
-    bg_path = os.path.join(temp_dir, f"temp_bg_blur_{vid_id}.png")
-    fg_path = os.path.join(temp_dir, f"temp_fg_sharp_{vid_id}.png")
-    bg_blurred.save(bg_path, "PNG")
-    fg_bordered.save(fg_path, "PNG")
-    return bg_path, fg_path
+    bg_path = os.path.join(temp_dir, f"temp_full_bg_{vid_id}.png")
+    bg_final.save(bg_path, "PNG")
+    return bg_path
 
 async def generate_voice(text, filename):
     voice = "en-US-ChristopherNeural"
@@ -415,22 +410,18 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
                     with open(local_img_path, "wb") as f:
                         f.write(response.read())
                 
-                bg_img_path, fg_img_path = create_parallax_background_files(local_img_path, TEMP_FOLDER, vid_id)
-                temp_image_paths.extend([local_img_path, bg_img_path, fg_img_path])
+                bg_img_path = create_parallax_background_files(local_img_path, TEMP_FOLDER, vid_id)
+                temp_image_paths.extend([local_img_path, bg_img_path])
                 
                 bg_layer = ImageClip(bg_img_path).set_duration(total_duration)
-                fg_layer = ImageClip(fg_img_path).set_duration(total_duration)
                 
                 try:
-                    bg_layer = bg_layer.resize(lambda t: 1.0 + 0.08 * (t / total_duration))
-                    fg_layer = fg_layer.resize(lambda t: 1.0 + 0.05 * (t / total_duration))
+                    bg_layer = bg_layer.resize(lambda t: 1.0 + 0.1 * (t / total_duration))
                 except Exception:
                     pass
                 
-                fg_layer = fg_layer.set_position(('center', 340))
-                
-                clip = CompositeVideoClip([bg_layer, fg_layer], size=(1080, 1920)).set_audio(final_audio)
-                temp_image_clips.extend([bg_layer, fg_layer])
+                clip = bg_layer.set_audio(final_audio)
+                temp_image_clips.append(bg_layer)
                 is_image_bg = True
                 safe_print("Successfully built animated contextual image background.")
             else:
@@ -465,32 +456,31 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     theme_rgb = hex_to_rgb(theme_color, (231, 76, 60))
     
     # Beautiful Question Card using plain theme color with solid white border (6px)
-    q_pos_y = 80 if is_image_bg else 220
     txt_q = create_rounded_text(
         q_text, fontsize=70, txt_color='white', bg_color=theme_rgb + (255,), font_path=font_to_use,
-        size=(880, None), align='center', padding=35, radius=35, border_color=(255, 255, 255, 255), border_width=6
-    ).set_position(('center', q_pos_y)).set_duration(total_duration).crossfadein(0.5)
+        size=(800, None), align='center', padding=25, radius=35, border_color=(255, 255, 255, 255), border_width=6
+    ).set_position(('center', 220)).set_duration(total_duration).crossfadein(0.5)
 
     # High-quality dynamic Option Cards (A, B, C, D) fully rounded like capsules with White Borders
     opt_labels = ["A", "B", "C", "D"]
     opt_vals = [opt1_val, opt2_val, opt3_val, opt4_val]
-    y_coords = [830, 970, 1110, 1250] if is_image_bg else [680, 830, 980, 1130]
+    y_coords = [680, 830, 980, 1130]
     
     option_clips = []
     for idx, (label, val, y) in enumerate(zip(opt_labels, opt_vals, y_coords), start=1):
         opt_text = f"  {label})  {val}"
         
         if idx == correct_idx:
-            # Active normal card before reveal with thick white border (padding=45 for thicker look)
+            # Active normal card before reveal with thick white border (padding=30 for narrower look)
             normal_before = create_rounded_text(
                 opt_text, fontsize=52, txt_color='white', bg_color=theme_rgb + (255,), font_path=font_to_use,
-                size=(880, None), align='West', padding=45, radius=-1, border_color=(255, 255, 255, 255), border_width=5
+                size=(800, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 255), border_width=5
             ).set_position(('center', y)).set_start(0.5).set_duration(reveal_time - 0.5).crossfadein(0.3)
             
             # Active green card after reveal with thick white border
             green_after = create_rounded_text(
                 opt_text, fontsize=52, txt_color='white', bg_color=(46, 204, 113, 255), font_path=font_to_use,
-                size=(880, None), align='West', padding=45, radius=-1, border_color=(255, 255, 255, 255), border_width=5
+                size=(800, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 255), border_width=5
             ).set_position(('center', y)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.2)
             
             option_clips.extend([normal_before, green_after])
@@ -498,23 +488,22 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
             # Normal card before reveal with thick white border
             normal_before = create_rounded_text(
                 opt_text, fontsize=52, txt_color='white', bg_color=theme_rgb + (255,), font_path=font_to_use,
-                size=(880, None), align='West', padding=45, radius=-1, border_color=(255, 255, 255, 255), border_width=5
+                size=(800, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 255), border_width=5
             ).set_position(('center', y)).set_start(0.5).set_duration(reveal_time - 0.5).crossfadein(0.3)
             
             # Dimmed card after reveal (to highlight the correct answer) - keeps theme color but with transparency
             dimmed_after = create_rounded_text(
                 opt_text, fontsize=52, txt_color='#d0d0d0', bg_color=theme_rgb + (100,), font_path=font_to_use,
-                size=(880, None), align='West', padding=45, radius=-1, border_color=(255, 255, 255, 100), border_width=5
+                size=(800, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 100), border_width=5
             ).set_position(('center', y)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.2)
             
             option_clips.extend([normal_before, dimmed_after])
 
     # Beautiful Green Bottom Answer Banner with White Border
-    ans_pos_y = 1420 if is_image_bg else 1350
     txt_ans = create_rounded_text(
         f"Correct Answer: {correct_label} 🎉", fontsize=75, txt_color='white', bg_color=(39, 174, 96, 255), font_path=font_to_use,
-        size=(880, None), align='center', padding=35, radius=30, border_color=(255, 255, 255, 255), border_width=6
-    ).set_position(('center', ans_pos_y)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.3)
+        size=(800, None), align='center', padding=25, radius=30, border_color=(255, 255, 255, 255), border_width=6
+    ).set_position(('center', 1350)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.3)
 
     # 5) Custom Logo Check
     logo_clip_final = None
