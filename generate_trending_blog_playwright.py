@@ -34,7 +34,37 @@ def get_trending_keyword():
         return "TikTok Quiz Videos"
 
 def get_unsplash_image(keyword):
-    """Unsplash से टॉपिक से मैचिंग 1200px की हाई-क्वालिटी फ़्री इमेज खोजता है"""
+    """Wikipedia PageImages से मैचिंग इमेज खोजता है, फ़ेल होने पर Unsplash के HD फ़ॉलबैक का उपयोग करता है"""
+    import ssl
+    import json
+    import urllib.parse
+    import urllib.request
+    
+    # Try Wikipedia first for a highly relevant contextual image
+    try:
+        context = ssl._create_unverified_context()
+        search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(keyword)}&utf8=&format=json&srlimit=1"
+        req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
+        with urllib.request.urlopen(req, timeout=10, context=context) as response:
+            search_data = json.loads(response.read().decode('utf-8'))
+            search_results = search_data.get("query", {}).get("search", [])
+            if search_results:
+                best_title = search_results[0]["title"]
+                
+                image_url_api = f"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=thumbnail&pithumbsize=1280&titles={urllib.parse.quote(best_title)}&redirects=1"
+                req2 = urllib.request.Request(image_url_api, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
+                with urllib.request.urlopen(req2, timeout=10, context=context) as response2:
+                    img_data = json.loads(response2.read().decode('utf-8'))
+                    pages = img_data.get("query", {}).get("pages", {})
+                    for page_id, page_data in pages.items():
+                        if "thumbnail" in page_data:
+                            wiki_img = page_data["thumbnail"]["source"]
+                            print(f"Wikipedia Image Found for {keyword}: {wiki_img}")
+                            return wiki_img
+    except Exception as e:
+        print(f"Wikipedia image fetch failed: {e}. Using Unsplash fallback.")
+
+    # Unsplash Fallback
     image_url = "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&q=80"
     if "game" in keyword.lower() or "sports" in keyword.lower():
         image_url = "https://images.unsplash.com/photo-1486427944299-d1955d23e317?auto=format&fit=crop&w=1200&q=80"
