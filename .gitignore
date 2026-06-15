@@ -13,4 +13,7 @@ frontend/dist/
 .vercel
 .env*.local
 backgrounds_cache/
-
+error_logs.txt
+test_output/
+*TEMP_MPY_*.mp4
+*TEMP_MPY_*.mp3

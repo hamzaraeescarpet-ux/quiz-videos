@@ -57,6 +57,23 @@ os.makedirs(TEMP_FOLDER, exist_ok=True)
 # Define font directly
 FONT_PATH = os.path.join(ASSETS_FOLDER, "fonts", "Milker.ttf")
 
+def safe_print(msg):
+    try:
+        print(msg, flush=True)
+    except Exception:
+        try:
+            print(msg.encode('ascii', errors='replace').decode('ascii'), flush=True)
+        except Exception:
+            pass
+    try:
+        log_file = os.path.join(BASE_DIR, "error_logs.txt")
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(f"[{timestamp}] {msg}\n")
+    except Exception:
+        pass
+
 import urllib.request
 import urllib.parse
 import json
@@ -95,7 +112,7 @@ def fetch_wikipedia_image(subject):
         context = ssl._create_unverified_context()
         # Step 1: Search Wikipedia for the best matching page title
         search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(subject)}&utf8=&format=json&srlimit=1"
-        req = urllib.request.Request(search_url, headers={'User-Agent': 'QuizViralBot/1.0'})
+        req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
         with urllib.request.urlopen(req, timeout=10, context=context) as response:
             search_data = json.loads(response.read().decode('utf-8'))
             search_results = search_data.get("query", {}).get("search", [])
@@ -105,7 +122,7 @@ def fetch_wikipedia_image(subject):
             
         # Step 2: Get the thumbnail image of the best matching page (max width 1280)
         image_url = f"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=thumbnail&pithumbsize=1280&titles={urllib.parse.quote(best_title)}&redirects=1"
-        req = urllib.request.Request(image_url, headers={'User-Agent': 'QuizViralBot/1.0'})
+        req = urllib.request.Request(image_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
         with urllib.request.urlopen(req, timeout=10, context=context) as response:
             img_data = json.loads(response.read().decode('utf-8'))
             pages = img_data.get("query", {}).get("pages", {})
@@ -113,7 +130,7 @@ def fetch_wikipedia_image(subject):
                 if "thumbnail" in page_data:
                     return page_data["thumbnail"]["source"]
     except Exception as e:
-        print(f"Error fetching Wikipedia image for {subject}: {e}", flush=True)
+        safe_print(f"Error fetching Wikipedia image for {subject}: {e}")
     return None
 
 def create_parallax_background_files(image_path, temp_dir, vid_id):
@@ -160,14 +177,7 @@ def hex_to_rgb(hex_str, default_rgb):
     except Exception:
         return default_rgb
 
-def safe_print(msg):
-    try:
-        print(msg, flush=True)
-    except Exception:
-        try:
-            print(msg.encode('ascii', errors='replace').decode('ascii'), flush=True)
-        except Exception:
-            pass
+# safe_print was moved to the top of the file
 
 def resolve_local_fallback_bg(category, tried_paths):
     category_path = os.path.join(BG_VIDEO_FOLDER, category)
