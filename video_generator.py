@@ -7,7 +7,7 @@ import edge_tts
 from moviepy.editor import *
 from moviepy.config import change_settings
 from moviepy.video.fx.all import loop, fadein
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 magick_path = shutil.which("magick")
 if magick_path:
@@ -53,6 +53,110 @@ os.makedirs(TEMP_FOLDER, exist_ok=True)
 
 # Define font directly
 FONT_PATH = os.path.join(ASSETS_FOLDER, "fonts", "Milker.ttf")
+
+import urllib.request
+import urllib.parse
+import json
+
+def extract_subject(row):
+    answer = str(row.get('answer', '')).strip()
+    question = str(row.get('question', '')).strip()
+    
+    # Check if answer is a valid entity (not a simple number, date, or percentage)
+    is_number = False
+    try:
+        float(answer.replace('%', '').replace('$', '').strip())
+        is_number = True
+    except ValueError:
+        pass
+        
+    if len(answer) > 2 and not is_number and answer.lower() not in ["yes", "no", "true", "false", "none"]:
+        return answer
+        
+    # Fallback to proper nouns in the question
+    words = question.split()
+    proper_nouns = []
+    for idx, w in enumerate(words):
+        clean_w = w.strip('?.,!""\'()')
+        if idx > 0 and clean_w and clean_w[0].isupper() and clean_w.lower() not in ["the", "a", "an", "is", "are", "which", "what", "who", "where", "when", "how"]:
+            proper_nouns.append(clean_w)
+            
+    if proper_nouns:
+        return " ".join(proper_nouns)
+        
+    return answer
+
+def fetch_wikipedia_image(subject):
+    import ssl
+    try:
+        context = ssl._create_unverified_context()
+        # Step 1: Search Wikipedia for the best matching page title
+        search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(subject)}&utf8=&format=json&srlimit=1"
+        req = urllib.request.Request(search_url, headers={'User-Agent': 'QuizViralBot/1.0'})
+        with urllib.request.urlopen(req, timeout=10, context=context) as response:
+            search_data = json.loads(response.read().decode('utf-8'))
+            search_results = search_data.get("query", {}).get("search", [])
+            if not search_results:
+                return None
+            best_title = search_results[0]["title"]
+            
+        # Step 2: Get the original image of the best matching page
+        image_url = f"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles={urllib.parse.quote(best_title)}&redirects=1"
+        req = urllib.request.Request(image_url, headers={'User-Agent': 'QuizViralBot/1.0'})
+        with urllib.request.urlopen(req, timeout=10, context=context) as response:
+            img_data = json.loads(response.read().decode('utf-8'))
+            pages = img_data.get("query", {}).get("pages", {})
+            for page_id, page_data in pages.items():
+                if "original" in page_data:
+                    img_url = page_data["original"]["source"]
+                    
+                    # Convert SVG to PNG if necessary
+                    if img_url.lower().endswith(".svg"):
+                        if "/commons/" in img_url and "/commons/thumb/" not in img_url:
+                            filename = img_url.split("/")[-1]
+                            img_url = img_url.replace("/commons/", "/commons/thumb/") + f"/1024px-{filename}.png"
+                    return img_url
+    except Exception as e:
+        print(f"Error fetching Wikipedia image for {subject}: {e}", flush=True)
+    return None
+
+def create_parallax_background_files(image_path, temp_dir, vid_id):
+    img = Image.open(image_path).convert("RGBA")
+    
+    # 1. Generate blurred background (1080x1920)
+    bg_w, bg_h = 1080, 1920
+    scale = max(bg_w / img.width, bg_h / img.height)
+    new_w = int(img.width * scale) + 1
+    new_h = int(img.height * scale) + 1
+    bg_resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    
+    left = (new_w - bg_w) // 2
+    top = (new_h - bg_h) // 2
+    bg_cropped = bg_resized.crop((left, top, left + bg_w, top + bg_h))
+    
+    # Apply Blur + 30% Black Overlay
+    bg_blurred = bg_cropped.filter(ImageFilter.GaussianBlur(radius=45))
+    overlay = Image.new("RGBA", bg_blurred.size, (0, 0, 0, 80))
+    bg_blurred = Image.alpha_composite(bg_blurred, overlay)
+    
+    # 2. Generate sharp foreground image with white border (8px)
+    max_fg_w, max_fg_h = 800, 450
+    fg_scale = min(max_fg_w / img.width, max_fg_h / img.height)
+    fg_w = int(img.width * fg_scale)
+    fg_h = int(img.height * fg_scale)
+    fg_resized = img.resize((fg_w, fg_h), Image.Resampling.LANCZOS)
+    
+    border_width = 8
+    fg_bordered_w = fg_w + 2 * border_width
+    fg_bordered_h = fg_h + 2 * border_width
+    fg_bordered = Image.new("RGBA", (fg_bordered_w, fg_bordered_h), (255, 255, 255, 255))
+    fg_bordered.paste(fg_resized, (border_width, border_width))
+    
+    bg_path = os.path.join(temp_dir, f"temp_bg_blur_{vid_id}.png")
+    fg_path = os.path.join(temp_dir, f"temp_fg_sharp_{vid_id}.png")
+    bg_blurred.save(bg_path, "PNG")
+    fg_bordered.save(fg_path, "PNG")
+    return bg_path, fg_path
 
 async def generate_voice(text, filename):
     voice = "en-US-ChristopherNeural"
@@ -287,23 +391,71 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     final_audio = CompositeAudioClip(final_audio_list).set_duration(total_duration)
 
     # 3) Video base
-    clip, resolved_path = load_bg_clip_safely(bg_video_path, category, custom_bg_paths)
-    clip = clip.fx(loop, duration=total_duration)
-    # Skip expensive CPU resize/crop operations if the video is already 1080x1920
-    if clip.w != 1080 or clip.h != 1920:
-        target_ratio = 1080 / 1920
-        clip_ratio = clip.w / clip.h
-        if clip_ratio > target_ratio:
-            # Video is wider than target (landscape or less vertical)
-            clip = clip.resize(height=1920)
-            x1 = (clip.w - 1080) / 2
-            clip = clip.crop(x1=x1, y1=0, width=1080, height=1920)
-        else:
-            # Video is narrower than target (more vertical)
-            clip = clip.resize(width=1080)
-            y1 = (clip.h - 1920) / 2
-            clip = clip.crop(x1=0, y1=y1, width=1080, height=1920)
-    clip = clip.set_audio(final_audio)
+    is_image_bg = False
+    temp_image_clips = []
+    temp_image_paths = []
+    
+    if "image" in category.lower():
+        try:
+            subject = extract_subject(row)
+            safe_print(f"Extracted subject for contextual image: '{subject}'")
+            image_url = fetch_wikipedia_image(subject)
+            if image_url:
+                safe_print(f"Found Wikipedia image URL: {image_url}")
+                parsed_url = urllib.parse.urlparse(image_url)
+                ext = os.path.splitext(parsed_url.path)[1]
+                if not ext or ext.lower() not in [".png", ".jpg", ".jpeg", ".webp"]:
+                    ext = ".png"
+                raw_filename = f"temp_raw_{vid_id}{ext}"
+                local_img_path = os.path.join(TEMP_FOLDER, raw_filename)
+                
+                import ssl
+                req = urllib.request.Request(image_url, headers={'User-Agent': 'QuizViralBot/1.0'})
+                with urllib.request.urlopen(req, timeout=15, context=ssl._create_unverified_context()) as response:
+                    with open(local_img_path, "wb") as f:
+                        f.write(response.read())
+                
+                bg_img_path, fg_img_path = create_parallax_background_files(local_img_path, TEMP_FOLDER, vid_id)
+                temp_image_paths.extend([local_img_path, bg_img_path, fg_img_path])
+                
+                bg_layer = ImageClip(bg_img_path).set_duration(total_duration)
+                fg_layer = ImageClip(fg_img_path).set_duration(total_duration)
+                
+                try:
+                    bg_layer = bg_layer.resize(lambda t: 1.0 + 0.08 * (t / total_duration))
+                    fg_layer = fg_layer.resize(lambda t: 1.0 + 0.05 * (t / total_duration))
+                except Exception:
+                    pass
+                
+                fg_layer = fg_layer.set_position(('center', 340))
+                
+                clip = CompositeVideoClip([bg_layer, fg_layer], size=(1080, 1920)).set_audio(final_audio)
+                temp_image_clips.extend([bg_layer, fg_layer])
+                is_image_bg = True
+                safe_print("Successfully built animated contextual image background.")
+            else:
+                safe_print("Wikipedia image URL not found. Falling back to default video background.")
+        except Exception as e:
+            safe_print(f"Failed to create image background: {e}. Falling back to default video background.")
+
+    if not is_image_bg:
+        clip, resolved_path = load_bg_clip_safely(bg_video_path, category, custom_bg_paths)
+        clip = clip.fx(loop, duration=total_duration)
+        # Skip expensive CPU resize/crop operations if the video is already 1080x1920
+        if clip.w != 1080 or clip.h != 1920:
+            target_ratio = 1080 / 1920
+            clip_ratio = clip.w / clip.h
+            if clip_ratio > target_ratio:
+                # Video is wider than target (landscape or less vertical)
+                clip = clip.resize(height=1920)
+                x1 = (clip.w - 1080) / 2
+                clip = clip.crop(x1=x1, y1=0, width=1080, height=1920)
+            else:
+                # Video is narrower than target (more vertical)
+                clip = clip.resize(width=1080)
+                y1 = (clip.h - 1920) / 2
+                clip = clip.crop(x1=0, y1=y1, width=1080, height=1920)
+        clip = clip.set_audio(final_audio)
 
     # 4) Text setup
     font_to_use = FONT_PATH if os.path.exists(FONT_PATH) else 'Arial'
@@ -313,15 +465,16 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     theme_rgb = hex_to_rgb(theme_color, (231, 76, 60))
     
     # Beautiful Question Card using plain theme color with solid white border (6px)
+    q_pos_y = 80 if is_image_bg else 220
     txt_q = create_rounded_text(
         q_text, fontsize=70, txt_color='white', bg_color=theme_rgb + (255,), font_path=font_to_use,
         size=(880, None), align='center', padding=35, radius=35, border_color=(255, 255, 255, 255), border_width=6
-    ).set_position(('center', 220)).set_duration(total_duration).crossfadein(0.5)
+    ).set_position(('center', q_pos_y)).set_duration(total_duration).crossfadein(0.5)
 
     # High-quality dynamic Option Cards (A, B, C, D) fully rounded like capsules with White Borders
     opt_labels = ["A", "B", "C", "D"]
     opt_vals = [opt1_val, opt2_val, opt3_val, opt4_val]
-    y_coords = [680, 830, 980, 1130]
+    y_coords = [830, 970, 1110, 1250] if is_image_bg else [680, 830, 980, 1130]
     
     option_clips = []
     for idx, (label, val, y) in enumerate(zip(opt_labels, opt_vals, y_coords), start=1):
@@ -357,10 +510,11 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
             option_clips.extend([normal_before, dimmed_after])
 
     # Beautiful Green Bottom Answer Banner with White Border
+    ans_pos_y = 1420 if is_image_bg else 1350
     txt_ans = create_rounded_text(
         f"Correct Answer: {correct_label} 🎉", fontsize=75, txt_color='white', bg_color=(39, 174, 96, 255), font_path=font_to_use,
         size=(880, None), align='center', padding=35, radius=30, border_color=(255, 255, 255, 255), border_width=6
-    ).set_position(('center', 1350)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.3)
+    ).set_position(('center', ans_pos_y)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.3)
 
     # 5) Custom Logo Check
     logo_clip_final = None
@@ -419,5 +573,18 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
         if os.path.exists(audio_path_2): os.remove(audio_path_2)
     except Exception:
         pass
+
+    if is_image_bg:
+        for c in temp_image_clips:
+            try:
+                c.close()
+            except Exception:
+                pass
+        for p in temp_image_paths:
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except Exception:
+                pass
 
     return output_path

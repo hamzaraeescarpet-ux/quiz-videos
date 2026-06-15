@@ -433,6 +433,7 @@ export default function Dashboard() {
   // Helper for category icons
   const getCategoryIcon = (cat) => {
     const lower = cat.toLowerCase();
+    if (lower.includes('image')) return '🖼️';
     if (lower.includes('minecraft')) return '⛏️';
     if (lower.includes('nature')) return '🌲';
     if (lower.includes('space')) return '🚀';
