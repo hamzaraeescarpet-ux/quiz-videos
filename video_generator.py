@@ -526,11 +526,16 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     final = CompositeVideoClip(final_elements)
     output_path = os.path.join(output_dir, f"quiz_{vid_id}.mp4")
 
+    # Use a specific temp_audiofile in the temp folder to avoid Windows permission/lock issues
+    temp_audio_file_path = os.path.join(TEMP_FOLDER, f"temp_audio_merge_{vid_id}.m4a")
+
     final.write_videofile(
         output_path,
         fps=24,
         codec="libx264",
         audio_codec="aac",
+        temp_audiofile=temp_audio_file_path,
+        remove_temp=True,
         preset="ultrafast",
         threads=4,
         verbose=False,
@@ -555,6 +560,11 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     try:
         if os.path.exists(audio_path_1): os.remove(audio_path_1)
         if os.path.exists(audio_path_2): os.remove(audio_path_2)
+        if os.path.exists(temp_audio_file_path):
+            try:
+                os.remove(temp_audio_file_path)
+            except Exception:
+                pass
     except Exception:
         pass
 
