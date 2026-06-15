@@ -690,71 +690,76 @@ export default function Dashboard() {
               </span>
             </div>
 
-            {status === 'Processing' && elapsedSeconds >= 120 && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="w-full overflow-hidden bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-400/30 rounded-xl py-3 px-4 shadow-xl relative"
-              >
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            {status === 'Processing' && (
+              (!isPremium && elapsedSeconds >= 120) ? (
+                // Premium Upgrade Ticker
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="w-full overflow-hidden bg-gradient-to-r from-brand-600/10 via-purple-600/10 to-indigo-600/10 border border-brand-500/30 rounded-xl py-3 px-4 shadow-xl relative"
+                >
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 w-full overflow-hidden">
+                      <span className="flex h-3 w-3 relative shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-brand-500"></span>
+                      </span>
+                      <div className="ticker-wrap w-full overflow-hidden text-left">
+                        <style dangerouslySetInnerHTML={{__html: `
+                          @keyframes premium-marquee {
+                            0% { transform: translate3d(0%, 0, 0); }
+                            100% { transform: translate3d(-50%, 0, 0); }
+                          }
+                          .premium-ticker-move {
+                            display: inline-block;
+                            white-space: nowrap;
+                            animation: premium-marquee 25s linear infinite;
+                          }
+                        `}} />
+                        <div className="premium-ticker-move text-sm font-extrabold text-brand-300">
+                          Loved the speed? Unlock Unlimited High-Speed Renderings, Premium AI Voices &amp; 500+ backgrounds! &nbsp;&nbsp;&nbsp;&nbsp; ★ &nbsp;&nbsp;&nbsp;&nbsp; Loved the speed? Unlock Unlimited High-Speed Renderings, Premium AI Voices &amp; 500+ backgrounds! &nbsp;&nbsp;&nbsp;&nbsp; ★ &nbsp;&nbsp;&nbsp;&nbsp;
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate('/pricing')}
+                      className="shrink-0 bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white font-black text-xs md:text-sm px-4 py-2 rounded-lg transition-all shadow-md shadow-brand-500/30 hover:scale-105 active:scale-95 cursor-pointer"
+                    >
+                      Upgrade to Premium Now
+                    </button>
+                  </div>
+                </motion.div>
+              ) : (
+                // Help Ticker (shown for Premium users, and for Free users when elapsedSeconds < 120)
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="w-full overflow-hidden bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-blue-500/10 border border-blue-500/30 rounded-xl py-3 px-4 shadow-xl relative"
+                >
                   <div className="flex items-center gap-3 w-full overflow-hidden">
                     <span className="flex h-3 w-3 relative shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
                     </span>
                     <div className="ticker-wrap w-full overflow-hidden text-left">
                       <style dangerouslySetInnerHTML={{__html: `
-                        @keyframes premium-marquee {
+                        @keyframes ticker-marquee {
                           0% { transform: translate3d(0%, 0, 0); }
                           100% { transform: translate3d(-50%, 0, 0); }
                         }
-                        .premium-ticker-move {
+                        .ticker-move {
                           display: inline-block;
                           white-space: nowrap;
-                          animation: premium-marquee 25s linear infinite;
+                          animation: ticker-marquee 30s linear infinite;
                         }
                       `}} />
-                      <div className="premium-ticker-move text-sm font-extrabold text-amber-300">
-                        Loved the speed? Unlock Unlimited High-Speed Renderings, Premium AI Voices &amp; 500+ backgrounds! &nbsp;&nbsp;&nbsp;&nbsp; ★ &nbsp;&nbsp;&nbsp;&nbsp; Loved the speed? Unlock Unlimited High-Speed Renderings, Premium AI Voices &amp; 500+ backgrounds! &nbsp;&nbsp;&nbsp;&nbsp; ★ &nbsp;&nbsp;&nbsp;&nbsp;
+                      <div className="ticker-move text-sm font-extrabold text-blue-300">
+                        💡 If the video generation is taking too long, you can stop it to download the videos generated so far and create the remaining ones later. Otherwise, you can just minimize this tab without closing it, and you will find all your videos ready after some time! &nbsp;&nbsp;&nbsp;&nbsp; ★ &nbsp;&nbsp;&nbsp;&nbsp; If the video generation is taking too long, you can stop it to download the videos generated so far and create the remaining ones later. Otherwise, you can just minimize this tab without closing it, and you will find all your videos ready after some time! &nbsp;&nbsp;&nbsp;&nbsp; ★ &nbsp;&nbsp;&nbsp;&nbsp;
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => navigate('/pricing')}
-                    className="shrink-0 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black text-xs md:text-sm px-4 py-2 rounded-lg transition-all shadow-md shadow-orange-500/30 hover:scale-105 active:scale-95 cursor-pointer"
-                  >
-                    Upgrade to Premium Now
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Legacy rendering-help ticker is intentionally hidden in favor of the premium banner above. */}
-            {status === 'Processing' && elapsedSeconds < 0 && (
-              <div className="w-full overflow-hidden bg-brand-500/5 border border-brand-500/20 rounded-lg py-2 mt-2 relative">
-                <style dangerouslySetInnerHTML={{__html: `
-                  @keyframes ticker-marquee {
-                    0% { transform: translate3d(0%, 0, 0); }
-                    100% { transform: translate3d(-100%, 0, 0); }
-                  }
-                  .ticker-wrap {
-                    overflow: hidden;
-                    width: 100%;
-                    white-space: nowrap;
-                  }
-                  .ticker-move {
-                    display: inline-block;
-                    padding-left: 100%;
-                    animation: ticker-marquee 35s linear infinite;
-                    will-change: transform;
-                  }
-                `}} />
-                <div className="ticker-wrap">
-                  <div className="ticker-move text-xs md:text-sm font-semibold text-brand-300">
-                    💡 If you feel the rendering is taking too long, feel free to stop it. You will get a ZIP file containing all the videos finished so far, and you can generate the remaining ones later or you Just minimize this tab and come back after some time; your bulk videos will be generated.
-                  </div>
-                </div>
-              </div>
+                </motion.div>
+              )
             )}
 
             {(status === 'Completed' || status === 'Interrupted') && (
