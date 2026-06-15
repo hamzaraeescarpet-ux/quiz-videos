@@ -103,30 +103,15 @@ def fetch_wikipedia_image(subject):
                 return None
             best_title = search_results[0]["title"]
             
-        # Step 2: Get the original image of the best matching page
-        image_url = f"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles={urllib.parse.quote(best_title)}&redirects=1"
+        # Step 2: Get the thumbnail image of the best matching page (max width 1280)
+        image_url = f"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=thumbnail&pithumbsize=1280&titles={urllib.parse.quote(best_title)}&redirects=1"
         req = urllib.request.Request(image_url, headers={'User-Agent': 'QuizViralBot/1.0'})
         with urllib.request.urlopen(req, timeout=10, context=context) as response:
             img_data = json.loads(response.read().decode('utf-8'))
             pages = img_data.get("query", {}).get("pages", {})
             for page_id, page_data in pages.items():
-                if "original" in page_data:
-                    img_url = page_data["original"]["source"]
-                    
-                    # Convert SVG to PNG if necessary
-                    if img_url.lower().endswith(".svg") and "/thumb/" not in img_url:
-                        try:
-                            parts = img_url.split("/")
-                            if "wikipedia" in parts:
-                                idx = parts.index("wikipedia")
-                                site = parts[idx + 1]
-                                filename = parts[-1]
-                                target_find = f"/wikipedia/{site}/"
-                                target_replace = f"/wikipedia/{site}/thumb/"
-                                img_url = img_url.replace(target_find, target_replace) + f"/1280px-{filename}.png"
-                        except Exception:
-                            pass
-                    return img_url
+                if "thumbnail" in page_data:
+                    return page_data["thumbnail"]["source"]
     except Exception as e:
         print(f"Error fetching Wikipedia image for {subject}: {e}", flush=True)
     return None
