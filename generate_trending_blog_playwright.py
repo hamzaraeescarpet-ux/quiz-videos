@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 import json
 import time
@@ -16,9 +17,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BLOG_POSTS_FILE = os.path.join(SCRIPT_DIR, "frontend", "src", "data", "blogPosts.js")
 # ========================================================
 
-def get_trending_keyword():
-    """Google Trends RSS Feed से आज का सबसे टॉप ट्रेंडिंग कीवर्ड निकालता है (100% फ़्री)"""
-    print("Fetching trending keywords from Google Trends...")
+def get_trending_keyword(index=0):
+    """Google Trends RSS Feed से ट्रेंडिंग कीवर्ड निकालता है (100% फ़्री)"""
+    print(f"Fetching trending keyword at index {index} from Google Trends...")
     url = "https://trends.google.com/trending/rss?geo=US"
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -26,13 +27,17 @@ def get_trending_keyword():
             xml_data = response.read()
         
         root = ET.fromstring(xml_data)
-        first_item = root.find(".//item")
-        title = first_item.find("title").text
-        print(f"Top trending topic found: {title}")
-        return title
+        items = root.findall(".//item")
+        if items and len(items) > index:
+            title = items[index].find("title").text
+            print(f"Trending topic found at index {index}: {title}")
+            return title
+        else:
+            print(f"Index {index} out of bounds (found {len(items)} items). Using fallback.")
+            return f"TikTok Quiz Videos {index}"
     except Exception as e:
         print(f"Error fetching trends: {e}. Falling back to default keyword.")
-        return "TikTok Quiz Videos"
+        return f"TikTok Quiz Videos {index}"
 
 def get_unsplash_image(keyword):
     """Wikipedia PageImages से मैचिंग इमेज खोजता है, फ़ेल होने पर Unsplash के HD फ़ॉलबैक का उपयोग करता है"""
@@ -351,8 +356,17 @@ def git_push_changes(title):
         print(f"Git push failed: {e}")
 
 def main():
+    # Parse trend index argument if provided
+    trend_index = 0
+    if "--trend-index" in sys.argv:
+        try:
+            idx = sys.argv.index("--trend-index")
+            trend_index = int(sys.argv[idx + 1])
+        except (ValueError, IndexError):
+            pass
+
     # 1. Google Trends से कीवर्ड लें
-    trend = get_trending_keyword()
+    trend = get_trending_keyword(trend_index)
     
     # 2. Unsplash से 1200px इमेज लें
     image_url = get_unsplash_image(trend)
