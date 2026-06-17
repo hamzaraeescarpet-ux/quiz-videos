@@ -136,6 +136,67 @@ def launch_chrome_if_needed():
         print(f"Failed to launch Chrome subprocess: {e}")
         return False
 
+def fallback_json_parser(raw_json):
+    """
+    Standard json.loads fails if Gemini generates unescaped double quotes inside strings.
+    This fallback uses regex and substring slicing to extract the fields.
+    """
+    try:
+        keys = ["title", "excerpt", "metaDescription", "seoKeywords", "content"]
+        key_positions = []
+        for k in keys:
+            pattern = rf'"{k}"\s*:'
+            match = re.search(pattern, raw_json)
+            if match:
+                key_positions.append((match.start(), match.end(), k))
+        
+        if not key_positions:
+            return None
+            
+        key_positions.sort(key=lambda x: x[0])
+        
+        data = {}
+        for i, (start, end, key) in enumerate(key_positions):
+            if i + 1 < len(key_positions):
+                next_start = key_positions[i+1][0]
+            else:
+                next_start = len(raw_json)
+                
+            val_str = raw_json[end:next_start].strip()
+            
+            if val_str.endswith(","):
+                val_str = val_str[:-1].strip()
+                
+            if i == len(key_positions) - 1:
+                if val_str.endswith("}"):
+                    val_str = val_str[:-1].strip()
+                    
+            if key == "seoKeywords":
+                if val_str.startswith("["):
+                    val_str = val_str[1:]
+                if val_str.endswith("]"):
+                    val_str = val_str[:-1]
+                items = []
+                for item in re.split(r',', val_str):
+                    item = item.strip().strip('"\'')
+                    if item:
+                        items.append(item)
+                data[key] = items
+            else:
+                if val_str.startswith('"'):
+                    val_str = val_str[1:]
+                if val_str.endswith('"'):
+                    val_str = val_str[:-1]
+                    
+                val_str = val_str.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"')
+                data[key] = val_str
+                
+        if "title" in data and "content" in data:
+            return data
+    except Exception as e:
+        print(f"Fallback regex parser failed: {e}")
+    return None
+
 def generate_blog_content_via_playwright(trend_keyword):
     """Playwright का उपयोग करके localhost:9222 पर चल रहे Chrome के ज़रिए विशिष्ट Gemini Chat से फ़्री ब्लॉग पोस्ट लिखवाता है"""
     
@@ -155,6 +216,12 @@ QuizViral AI is a tool that allows creators to create 100+ viral faceless quiz/t
 Explain how creators can capitalize on this trending topic "{trend_keyword}" by making interactive trivia/quiz videos using QuizViral AI and how they can monetize it to get massive views.
 
 You MUST respond ONLY with a JSON object. Do not wrap it in markdown code blocks like ```json.
+
+CRITICAL JSON FORMATTING RULES:
+1. Inside the JSON string values (especially the 'content', 'excerpt', and 'title' keys), do NOT use double quotes ("). If you want to quote anything (e.g. 'Which President nominated...' or 'QuizViral AI'), you MUST use single quotes (') instead.
+2. Double quotes (") must ONLY be used as JSON property names and to wrap string values.
+3. Ensure the JSON is 100% valid.
+
 JSON format:
 {{
   "title": "SEO-optimized title connecting {trend_keyword} and QuizViral AI",
@@ -216,12 +283,15 @@ JSON format:
         # JSON ढूँढें
         json_match = re.search(r"\{.*\}", final_response, re.DOTALL)
         if json_match:
+            raw_json = json_match.group(0).strip()
+            raw_json = raw_json.replace("{trend_keyword}", trend_keyword)
             try:
-                # Replace the exact placeholder string if Gemini forgot to replace it
-                raw_json = json_match.group(0).strip()
-                raw_json = raw_json.replace("{trend_keyword}", trend_keyword)
                 return json.loads(raw_json)
             except Exception as e:
+                print(f"Standard JSON parser failed: {e}. Trying custom regex fallback...")
+                parsed_data = fallback_json_parser(raw_json)
+                if parsed_data:
+                    return parsed_data
                 print(f"Error parsing JSON from Gemini response: {e}")
                 print(f"Raw response was: {final_response}")
                 return None
