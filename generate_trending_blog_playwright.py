@@ -74,8 +74,77 @@ def get_unsplash_image(keyword):
         image_url = "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80"
     return image_url
 
+def check_port_open(port):
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect(("127.0.0.1", port))
+        s.close()
+        return True
+    except Exception:
+        return False
+
+def launch_chrome_if_needed():
+    if check_port_open(9222):
+        print("Chrome is already running with remote debugging on port 9222.")
+        return True
+        
+    print("Chrome is not running on port 9222. Attempting to launch it automatically...")
+    
+    # Common Chrome executable paths on Windows
+    paths = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), r"Google\Chrome\Application\chrome.exe")
+    ]
+    
+    chrome_path = None
+    for p in paths:
+        if os.path.exists(p):
+            chrome_path = p
+            break
+            
+    if not chrome_path:
+        # Check if it's on PATH
+        import shutil
+        chrome_path = shutil.which("chrome") or shutil.which("chrome.exe")
+        
+    if not chrome_path:
+        print("Error: Could not locate chrome.exe on this system automatically.")
+        return False
+        
+    cmd = [
+        chrome_path,
+        "--remote-debugging-port=9222",
+        f"--user-data-dir={CHROME_PROFILE_PATH}"
+    ]
+    
+    print(f"Launching Chrome: {' '.join(cmd)}")
+    try:
+        # Start Chrome detached in the background
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Wait a few seconds for Chrome to spin up and bind the port
+        for _ in range(8):
+            time.sleep(1)
+            if check_port_open(9222):
+                print("Chrome started and listening on port 9222 successfully!")
+                return True
+        print("Warning: Chrome launched but port 9222 is still not responsive.")
+        print("Hint: If normal Google Chrome is already running, close all its windows completely (or end it from Task Manager) and run the script again so it can open in debugging mode.")
+        return False
+    except Exception as e:
+        print(f"Failed to launch Chrome subprocess: {e}")
+        return False
+
 def generate_blog_content_via_playwright(trend_keyword):
     """Playwright का उपयोग करके localhost:9222 पर चल रहे Chrome के ज़रिए विशिष्ट Gemini Chat से फ़्री ब्लॉग पोस्ट लिखवाता है"""
+    
+    # Ensure Chrome is running on port 9222
+    launched = launch_chrome_if_needed()
+    if not launched:
+        print("Error: Could not connect to Chrome because it could not be started.")
+        return None
+        
     print(f"Connecting to running Chrome on port 9222 for trend: {trend_keyword}...")
     
     prompt = f"""
@@ -102,8 +171,6 @@ JSON format:
             browser = p.chromium.connect_over_cdp("http://localhost:9222")
         except Exception as e:
             print(f"Failed to connect to Chrome on port 9222: {e}")
-            print("कृपया सुनिश्चित करें कि आपने Chrome को इस कमांड से खोला है:")
-            print(rf'chrome.exe --remote-debugging-port=9222 --user-data-dir="{CHROME_PROFILE_PATH}"')
             return None
 
         # डिफ़ॉल्ट कांटेक्स्ट का उपयोग करें
