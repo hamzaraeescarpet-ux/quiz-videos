@@ -12,7 +12,8 @@ from playwright.sync_api import sync_playwright
 # आपके Chrome Profile का पाथ (लॉगिन सेशन बनाए रखने के लिए)
 CHROME_PROFILE_PATH = r"C:\Users\hamza\Downloads\python development\browser automation\gemini video points\bulk scheduling fb videos\chrome_profile_2"
 
-BLOG_POSTS_FILE = os.path.join("frontend", "src", "data", "blogPosts.js")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BLOG_POSTS_FILE = os.path.join(SCRIPT_DIR, "frontend", "src", "data", "blogPosts.js")
 # ========================================================
 
 def get_trending_keyword():
@@ -341,10 +342,10 @@ def git_push_changes(title):
     """Git commit & push automatic runs to trigger Vercel deployment"""
     print("Staging and pushing changes to GitHub...")
     try:
-        subprocess.run(["git", "add", "."], check=True)
-        subprocess.run(["git", "commit", "-m", f"chore(blog): auto-publish post about {title}"], check=True)
-        subprocess.run(["git", "push", "github", "main"], check=True)
-        subprocess.run(["git", "push", "github", "main:master"], check=True)
+        subprocess.run(["git", "add", "."], cwd=SCRIPT_DIR, check=True)
+        subprocess.run(["git", "commit", "-m", f"chore(blog): auto-publish post about {title}"], cwd=SCRIPT_DIR, check=True)
+        subprocess.run(["git", "push", "github", "main"], cwd=SCRIPT_DIR, check=True)
+        subprocess.run(["git", "push", "github", "main:master"], cwd=SCRIPT_DIR, check=True)
         print("Git Push Completed! Vercel build triggered.")
     except Exception as e:
         print(f"Git push failed: {e}")
@@ -376,7 +377,7 @@ def main():
     # 5. Build and Push
     if success:
         print("Running build verification...")
-        build_res = subprocess.run(["npm", "run", "build"], cwd="frontend", shell=True)
+        build_res = subprocess.run(["npm", "run", "build"], cwd=os.path.join(SCRIPT_DIR, "frontend"), shell=True)
         if build_res.returncode == 0:
             git_push_changes(blog_data["title"])
         else:
