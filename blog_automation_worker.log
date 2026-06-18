@@ -51,3 +51,51 @@ To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
 [2026-06-18 14:04:15] Successfully finished blog generation for trend index 0.
 [2026-06-18 14:04:15] Sleeping for 2 hours before generating the 2nd blog...
 [2026-06-18 16:04:15] Starting blog generation for trend index 1...
+[2026-06-18 16:05:22] STDOUT:
+
+> frontend@0.0.0 build
+> vite build
+
+[36mvite v8.0.13 [32mbuilding client environment for production...[36m[39m
+[2K
+transforming...âœ“ 2239 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.49 kB â”‚ gzip:   0.83 kB
+dist/assets/index-Dwh1cgQq.css   64.38 kB â”‚ gzip:  10.36 kB
+dist/assets/index-CUAjJmyJ.js   724.61 kB â”‚ gzip: 222.34 kB
+
+[32mâœ“ built in 3.24s[39m
+[main 58fe9d2] chore(blog): auto-publish post about Hitting a Home Run with Sports Trends: How to Turn the Seth Brown Minor League Release into Viral Views Using QuizViral AI
+ 3 files changed, 20 insertions(+), 1 deletion(-)
+Fetching trending keyword at index 1 from Google Trends...
+Trending topic found at index 1: seth brown minor league release
+Wikipedia Image Found for seth brown minor league release: https://upload.wikimedia.org/wikipedia/commons/6/67/SethBrownAviators.jpg
+Chrome is not running on port 9222. Attempting to launch it automatically...
+Launching Chrome: C:\Program Files\Google\Chrome\Application\chrome.exe --remote-debugging-port=9222 --user-data-dir=C:\Users\hamza\Downloads\python development\browser automation\gemini video points\bulk scheduling fb videos\chrome_profile_2
+Chrome started and listening on port 9222 successfully!
+Connecting to running Chrome on port 9222 for trend: seth brown minor league release...
+Typing prompt into Gemini...
+Submitting prompt...
+Waiting for Gemini to generate the response...
+Adding new blog post to C:\Users\hamza\OneDrive\Desktop\QuizBot\frontend\src\data\blogPosts.js...
+blogPosts.js updated successfully!
+Running build verification...
+Staging and pushing changes to GitHub...
+Git Push Completed! Vercel build triggered.
+
+[2026-06-18 16:05:22] STDERR:
+(node:14292) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[33m[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
+   64db09c..58fe9d2  main -> main
+To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
+   64db09c..58fe9d2  main -> master
+
+[2026-06-18 16:05:22] Successfully finished blog generation for trend index 1.
+[2026-06-18 16:05:22] Sleeping for 2 hours before generating the 3rd blog...
