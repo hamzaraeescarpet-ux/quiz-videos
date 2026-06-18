@@ -24,8 +24,8 @@ export default function Pricing() {
     // =========================================================================
     // REPLACE THESE PLACEHOLDERS WITH YOUR DODO PAYMENTS CHECKOUT LINKS FROM THE DASHBOARD
     // Example: "https://checkout.dodopayments.com/buy/p_12345..."
-    const DODO_MONTHLY_LINK = "https://checkout.dodopayments.com/buy/pdt_0NhJ8B12iV14QguVLXSkD?quantity=1&redirect_url=https://quizviral-nine.vercel.app%2F";
-    const DODO_YEARLY_LINK = "https://checkout.dodopayments.com/buy/pdt_0NhJ8B12iV14QguVLXSkD?quantity=1&redirect_url=https://quizviral-nine.vercel.app%2F";
+    const DODO_MONTHLY_LINK = "https://checkout.dodopayments.com/buy/pdt_0NhJ8B12iV14QguVLXSkD?quantity=1&redirect_url=https%3A%2F%2Fquizviral-nine.vercel.app%2Fsuccess";
+    const DODO_YEARLY_LINK = "https://checkout.dodopayments.com/buy/pdt_0NhJ8B12iV14QguVLXSkD?quantity=1&redirect_url=https%3A%2F%2Fquizviral-nine.vercel.app%2Fsuccess";
     // =========================================================================
 
     const checkoutBaseUrl = planType === 'yearly' ? DODO_YEARLY_LINK : DODO_MONTHLY_LINK;

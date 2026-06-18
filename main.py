@@ -859,8 +859,30 @@ async def kofi_webhook(
 async def dodo_webhook(
     request: Request
 ):
+    import hmac
+    import hashlib
+    
+    raw_body = await request.body()
+    
+    # Optional Signature verification (if DODO_WEBHOOK_SECRET is set in environment)
+    secret = os.environ.get("DODO_WEBHOOK_SECRET")
+    if secret:
+        signature = request.headers.get("webhook-signature")
+        if not signature:
+            raise HTTPException(status_code=401, detail="Missing webhook-signature header")
+        
+        # Calculate signature
+        computed_signature = hmac.new(
+            key=secret.encode('utf-8'),
+            msg=raw_body,
+            digestmod=hashlib.sha256
+        ).hexdigest()
+        
+        if not hmac.compare_digest(computed_signature, signature):
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+            
     try:
-        payload = await request.json()
+        payload = json.loads(raw_body.decode('utf-8'))
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
         
