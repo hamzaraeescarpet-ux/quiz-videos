@@ -6,7 +6,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -854,6 +854,74 @@ async def kofi_webhook(
         print(f"Failed to process Facebook CAPI event: {ex}", flush=True)
 
     return {"status": "success", "message": f"Activated premium status for {email}"}
+
+@app.post("/api/dodo-webhook")
+async def dodo_webhook(
+    request: Request
+):
+    try:
+        payload = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+        
+    event_type = payload.get("type")
+    data = payload.get("data", {})
+    
+    # Extract email from data.customer or fallback to data.customer_email/metadata
+    email = None
+    if isinstance(data, dict):
+        customer = data.get("customer", {})
+        if isinstance(customer, dict):
+            email = customer.get("email")
+            
+    if not email:
+        email = data.get("email")
+        
+    if not email:
+        return {"status": "ignored", "message": "No email found in webhook payload"}
+        
+    print(f"WEBHOOK: Received Dodo Payments event ({event_type}) for email: {email}", flush=True)
+    
+    # If subscription is active or renewed, or a payment succeeded
+    if event_type in ("subscription.active", "payment.succeeded", "subscription.renewed"):
+        db = SessionLocal()
+        user_rec = db.query(User).filter(User.username == email).first()
+        if user_rec:
+            user_rec.is_premium = True
+            print(f"WEBHOOK: Activated existing user to premium: {email}", flush=True)
+        else:
+            user_rec = User(
+                username=email,
+                videos_generated_count=0,
+                is_premium=True
+            )
+            db.add(user_rec)
+            print(f"WEBHOOK: Created and activated new premium user: {email}", flush=True)
+            
+        db.commit()
+        db.close()
+        
+        # Try sending Facebook CAPI Event
+        try:
+            # Dodo Payments amount is in cents, so convert to dollars
+            amount_cents = float(data.get("total_amount", 0))
+            amount_val = amount_cents / 100.0
+            currency_val = data.get("currency", "USD")
+            send_facebook_capi_event(email, amount_val, currency_val)
+        except Exception as ex:
+            print(f"Failed to process Facebook CAPI event: {ex}", flush=True)
+            
+    elif event_type in ("subscription.cancelled", "subscription.expired", "subscription.failed"):
+        # Deactivate premium status
+        db = SessionLocal()
+        user_rec = db.query(User).filter(User.username == email).first()
+        if user_rec:
+            user_rec.is_premium = False
+            db.commit()
+            print(f"WEBHOOK: Deactivated user subscription: {email}", flush=True)
+        db.close()
+        
+    return {"status": "success", "message": f"Processed event {event_type} for {email}"}
 
 @app.get("/api/admin/users")
 def get_users(email: str):

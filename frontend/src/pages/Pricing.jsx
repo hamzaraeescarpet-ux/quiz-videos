@@ -21,12 +21,24 @@ export default function Pricing() {
       });
     }
 
-    // Redirect to Ko-fi checkout page.
-    // We pass the email in query parameters. Ko-fi donation page supports custom messages or pre-filling names.
-    // To identify users, we will instruct them on Ko-fi, or match by their PayPal/Ko-fi payer email during webhook trigger.
-    // Let's redirect them to your public Ko-fi page where they can checkout.
-    const kofiUrl = `https://ko-fi.com/quizviralai?email=${encodeURIComponent(currentUser.email)}`;
-    window.open(kofiUrl, '_blank');
+    // =========================================================================
+    // REPLACE THESE PLACEHOLDERS WITH YOUR DODO PAYMENTS CHECKOUT LINKS FROM THE DASHBOARD
+    // Example: "https://checkout.dodopayments.com/buy/p_12345..."
+    const DODO_MONTHLY_LINK = "YOUR_DODO_MONTHLY_CHECKOUT_LINK";
+    const DODO_YEARLY_LINK = "YOUR_DODO_YEARLY_CHECKOUT_LINK";
+    // =========================================================================
+
+    const checkoutBaseUrl = planType === 'yearly' ? DODO_YEARLY_LINK : DODO_MONTHLY_LINK;
+
+    if (checkoutBaseUrl.startsWith("YOUR_DODO_")) {
+      alert("System upgrade in progress: Dodo Payments checkout links are not yet configured. Please provide the product links in the configuration.");
+      return;
+    }
+
+    // Append the customer's email to pre-fill on Dodo Payments checkout screen
+    const separator = checkoutBaseUrl.includes('?') ? '&' : '?';
+    const checkoutUrl = `${checkoutBaseUrl}${separator}email=${encodeURIComponent(currentUser.email)}`;
+    window.open(checkoutUrl, '_blank');
   };
 
   const plans = [
@@ -151,7 +163,7 @@ export default function Pricing() {
             </button>
             {!isPremium && (
               <p className="text-xs text-center text-gray-500 mt-3">
-                Secure checkout powered by Ko-fi & PayPal.
+                Secure checkout powered by Dodo Payments.
               </p>
             )}
           </div>
