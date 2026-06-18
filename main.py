@@ -864,11 +864,25 @@ async def dodo_webhook(
     
     raw_body = await request.body()
     
+    # Log that webhook was received
+    try:
+        log_msg = f"[WEBHOOK DEBUG] Received raw request. Headers: {dict(request.headers)}, Body len: {len(raw_body)}\n"
+        with open("error_logs.txt", "a", encoding="utf-8") as f:
+            f.write(log_msg)
+    except Exception:
+        pass
+
     # Optional Signature verification (if DODO_WEBHOOK_SECRET is set in environment)
     secret = os.environ.get("DODO_WEBHOOK_SECRET")
     if secret:
         signature = request.headers.get("webhook-signature")
         if not signature:
+            err_msg = "[WEBHOOK ERROR] Missing webhook-signature header\n"
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write(err_msg)
+            except Exception:
+                pass
             raise HTTPException(status_code=401, detail="Missing webhook-signature header")
         
         # Calculate signature
@@ -879,11 +893,35 @@ async def dodo_webhook(
         ).hexdigest()
         
         if not hmac.compare_digest(computed_signature, signature):
+            err_msg = f"[WEBHOOK ERROR] Signature mismatch. Computed: {computed_signature}, Received: {signature}\n"
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write(err_msg)
+            except Exception:
+                pass
             raise HTTPException(status_code=401, detail="Invalid webhook signature")
+        else:
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write("[WEBHOOK DEBUG] Signature verification passed successfully!\n")
+            except Exception:
+                pass
+    else:
+        try:
+            with open("error_logs.txt", "a", encoding="utf-8") as f:
+                f.write("[WEBHOOK DEBUG] DODO_WEBHOOK_SECRET is not set in environment. Signature check skipped.\n")
+        except Exception:
+            pass
             
     try:
         payload = json.loads(raw_body.decode('utf-8'))
     except Exception as e:
+        err_msg = f"[WEBHOOK ERROR] Failed to parse JSON payload: {e}\n"
+        try:
+            with open("error_logs.txt", "a", encoding="utf-8") as f:
+                f.write(err_msg)
+        except Exception:
+            pass
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
         
     event_type = payload.get("type")
@@ -900,17 +938,32 @@ async def dodo_webhook(
         email = data.get("email")
         
     if not email:
+        err_msg = f"[WEBHOOK WARNING] No email found in payload data: {payload}\n"
+        try:
+            with open("error_logs.txt", "a", encoding="utf-8") as f:
+                f.write(err_msg)
+        except Exception:
+            pass
         return {"status": "ignored", "message": "No email found in webhook payload"}
         
-    print(f"WEBHOOK: Received Dodo Payments event ({event_type}) for email: {email}", flush=True)
-    
+    # Log event type and email
+    try:
+        with open("error_logs.txt", "a", encoding="utf-8") as f:
+            f.write(f"[WEBHOOK] Event: {event_type}, Email: {email}\n")
+    except Exception:
+        pass
+
     # If subscription is active or renewed, or a payment succeeded
     if event_type in ("subscription.active", "payment.succeeded", "subscription.renewed"):
         db = SessionLocal()
         user_rec = db.query(User).filter(User.username == email).first()
         if user_rec:
             user_rec.is_premium = True
-            print(f"WEBHOOK: Activated existing user to premium: {email}", flush=True)
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write(f"[WEBHOOK] Activated existing premium user: {email}\n")
+            except Exception:
+                pass
         else:
             user_rec = User(
                 username=email,
@@ -918,7 +971,11 @@ async def dodo_webhook(
                 is_premium=True
             )
             db.add(user_rec)
-            print(f"WEBHOOK: Created and activated new premium user: {email}", flush=True)
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write(f"[WEBHOOK] Created and activated new premium user: {email}\n")
+            except Exception:
+                pass
             
         db.commit()
         db.close()
@@ -940,7 +997,11 @@ async def dodo_webhook(
         if user_rec:
             user_rec.is_premium = False
             db.commit()
-            print(f"WEBHOOK: Deactivated user subscription: {email}", flush=True)
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write(f"[WEBHOOK] Deactivated user subscription: {email}\n")
+            except Exception:
+                pass
         db.close()
         
     return {"status": "success", "message": f"Processed event {event_type} for {email}"}
