@@ -318,10 +318,10 @@ def get_latest_blog_post():
             
         if match:
             object_str = "{" + match.group(1).strip() + "}"
-            title_match = re.search(r"title:\s*['\"`](.*?)['\"`],", object_str)
-            slug_match = re.search(r"slug:\s*['\"`](.*?)['\"`],", object_str)
-            excerpt_match = re.search(r"excerpt:\s*['\"`](.*?)['\"`],", object_str)
-            image_match = re.search(r"image:\s*['\"`](.*?)['\"`],", object_str)
+            title_match = re.search(r"title:\s*['\"`](.*?)['\"']", object_str)
+            slug_match = re.search(r"slug:\s*['\"`](.*?)['\"']", object_str)
+            excerpt_match = re.search(r"excerpt:\s*['\"`](.*?)['\"']", object_str)
+            image_match = re.search(r"image:\s*['\"`](.*?)['\"']", object_str)
             
             blog_data = {}
             if title_match: blog_data["title"] = title_match.group(1)
