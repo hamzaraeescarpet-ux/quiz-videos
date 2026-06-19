@@ -81,13 +81,28 @@ def launch_chrome_with_profile(profile_path):
         print("Error: Could not locate chrome.exe.")
         return False
         
+    # Optimized performance flags to prevent Chrome background tasks from hogging internet bandwidth
     cmd = [
         chrome_path,
         "--remote-debugging-port=9222",
-        f"--user-data-dir={profile_path}"
+        "--remote-debugging-address=127.0.0.1",
+        f"--user-data-dir={profile_path}",
+        "--disable-gpu",
+        "--disable-background-networking",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-breakpad",
+        "--disable-client-side-phishing-detection",
+        "--disable-default-apps",
+        "--disable-hang-monitor",
+        "--disable-prompt-on-repost",
+        "--disable-sync",
+        "--metrics-recording-only",
+        "--no-first-run",
+        "--safebrowsing-disable-auto-update"
     ]
     if HEADLESS:
-        cmd.extend(["--headless=new", "--disable-gpu"])
+        cmd.extend(["--headless=new"])
         
     try:
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -183,29 +198,51 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
     success = False
     with sync_playwright() as p:
         try:
-            print("Connecting Playwright to Chrome remote debugger...")
-            browser = p.chromium.connect_over_cdp("http://localhost:9222")
+            print("Connecting Playwright to Chrome remote debugger (using 127.0.0.1 to prevent loopback lag)...")
+            browser = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
             context = browser.contexts[0]
             page = context.new_page()
             
+            # Use domcontentloaded to load page instantly without waiting for heavy track scripts/ads
             print("Navigating to Pinterest Pin Builder...")
-            page.goto("https://www.pinterest.com/pin-builder/")
+            page.goto("https://www.pinterest.com/pin-builder/", wait_until="domcontentloaded")
             
-            # Wait for loaded page state (delays added to allow fully rendering JS assets)
-            print("Pinterest page load hone ka wait kar rahe hai (10 seconds)...")
-            time.sleep(10)
-            
-            # Check if user is logged in
+            # Smart waiting logic: wait up to 15s for either Title Input (logged-in) OR Login Button (logged-out) to appear
+            print("Pinterest components load hone ka wait kar rahe hai...")
+            try:
+                page.wait_for_selector(
+                    'input[placeholder*="title" i], textarea[placeholder*="title" i], button:has-text("Log in"), button:has-text("Log In"), a[href*="login"]',
+                    timeout=15000
+                )
+            except Exception:
+                pass
+                
+            # Double check login state
             is_logged_out = False
-            if "login" in page.url or page.locator('button:has-text("Log in")').count() > 0 or page.locator('button:has-text("Log In")').count() > 0:
+            has_login_btn = (
+                page.locator('button:has-text("Log in")').is_visible() or 
+                page.locator('button:has-text("Log In")').is_visible() or 
+                "login" in page.url
+            )
+            
+            # Check if title input is visible
+            has_title_input = False
+            title_input_loc = page.locator('input[placeholder*="title" i], textarea[placeholder*="title" i]')
+            if title_input_loc.count() > 0:
+                for i in range(title_input_loc.count()):
+                    if title_input_loc.nth(i).is_visible():
+                        has_title_input = True
+                        break
+                        
+            if has_login_btn or (not has_title_input and "pin-builder" not in page.url):
                 is_logged_out = True
                 
             if is_logged_out:
                 expected_id = ACCOUNT_IDS[idx] if idx < len(ACCOUNT_IDS) else "Pinterest Account"
                 print("\n" + "="*80)
                 print(f"👉 [IMPORTANT ALERT] Profile {idx + 1} logged in nahi hai! (Expected Account: {expected_id})")
-                print(f"Bhai, kripya open hui Chrome Window me Pinterest Account '{expected_id}' par log in karein.")
-                print("Log in hone ke baad jab aap Pinterest home feed ya Pin Builder page par pahunch jayein,")
+                print(f"Bhai, kripya open hui Chrome Window me Pinterest Account '{expected_id}' par log in/sign in karein.")
+                print("Log in hone ke baad jab aap Pinterest home feed ya Pin Builder page par pahunch/navigate ho jayein,")
                 print("tab yahan terminal me ENTER press karein aur automation continue ho jayegi...")
                 print("="*80 + "\n")
                 
@@ -216,8 +253,8 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 # Re-navigate to Pin Builder after login
                 if "pin-builder" not in page.url:
                     print("Pin Builder page par navigate kar rahe hai...")
-                    page.goto("https://www.pinterest.com/pin-builder/")
-                    time.sleep(10)
+                    page.goto("https://www.pinterest.com/pin-builder/", wait_until="domcontentloaded")
+                    time.sleep(8)
             
             print("Account verified as logged in. Filling Pin details with deliberate human delays...")
             time.sleep(3)
