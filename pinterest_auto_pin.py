@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import re
+import json
 import subprocess
 from playwright.sync_api import sync_playwright
 
@@ -40,6 +41,39 @@ def check_port_open(port=9222):
     except Exception:
         return False
 
+def reset_chrome_crash_state(profile_path):
+    """Resets the Chrome crash state in Preferences file to completely disable the 'Restore pages' popup"""
+    paths = [
+        os.path.join(profile_path, "Default", "Preferences"),
+        os.path.join(profile_path, "Preferences")
+    ]
+    for p in paths:
+        if os.path.exists(p):
+            try:
+                print(f"Resetting Chrome crash/restore state in: {p}...")
+                with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read().strip()
+                    if not content:
+                        continue
+                    data = json.loads(content)
+                
+                # Modify crash state preferences
+                modified = False
+                if "profile" in data and isinstance(data["profile"], dict):
+                    if "exit_type" in data["profile"]:
+                        data["profile"]["exit_type"] = "Normal"
+                        modified = True
+                if "exit_state_classified" in data:
+                    data["exit_state_classified"] = "Normal"
+                    modified = True
+                    
+                if modified:
+                    with open(p, "w", encoding="utf-8") as f:
+                        json.dump(data, f)
+                    print(f"Successfully cleared Chrome crash popup state!")
+            except Exception as e:
+                print(f"Could not reset Preferences file crash state: {e}")
+
 def kill_chrome_on_port_9222():
     print("Checking if port 9222 is busy...")
     try:
@@ -60,6 +94,9 @@ def kill_chrome_on_port_9222():
 def launch_chrome_with_profile(profile_path):
     # Ensure port is clean
     kill_chrome_on_port_9222()
+    
+    # Clear session crash popup state in Chrome JSON preferences
+    reset_chrome_crash_state(profile_path)
     
     print(f"Launching Chrome with profile: {profile_path}...")
     paths = [
@@ -99,7 +136,10 @@ def launch_chrome_with_profile(profile_path):
         "--disable-sync",
         "--metrics-recording-only",
         "--no-first-run",
-        "--safebrowsing-disable-auto-update"
+        "--safebrowsing-disable-auto-update",
+        "--disable-session-crashed-bubble",
+        "--hide-crash-restore-bubble",
+        "--simulate-outdated-no-updater"
     ]
     if HEADLESS:
         cmd.extend(["--headless=new"])
@@ -190,27 +230,78 @@ def format_pinterest_description(title, excerpt, url):
         desc = desc[:497] + "..."
     return desc
 
-def get_safe_input(page, selectors, exclude_keywords=["search"]):
-    """Helper to locate a visible input element while strictly excluding global navigation search inputs"""
-    for sel in selectors:
-        loc = page.locator(sel)
-        count = loc.count()
+def find_builder_fields(page):
+    """
+    Scans the Pin Builder page and detects Title, Description, and Link fields.
+    This is highly specific and robust against Pinterest changes.
+    """
+    fields = {"title": None, "desc": None, "link": None}
+    
+    # 1. Look for standard test-ids first
+    title_loc = page.locator('[data-testid="pin-builder-title"]')
+    if title_loc.count() > 0 and title_loc.first.is_visible():
+        fields["title"] = title_loc.first
+        
+    desc_loc = page.locator('[data-testid="pin-builder-description"]')
+    if desc_loc.count() > 0 and desc_loc.first.is_visible():
+        fields["desc"] = desc_loc.first
+        
+    link_loc = page.locator('[data-testid="pin-builder-link"]')
+    if link_loc.count() > 0 and link_loc.first.is_visible():
+        fields["link"] = link_loc.first
+        
+    # 2. Scanner fallback: check properties of all input/textarea/contenteditable fields, excluding search boxes
+    if not fields["title"] or not fields["desc"] or not fields["link"]:
+        candidates = page.locator('input, textarea, div[contenteditable="true"], div[role="textbox"]')
+        count = candidates.count()
         for i in range(count):
-            el = loc.nth(i)
+            el = candidates.nth(i)
             try:
-                if el.is_visible():
-                    placeholder = el.get_attribute("placeholder") or ""
-                    el_id = el.get_attribute("id") or ""
-                    aria_label = el.get_attribute("aria-label") or ""
-                    name = el.get_attribute("name") or ""
+                if not el.is_visible():
+                    continue
+                placeholder = (el.get_attribute("placeholder") or "").lower()
+                el_id = (el.get_attribute("id") or "").lower()
+                aria_label = (el.get_attribute("aria-label") or "").lower()
+                role = (el.get_attribute("role") or "").lower()
+                name = (el.get_attribute("name") or "").lower()
+                
+                combined = placeholder + el_id + aria_label + role + name
+                if "search" in combined:
+                    continue
                     
-                    combined = (placeholder + el_id + aria_label + name).lower()
-                    if any(kw in combined for kw in exclude_keywords):
-                        continue
-                    return el
+                if not fields["title"] and ("title" in combined or "header" in combined):
+                    fields["title"] = el
+                elif not fields["desc"] and ("about" in combined or "desc" in combined):
+                    fields["desc"] = el
+                elif not fields["link"] and ("link" in combined or "website" in combined or "destination" in combined or "url" in combined):
+                    fields["link"] = el
             except Exception:
                 continue
-    return None
+                
+    # 3. Layout order fallback (First is Title, Second is Description, Third is Link)
+    if not fields["title"] or not fields["desc"] or not fields["link"]:
+        print("Using layout-order fallback scanner...")
+        all_inputs = []
+        candidates = page.locator('input, textarea, div[contenteditable="true"], div[role="textbox"]')
+        for i in range(candidates.count()):
+            el = candidates.nth(i)
+            try:
+                if el.is_visible():
+                    placeholder = (el.get_attribute("placeholder") or "").lower()
+                    el_id = (el.get_attribute("id") or "").lower()
+                    aria_label = (el.get_attribute("aria-label") or "").lower()
+                    combined = placeholder + el_id + aria_label
+                    if "search" in combined:
+                        continue
+                    all_inputs.append(el)
+            except Exception:
+                continue
+        if len(all_inputs) >= 3:
+            if not fields["title"]: fields["title"] = all_inputs[0]
+            if not fields["desc"]: fields["desc"] = all_inputs[1]
+            if not fields["link"]: fields["link"] = all_inputs[2]
+            
+    return fields
 
 def publish_pin_for_profile(profile_path, pin_data, idx):
     if not launch_chrome_with_profile(profile_path):
@@ -307,18 +398,12 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
             else:
                 print("Error: Could not find image file input element on Pinterest.")
                 
+            # Scan fields on Pin Builder
+            fields = find_builder_fields(page)
+            
             # 2. Fill the Title
             print("Title fill kar rahe hai...")
-            title_selectors = [
-                '[data-testid="pin-builder-title"]',
-                'textarea[id*="title" i]',
-                'input[id*="title" i]',
-                'textarea[placeholder*="title" i]',
-                'input[placeholder*="title" i]',
-                'textarea[placeholder*="Title" i]',
-                'input[placeholder*="Title" i]'
-            ]
-            target_title = get_safe_input(page, title_selectors)
+            target_title = fields["title"]
             if target_title:
                 target_title.scroll_into_view_if_needed()
                 time.sleep(1.5)
@@ -334,16 +419,7 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 
             # 3. Fill the Description
             print("Description aur blog link fill kar rahe hai...")
-            desc_selectors = [
-                '[data-testid="pin-builder-description"]',
-                'div[role="textbox"][placeholder*="about" i]',
-                'div[contenteditable="true"][placeholder*="about" i]',
-                'textarea[placeholder*="about" i]',
-                'textarea[placeholder*="description" i]',
-                'div[role="textbox"][id*="description" i]',
-                'textarea[id*="description" i]'
-            ]
-            target_desc = get_safe_input(page, desc_selectors)
+            target_desc = fields["desc"]
             if target_desc:
                 target_desc.scroll_into_view_if_needed()
                 time.sleep(1.5)
@@ -359,15 +435,7 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 
             # 4. Fill the Destination Link
             print("Destination blog link fill kar rahe hai...")
-            link_selectors = [
-                '[data-testid="pin-builder-link"]',
-                'input[placeholder*="link" i]',
-                'input[placeholder*="website" i]',
-                'input[placeholder*="URL" i]',
-                'input[id*="link" i]',
-                'input[aria-label*="link" i]'
-            ]
-            target_link = get_safe_input(page, link_selectors)
+            target_link = fields["link"]
             if target_link:
                 target_link.scroll_into_view_if_needed()
                 time.sleep(1.5)
@@ -381,7 +449,7 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
             else:
                 print("Warning: Could not find Destination Link input.")
                 
-            # 5. Handle Product Tagging (New requested Feature)
+            # 5. Handle Product Tagging
             print("Product Tag lagane ki koshish kar rahe hai...")
             try:
                 # Search for Tag products button on the page
