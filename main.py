@@ -52,6 +52,7 @@ class VideoJob(Base):
     completed_so_far = Column(Integer, default=0)
     zip_file_path = Column(String, nullable=True)
     user_email = Column(String, nullable=True)
+    created_at = Column(String, nullable=True)
 
 class Feedback(Base):
     __tablename__ = "feedbacks"
@@ -62,6 +63,17 @@ class Feedback(Base):
     submitted_at = Column(String)
 
 Base.metadata.create_all(bind=engine)
+
+# Migration to add created_at column safely if not exists
+try:
+    with engine.begin() as conn:
+        cursor = conn.execute("PRAGMA table_info(video_jobs)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "created_at" not in columns:
+            conn.execute("ALTER TABLE video_jobs ADD COLUMN created_at VARCHAR")
+            print("Migration: Added created_at column to video_jobs table.", flush=True)
+except Exception as e:
+    print(f"Migration Error: {e}", flush=True)
 
 # Paths (Adjusted for root)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -204,29 +216,132 @@ def download_and_cache_video(url: str) -> str:
                 pass
         return None
 
-def cleanup_old_zip_files():
-    """Delete any zip files in the output directory that are older than 24 hours."""
+def update_job_progress(session_id: str, completed_increment: int = 0, status: str = None, zip_file_path: str = None):
+    """Update progress or status of a VideoJob in a short-lived transaction."""
+    db = SessionLocal()
     try:
-        now = time.time()
-        for filename in os.listdir(OUTPUT_DIR):
-            if filename.endswith(".zip"):
-                filepath = os.path.join(OUTPUT_DIR, filename)
-                file_age = now - os.path.getmtime(filepath)
-                if file_age > 86400: # 24 hours in seconds
-                    print(f"AUTOMATION: Cleaning up old zip file: {filepath}", flush=True)
-                    try:
-                        os.remove(filepath)
-                    except Exception:
-                        pass
-                    # Also delete the folder directory of that session if it exists
-                    session_dir = os.path.join(OUTPUT_DIR, filename.replace(".zip", ""))
-                    if os.path.exists(session_dir) and os.path.isdir(session_dir):
-                        try:
-                            shutil.rmtree(session_dir)
-                        except Exception:
-                            pass
+        job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
+        if job:
+            if completed_increment > 0:
+                job.completed_so_far += completed_increment
+            if status:
+                job.status = status
+            if zip_file_path:
+                job.zip_file_path = zip_file_path
+            db.commit()
     except Exception as e:
-        print(f"Error during zip file cleanup: {e}", flush=True)
+        print(f"Error updating job progress: {e}", flush=True)
+    finally:
+        db.close()
+
+def finalize_job_and_user_credits(session_id: str, user_email: str, default_status: str = "Completed"):
+    """Determine final job status and update user credit count in a short transaction."""
+    db = SessionLocal()
+    try:
+        job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
+        if job:
+            if job.status == "Processing":
+                if job.completed_so_far == 0:
+                    job.status = "Failed"
+                else:
+                    job.status = default_status
+            
+            if user_email and job.completed_so_far > 0:
+                user_rec = db.query(User).filter(User.username == user_email).first()
+                if user_rec:
+                    user_rec.videos_generated_count += job.completed_so_far
+            db.commit()
+            return job.status, job.completed_so_far
+    except Exception as e:
+        print(f"Error finalizing job credits: {e}", flush=True)
+    finally:
+        db.close()
+    return "Failed", 0
+
+def cleanup_expired_video_jobs():
+    """
+    Deletes all VideoJob records, output session directories, and zip files 
+    that are older than 24 hours. Also cleans up stray files in output and temp.
+    """
+    db = SessionLocal()
+    try:
+        now = datetime.datetime.now()
+        jobs = db.query(VideoJob).all()
+        for job in jobs:
+            should_delete = False
+            if job.created_at:
+                try:
+                    job_time = datetime.datetime.fromisoformat(job.created_at)
+                    if (now - job_time).total_seconds() > 86400: # 24 hours
+                        should_delete = True
+                except Exception:
+                    should_delete = True
+            else:
+                should_delete = True
+
+            if should_delete:
+                print(f"CLEANUP: Deleting expired job {job.session_id} (Created at: {job.created_at})", flush=True)
+                session_dir = os.path.join(OUTPUT_DIR, job.session_id)
+                if os.path.exists(session_dir):
+                    try:
+                        shutil.rmtree(session_dir)
+                    except Exception as e:
+                        print(f"Error deleting dir {session_dir}: {e}", flush=True)
+                
+                if job.zip_file_path and os.path.exists(job.zip_file_path):
+                    try:
+                        os.remove(job.zip_file_path)
+                    except Exception as e:
+                        print(f"Error deleting zip {job.zip_file_path}: {e}", flush=True)
+                
+                fallback_zip = os.path.join(OUTPUT_DIR, f"{job.session_id}.zip")
+                if os.path.exists(fallback_zip):
+                    try:
+                        os.remove(fallback_zip)
+                    except Exception as e:
+                        print(f"Error deleting zip {fallback_zip}: {e}", flush=True)
+                
+                db.delete(job)
+        db.commit()
+    except Exception as e:
+        print(f"Error during DB jobs cleanup: {e}", flush=True)
+    finally:
+        db.close()
+
+    try:
+        now_ts = time.time()
+        if os.path.exists(OUTPUT_DIR):
+            for item in os.listdir(OUTPUT_DIR):
+                item_path = os.path.join(OUTPUT_DIR, item)
+                if os.path.getmtime(item_path) < now_ts - 86400:
+                    print(f"CLEANUP: Removing stray output item: {item_path}", flush=True)
+                    try:
+                        if os.path.isdir(item_path):
+                            shutil.rmtree(item_path)
+                        else:
+                            os.remove(item_path)
+                    except Exception as e:
+                        print(f"Error removing stray output {item_path}: {e}", flush=True)
+        if os.path.exists(TEMP_FOLDER):
+            for item in os.listdir(TEMP_FOLDER):
+                item_path = os.path.join(TEMP_FOLDER, item)
+                if os.path.getmtime(item_path) < now_ts - 86400:
+                    try:
+                        if os.path.isdir(item_path):
+                            shutil.rmtree(item_path)
+                        else:
+                            os.remove(item_path)
+                    except Exception as e:
+                        print(f"Error removing temp item {item_path}: {e}", flush=True)
+    except Exception as e:
+        print(f"Error during stray files cleanup: {e}", flush=True)
+
+# Run startup cleanup
+try:
+    cleanup_expired_video_jobs()
+    print("Startup Cleanup: Completed cleaning expired video jobs and files.", flush=True)
+except Exception as e:
+    print(f"Startup Cleanup Error: {e}", flush=True)
 
 class QuestionRow(BaseModel):
     id: int
@@ -286,9 +401,6 @@ def process_video_batch(
     box_color: str = None,
     custom_bg_paths: List[str] = None
 ):
-    db = SessionLocal()
-    job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
-    
     session_output_dir = os.path.join(OUTPUT_DIR, session_id)
     os.makedirs(session_output_dir, exist_ok=True)
     
@@ -299,7 +411,6 @@ def process_video_batch(
         "#6F1E51", "#1B1464", "#0652DD", "#833471", "#6D213C", "#1E3799"
     ]
     
-    # Load backgrounds_config.json URLs for this category
     config_path = os.path.join(BASE_DIR, "backgrounds_config.json")
     bg_urls = []
     info_msg = f"INFO: Started process_video_batch. session_id={session_id}, category={category}, config_path_exists={os.path.exists(config_path)}"
@@ -326,15 +437,13 @@ def process_video_batch(
     try:
         for idx, row in enumerate(questions):
             if session_id in active_sessions and active_sessions[session_id] == "stop":
-                job.status = "Interrupted"
+                update_job_progress(session_id, status="Interrupted")
                 break
                 
-            # Pick background video: either custom uploads, local backgrounds, or cache from category config URLs
             row_bg_paths = None
             category_local_path = os.path.join(BASE_DIR, "backgrounds", category)
             local_bg_files = []
             if category == "Mix":
-                # Collect all local background videos recursively from all categories
                 for root_dir, _, files in os.walk(os.path.join(BASE_DIR, "backgrounds")):
                     for file in files:
                         if file.lower().endswith((".mp4", ".mov", ".mkv", ".webm")):
@@ -375,13 +484,11 @@ def process_video_batch(
                 except Exception:
                     pass
 
-            # Randomly select a high-contrast theme color for each individual video
             selected_color = random.choice(PREMIUM_COLORS)
             try:
                 output_file = create_video_from_row(row, category, logo_path, session_output_dir, selected_color, row_bg_paths)
                 if output_file:
-                    job.completed_so_far += 1
-                    db.commit()
+                    update_job_progress(session_id, completed_increment=1)
             except Exception as e:
                 import traceback
                 error_msg = f"Error processing row {idx}: {e}\n{traceback.format_exc()}"
@@ -389,48 +496,8 @@ def process_video_batch(
                 with open("error_logs.txt", "a") as f:
                     f.write(error_msg + "\n")
                 
-        if job.status != "Interrupted":
-            if job.completed_so_far == 0:
-                job.status = "Failed"
-            else:
-                job.status = "Completed"
-                
-                # AUTOMATION: Send email to user
-                if user_email:
-                    print(f"\n[{user_email}] AUTOMATION: Sending email -> 'Sit back and relax, your bulk videos are ready to download!'", flush=True)
-                    try:
-                        mailer_url = "https://quizviral-nine.vercel.app/api/mailer"
-                        download_link = "https://quizviral-nine.vercel.app"
-                        body = f"""Hello Creator,
-
-Your bulk trivia videos have been successfully generated!
-
-You can download them right now by going to your dashboard or using this direct link:
-{download_link}
-
-Keep growing your viral factory!
-- QuizViral AI Team"""
-
-                        payload = {
-                            "to": user_email,
-                            "subject": "Your Bulk Quiz Videos are Ready! 🎉",
-                            "text": body
-                        }
-
-                        data = json.dumps(payload).encode('utf-8')
-                        req = urllib.request.Request(mailer_url, data=data, headers={'Content-Type': 'application/json'})
-                        
-                        with urllib.request.urlopen(req, timeout=15) as response:
-                            if response.status == 200:
-                                print(f"Successfully sent email to {user_email} via Vercel mailer", flush=True)
-                            else:
-                                print(f"Failed to send via Vercel: {response.read()}", flush=True)
-                                
-                    except Exception as email_err:
-                        print(f"Failed to send email HTTP request: {email_err}", flush=True)
-            
     except Exception as e:
-        job.status = "Failed"
+        update_job_progress(session_id, status="Failed")
         import traceback
         error_msg = f"Batch generation failed: {e}\n{traceback.format_exc()}"
         print(error_msg, flush=True)
@@ -442,7 +509,7 @@ Keep growing your viral factory!
         try:
             print(f"Creating zip file: {zip_path} from folder: {session_output_dir}", flush=True)
             shutil.make_archive(zip_path.replace('.zip', ''), 'zip', session_output_dir)
-            job.zip_file_path = zip_path
+            update_job_progress(session_id, zip_file_path=zip_path)
         except Exception as zip_err:
             import traceback
             zip_err_msg = f"ZIP creation failed: {zip_err}\n{traceback.format_exc()}"
@@ -453,16 +520,41 @@ Keep growing your viral factory!
             except Exception:
                 pass
         
-        # Update user's generated videos count in SQLite
-        if user_email and job.completed_so_far > 0:
-            user_rec = db.query(User).filter(User.username == user_email).first()
-            if user_rec:
-                user_rec.videos_generated_count += job.completed_so_far
-                
-        db.commit()
-        db.close()
+        final_status, completed_so_far = finalize_job_and_user_credits(session_id, user_email)
         
-        # Clean custom backgrounds to free up storage
+        if final_status == "Completed" and user_email:
+            print(f"\n[{user_email}] AUTOMATION: Sending email -> 'Sit back and relax, your bulk videos are ready to download!'", flush=True)
+            try:
+                mailer_url = "https://quizviral-nine.vercel.app/api/mailer"
+                download_link = "https://quizviral-nine.vercel.app"
+                body = f"""Hello Creator,
+
+Your bulk trivia videos have been successfully generated!
+
+You can download them right now by going to your dashboard or using this direct link:
+{download_link}
+
+Keep growing your viral factory!
+- QuizViral AI Team"""
+
+                payload = {
+                    "to": user_email,
+                    "subject": "Your Bulk Quiz Videos are Ready! 🎉",
+                    "text": body
+                }
+
+                data = json.dumps(payload).encode('utf-8')
+                req = urllib.request.Request(mailer_url, data=data, headers={'Content-Type': 'application/json'})
+                
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    if response.status == 200:
+                        print(f"Successfully sent email to {user_email} via Vercel mailer", flush=True)
+                    else:
+                        print(f"Failed to send via Vercel: {response.read()}", flush=True)
+                        
+            except Exception as email_err:
+                print(f"Failed to send email HTTP request: {email_err}", flush=True)
+        
         if custom_bg_paths:
             for path in custom_bg_paths:
                 try:
@@ -489,8 +581,8 @@ async def generate_bulk(
     if len(questions_list) == 0:
         raise HTTPException(status_code=400, detail="No questions provided")
         
-    # Run automatic clean-up of expired download zips (> 24 hours) in backgrounds
-    background_tasks.add_task(cleanup_old_zip_files)
+    # Run automatic clean-up of expired download jobs (> 24 hours) in backgrounds
+    background_tasks.add_task(cleanup_expired_video_jobs)
 
     session_id = str(uuid.uuid4())
     
@@ -515,7 +607,8 @@ async def generate_bulk(
         session_id=session_id,
         total_expected=len(questions_list),
         status="Processing",
-        user_email=email
+        user_email=email,
+        created_at=datetime.datetime.now().isoformat()
     )
     db.add(new_job)
     db.commit()
@@ -604,14 +697,16 @@ def preview_generated_video(session_id: str, filename: str):
     return FileResponse(video_path, media_type="video/mp4")
 
 @app.get("/api/jobs")
-def get_user_jobs(email: str):
+def get_user_jobs(email: str, background_tasks: BackgroundTasks):
+    background_tasks.add_task(cleanup_expired_video_jobs)
     db = SessionLocal()
     jobs = db.query(VideoJob).filter(VideoJob.user_email == email).order_by(VideoJob.id.desc()).all()
     job_list = [{
         "session_id": j.session_id,
         "status": j.status,
         "completed_so_far": j.completed_so_far,
-        "total_expected": j.total_expected
+        "total_expected": j.total_expected,
+        "created_at": j.created_at
     } for j in jobs]
     db.close()
     return {"jobs": job_list}

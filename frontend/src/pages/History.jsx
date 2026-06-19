@@ -14,8 +14,18 @@ export default function History() {
       axios.get(`/api/hf/jobs?email=${currentUser.email}`)
         .then(res => {
           const backendJobs = res.data.jobs || [];
+          
+          // Clean up localHistory (remove jobs older than 24 hours)
           const localHistory = JSON.parse(localStorage.getItem('quizviral_jobs_history') || '[]');
-          const userLocalHistory = localHistory.filter(job => job.user_email === currentUser.email);
+          const now = Date.now();
+          const activeLocalHistory = localHistory.filter(job => {
+            if (!job.created_at) return false;
+            const jobTime = new Date(job.created_at).getTime();
+            return (now - jobTime) < 86400000; // keep if less than 24 hours
+          });
+          localStorage.setItem('quizviral_jobs_history', JSON.stringify(activeLocalHistory));
+
+          const userLocalHistory = activeLocalHistory.filter(job => job.user_email === currentUser.email);
           
           // Merge lists using session_id as the unique key
           const mergedJobsMap = {};
@@ -48,9 +58,17 @@ export default function History() {
         })
         .catch(err => {
           console.error("Error loading history", err);
-          // If backend is down or DB resets, fallback to local history
+          // If backend is down, fallback to local history (but still clean up expired ones)
           const localHistory = JSON.parse(localStorage.getItem('quizviral_jobs_history') || '[]');
-          const userLocalHistory = localHistory.filter(job => job.user_email === currentUser.email);
+          const now = Date.now();
+          const activeLocalHistory = localHistory.filter(job => {
+            if (!job.created_at) return false;
+            const jobTime = new Date(job.created_at).getTime();
+            return (now - jobTime) < 86400000;
+          });
+          localStorage.setItem('quizviral_jobs_history', JSON.stringify(activeLocalHistory));
+
+          const userLocalHistory = activeLocalHistory.filter(job => job.user_email === currentUser.email);
           const sortedJobs = userLocalHistory.sort((a, b) => {
             const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
             const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -117,6 +135,7 @@ export default function History() {
             <thead className="text-xs text-gray-600 dark:text-gray-300 uppercase bg-gray-50 dark:bg-dark-900 border-b border-gray-200 dark:border-dark-700">
               <tr>
                 <th className="px-4 py-3 md:px-6 md:py-4">Session ID</th>
+                <th className="px-4 py-3 md:px-6 md:py-4">Date</th>
                 <th className="px-4 py-3 md:px-6 md:py-4">Status</th>
                 <th className="px-4 py-3 md:px-6 md:py-4">Videos</th>
                 <th className="px-4 py-3 md:px-6 md:py-4 text-right">Action</th>
@@ -126,6 +145,14 @@ export default function History() {
               {jobs.map(job => (
                 <tr key={job.session_id} className="border-b border-gray-200 dark:border-dark-700 hover:bg-gray-50 dark:hover:bg-dark-700/50 transition-colors">
                   <td className="px-4 py-3 md:px-6 md:py-4 font-mono text-gray-700 dark:text-gray-300 text-xs md:text-sm">{job.session_id.substring(0, 8)}...</td>
+                  <td className="px-4 py-3 md:px-6 md:py-4 text-gray-700 dark:text-gray-300 text-xs md:text-sm">
+                    {job.created_at ? new Date(job.created_at).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }) : 'N/A'}
+                  </td>
                   <td className="px-4 py-3 md:px-6 md:py-4">
                     <div className="flex items-center gap-1 md:gap-2">
                       {job.status === 'Completed' && <CheckCircle className="w-4 h-4 text-green-500" />}

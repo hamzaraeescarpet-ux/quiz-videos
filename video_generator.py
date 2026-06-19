@@ -45,6 +45,8 @@ def create_rounded_text(text, fontsize, txt_color, bg_color, font_path, size, al
     
     bg_clip = ImageClip(rgb).set_mask(ImageClip(alpha, ismask=True))
     composite = CompositeVideoClip([bg_clip, txt_clip.set_position('center')], size=(bg_w, bg_h))
+    composite.txt_clip = txt_clip
+    composite.bg_clip = bg_clip
     return composite
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -333,7 +335,19 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     speech_2 = f"The correct answer is ... {ans_val}"
 
     try:
-        asyncio.run(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2))
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+        if loop.is_running():
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor() as executor:
+                future = executor.submit(lambda: asyncio.run(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2)))
+                future.result()
+        else:
+            loop.run_until_complete(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2))
     except Exception as e:
         print(f"edge-tts failed: {e}. Falling back to gTTS...", flush=True)
         try:
@@ -537,25 +551,117 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
         temp_audiofile=temp_audio_file_path,
         remove_temp=True,
         preset="ultrafast",
-        threads=4,
+        threads=2,
         verbose=False,
         logger=None
     )
 
-    final.close()
-    clip.close()
-    txt_q.close()
-    for o_clip in option_clips:
-        o_clip.close()
-    txt_ans.close()
-    voice_clip_1.close()
-    voice_clip_2.close()
-    tick_sfx.close()
-    hurray_sfx.close()
+    # Memory Cleanup: Close all subclips and composite clips
+    try:
+        final.close()
+    except Exception:
+        pass
+
+    try:
+        clip.close()
+        if hasattr(clip, "mask") and clip.mask:
+            try:
+                clip.mask.close()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
+        txt_q.close()
+        if hasattr(txt_q, "txt_clip") and txt_q.txt_clip:
+            try:
+                txt_q.txt_clip.close()
+            except Exception:
+                pass
+        if hasattr(txt_q, "bg_clip") and txt_q.bg_clip:
+            try:
+                txt_q.bg_clip.close()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
+        for o_clip in option_clips:
+            try:
+                o_clip.close()
+                if hasattr(o_clip, "txt_clip") and o_clip.txt_clip:
+                    try:
+                        o_clip.txt_clip.close()
+                    except Exception:
+                        pass
+                if hasattr(o_clip, "bg_clip") and o_clip.bg_clip:
+                    try:
+                        o_clip.bg_clip.close()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
+        txt_ans.close()
+        if hasattr(txt_ans, "txt_clip") and txt_ans.txt_clip:
+            try:
+                txt_ans.txt_clip.close()
+            except Exception:
+                pass
+        if hasattr(txt_ans, "bg_clip") and txt_ans.bg_clip:
+            try:
+                txt_ans.bg_clip.close()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
+        voice_clip_1.close()
+    except Exception:
+        pass
+
+    try:
+        voice_clip_2.close()
+    except Exception:
+        pass
+
+    try:
+        tick_sfx.close()
+    except Exception:
+        pass
+
+    try:
+        hurray_sfx.close()
+    except Exception:
+        pass
+
     if bg_music:
-        bg_music.close()
+        try:
+            bg_music.close()
+        except Exception:
+            pass
+
+    try:
+        final_audio.close()
+    except Exception:
+        pass
+
     if logo_clip_final:
-        logo_clip_final.close()
+        try:
+            logo_clip_final.close()
+            if hasattr(logo_clip_final, "mask") and logo_clip_final.mask:
+                try:
+                    logo_clip_final.mask.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     try:
         if os.path.exists(audio_path_1): os.remove(audio_path_1)
@@ -572,6 +678,16 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
         for c in temp_image_clips:
             try:
                 c.close()
+                if hasattr(c, "txt_clip") and c.txt_clip:
+                    try:
+                        c.txt_clip.close()
+                    except Exception:
+                        pass
+                if hasattr(c, "bg_clip") and c.bg_clip:
+                    try:
+                        c.bg_clip.close()
+                    except Exception:
+                        pass
             except Exception:
                 pass
         for p in temp_image_paths:
@@ -580,5 +696,8 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
                     os.remove(p)
             except Exception:
                 pass
+
+    import gc
+    gc.collect()
 
     return output_path

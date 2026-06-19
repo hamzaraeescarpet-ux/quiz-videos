@@ -31,7 +31,6 @@ export default function Dashboard() {
   const [isStopping, setIsStopping] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showGenerateGuide, setShowGenerateGuide] = useState(false);
-  const [generatedVideos, setGeneratedVideos] = useState([]);
   const generateSectionRef = useRef(null);
   const [pendingComplete, setPendingComplete] = useState(false);
   const startTimeRef = useRef(null);
@@ -98,18 +97,7 @@ export default function Dashboard() {
     }).catch(err => console.error("Error fetching categories", err));
   }, []);
 
-  useEffect(() => {
-    if (!sessionId || !['Completed', 'Interrupted'].includes(status)) {
-      return;
-    }
 
-    axios.get(`/api/hf/videos/${sessionId}`).then(res => {
-      setGeneratedVideos(res.data.videos || []);
-    }).catch(err => {
-      console.error("Failed to load generated video previews", err);
-      setGeneratedVideos([]);
-    });
-  }, [sessionId, status]);
 
   useEffect(() => {
     let interval;
@@ -343,7 +331,6 @@ export default function Dashboard() {
       startTimeRef.current = Date.now();
       setPendingComplete(false);
       setShowGenerateGuide(false);
-      setGeneratedVideos([]);
       setStatus('Processing');
       setProgress({ current: 0, total: rows.length });
       setDisplayPercent(0);
@@ -414,7 +401,6 @@ export default function Dashboard() {
     setIsStopping(false);
     setElapsedSeconds(0);
     setShowGenerateGuide(false);
-    setGeneratedVideos([]);
     setRows([{ id: Date.now(), question: '', option1: '', option2: '', option3: '', option4: '', answer: '' }]);
     localStorage.removeItem('current_session_id');
     startTimeRef.current = null;
@@ -690,8 +676,8 @@ export default function Dashboard() {
               </span>
             </div>
 
-            {status === 'Processing' && (
-              (!isPremium && elapsedSeconds >= 120) ? (
+            {status === 'Processing' && elapsedSeconds >= 120 && (
+              !isPremium ? (
                 // Premium Upgrade Ticker
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -730,7 +716,7 @@ export default function Dashboard() {
                   </div>
                 </motion.div>
               ) : (
-                // Help Ticker (shown for Premium users, and for Free users when elapsedSeconds < 120)
+                // Help Ticker (shown for Premium users when elapsedSeconds >= 120)
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -764,19 +750,6 @@ export default function Dashboard() {
 
             {(status === 'Completed' || status === 'Interrupted') && (
               <div className="space-y-6 pt-2 md:pt-4">
-                {generatedVideos.length > 0 && (
-                  <div>
-                    <h4 className="mb-4 text-center text-lg font-extrabold text-brand-300">Your Generated Video Previews</h4>
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                      {generatedVideos.map((video, index) => (
-                        <div key={video.filename} className="overflow-hidden rounded-xl border border-dark-600 bg-dark-900 shadow-xl">
-                          <video controls preload="metadata" className="aspect-[9/16] w-full bg-black" src={`/api/hf/videos/${sessionId}/${encodeURIComponent(video.filename)}`} />
-                          <p className="px-3 py-2 text-center text-xs font-bold text-gray-300">Video {index + 1}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 <div className="flex flex-col sm:flex-row justify-center gap-4">
                   <button
                     onClick={downloadZip}
