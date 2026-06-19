@@ -171,8 +171,35 @@ export default function BlogPostDetail() {
     });
   };
 
+  const schemaMarkup = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": post.title,
+    "image": [post.image],
+    "datePublished": post.date ? new Date(post.date).toISOString() : new Date().toISOString(),
+    "dateModified": post.date ? new Date(post.date).toISOString() : new Date().toISOString(),
+    "author": [{
+      "@type": "Person",
+      "name": post.author || "QuizViral AI Team",
+      "url": "https://quizviral-nine.vercel.app/"
+    }],
+    "publisher": {
+      "@type": "Organization",
+      "name": "QuizViral AI",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://quizviral-nine.vercel.app/favicon.svg"
+      }
+    },
+    "description": post.metaDescription
+  };
+
   return (
     <div className="animate-in fade-in duration-500 py-4 max-w-6xl mx-auto">
+      {/* JSON-LD Article Schema Markup for Google Rich Cards */}
+      <script type="application/ld+json">
+        {JSON.stringify(schemaMarkup)}
+      </script>
       {/* Back button */}
       <Link 
         to="/blog" 

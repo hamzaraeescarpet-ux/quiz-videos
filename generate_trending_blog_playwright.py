@@ -458,6 +458,40 @@ def update_sitemap(slug):
         print(f"Failed to update sitemap.xml: {e}")
         return False
 
+def ping_indexnow(slug):
+    """Pings IndexNow API to request instant crawling of the new blog URL on Bing/Yahoo/Yandex"""
+    import urllib.request
+    import urllib.parse
+    import ssl
+    
+    url_to_index = f"https://quizviral-nine.vercel.app/blog/{slug}"
+    key = "86b7a1114fbd4f80a501b0dbc2731be3"
+    key_location = f"https://quizviral-nine.vercel.app/{key}.txt"
+    
+    # Build request parameters
+    params = {
+        "url": url_to_index,
+        "key": key,
+        "keyLocation": key_location
+    }
+    encoded_params = urllib.parse.urlencode(params)
+    ping_url = f"https://api.indexnow.org/indexnow?{encoded_params}"
+    
+    print(f"Pinging IndexNow for instant indexing of: {url_to_index}...")
+    try:
+        context = ssl._create_unverified_context()
+        req = urllib.request.Request(ping_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10, context=context) as response:
+            status = response.getcode()
+            if status == 200:
+                print("IndexNow ping successful! Search engines notified.")
+                return True
+            else:
+                print(f"IndexNow ping returned status: {status}")
+    except Exception as e:
+        print(f"Failed to ping IndexNow: {e}")
+    return False
+
 def kill_chrome_on_port_9222():
     """Finds and terminates the Chrome process listening on remote debugging port 9222 on Windows"""
     import subprocess
@@ -512,9 +546,10 @@ def main():
         # 4. blogPosts.js में सेव करें
         success = update_blog_posts_file(blog_data)
         
-        # 5. sitemap.xml में सेव करें
+        # 5. sitemap.xml me save karein aur IndexNow ping karein
         if success:
             update_sitemap(blog_data["slug"])
+            ping_indexnow(blog_data["slug"])
         
         # 6. Build and Push
         if success:
