@@ -190,6 +190,28 @@ def format_pinterest_description(title, excerpt, url):
         desc = desc[:497] + "..."
     return desc
 
+def get_safe_input(page, selectors, exclude_keywords=["search"]):
+    """Helper to locate a visible input element while strictly excluding global navigation search inputs"""
+    for sel in selectors:
+        loc = page.locator(sel)
+        count = loc.count()
+        for i in range(count):
+            el = loc.nth(i)
+            try:
+                if el.is_visible():
+                    placeholder = el.get_attribute("placeholder") or ""
+                    el_id = el.get_attribute("id") or ""
+                    aria_label = el.get_attribute("aria-label") or ""
+                    name = el.get_attribute("name") or ""
+                    
+                    combined = (placeholder + el_id + aria_label + name).lower()
+                    if any(kw in combined for kw in exclude_keywords):
+                        continue
+                    return el
+            except Exception:
+                continue
+    return None
+
 def publish_pin_for_profile(profile_path, pin_data, idx):
     if not launch_chrome_with_profile(profile_path):
         print(f"Failed to start Chrome for profile: {profile_path}")
@@ -203,11 +225,22 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
             context = browser.contexts[0]
             page = context.new_page()
             
-            # Use domcontentloaded to load page instantly without waiting for heavy track scripts/ads
-            print("Navigating to Pinterest Pin Builder...")
-            page.goto("https://www.pinterest.com/pin-builder/", wait_until="domcontentloaded")
+            # Set viewport to 1280x800 to make sure all components are visible on screen
+            page.set_viewport_size({"width": 1280, "height": 800})
             
-            # Smart waiting logic: wait up to 15s for either Title Input (logged-in) OR Login Button (logged-out) to appear
+            # Navigate to Pinterest Pin Builder with a retry loop to handle page load errors/redirection aborts
+            print("Navigating to Pinterest Pin Builder...")
+            for attempt in range(3):
+                try:
+                    page.goto("https://www.pinterest.com/pin-builder/", wait_until="domcontentloaded", timeout=45000)
+                    break
+                except Exception as e:
+                    if attempt == 2:
+                        raise e
+                    print(f"Navigation error (attempt {attempt + 1}/3): {e}. Retrying in 5 seconds...")
+                    time.sleep(5)
+            
+            # Wait up to 15s for either Title Input (logged-in) OR Login Button (logged-out) to appear
             print("Pinterest components load hone ka wait kar rahe hai...")
             try:
                 page.wait_for_selector(
@@ -250,11 +283,16 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 print("Settle hone ke liye 5 seconds wait kar rahe hai...")
                 time.sleep(5)
                 
-                # Re-navigate to Pin Builder after login
-                if "pin-builder" not in page.url:
-                    print("Pin Builder page par navigate kar rahe hai...")
-                    page.goto("https://www.pinterest.com/pin-builder/", wait_until="domcontentloaded")
-                    time.sleep(8)
+                # Re-navigate to Pin Builder after login with retry loop
+                for attempt in range(3):
+                    try:
+                        page.goto("https://www.pinterest.com/pin-builder/", wait_until="domcontentloaded", timeout=45000)
+                        break
+                    except Exception as e:
+                        if attempt == 2:
+                            raise e
+                        print(f"Navigation error (attempt {attempt + 1}/3): {e}. Retrying in 5 seconds...")
+                        time.sleep(5)
             
             print("Account verified as logged in. Filling Pin details with deliberate human delays...")
             time.sleep(3)
@@ -271,52 +309,48 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 
             # 2. Fill the Title
             print("Title fill kar rahe hai...")
-            title_input = page.locator(
-                'input[placeholder*="title" i], '
-                'textarea[placeholder*="title" i], '
-                'input[aria-label*="title" i], '
-                'input, '
-                'textarea'
-            )
-            target_title = None
-            if title_input.count() > 0:
-                for i in range(title_input.count()):
-                    if title_input.nth(i).is_visible():
-                        target_title = title_input.nth(i)
-                        break
+            title_selectors = [
+                '[data-testid="pin-builder-title"]',
+                'textarea[id*="title" i]',
+                'input[id*="title" i]',
+                'textarea[placeholder*="title" i]',
+                'input[placeholder*="title" i]',
+                'textarea[placeholder*="Title" i]',
+                'input[placeholder*="Title" i]'
+            ]
+            target_title = get_safe_input(page, title_selectors)
             if target_title:
+                target_title.scroll_into_view_if_needed()
+                time.sleep(1.5)
                 target_title.click()
-                time.sleep(2)
+                time.sleep(1.5)
                 target_title.fill("")
-                time.sleep(2)
+                time.sleep(1.5)
                 target_title.fill(pin_data["title"])
-                print(f"Title filled: {pin_data['title']}")
+                print(f"Title filled successfully: {pin_data['title']}")
                 time.sleep(3) # Delay after typing title
             else:
                 print("Warning: Could not find Title input.")
                 
             # 3. Fill the Description
             print("Description aur blog link fill kar rahe hai...")
-            desc_input = page.locator(
-                'div[role="textbox"][placeholder*="about" i], '
-                'div[role="textbox"][aria-label*="description" i], '
-                'div[contenteditable="true"][placeholder*="about" i], '
-                'textarea[placeholder*="about" i], '
-                'textarea[placeholder*="description" i], '
-                'div[contenteditable="true"], '
-                'textarea'
-            )
-            target_desc = None
-            if desc_input.count() > 0:
-                for i in range(desc_input.count()):
-                    if desc_input.nth(i).is_visible():
-                        target_desc = desc_input.nth(i)
-                        break
+            desc_selectors = [
+                '[data-testid="pin-builder-description"]',
+                'div[role="textbox"][placeholder*="about" i]',
+                'div[contenteditable="true"][placeholder*="about" i]',
+                'textarea[placeholder*="about" i]',
+                'textarea[placeholder*="description" i]',
+                'div[role="textbox"][id*="description" i]',
+                'textarea[id*="description" i]'
+            ]
+            target_desc = get_safe_input(page, desc_selectors)
             if target_desc:
+                target_desc.scroll_into_view_if_needed()
+                time.sleep(1.5)
                 target_desc.click()
-                time.sleep(2)
+                time.sleep(1.5)
                 target_desc.fill("")
-                time.sleep(2)
+                time.sleep(1.5)
                 target_desc.fill(pin_data["description"])
                 print("Description field filled successfully with full blog post URL.")
                 time.sleep(4) # Delay after typing description
@@ -325,56 +359,146 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 
             # 4. Fill the Destination Link
             print("Destination blog link fill kar rahe hai...")
-            link_input = page.locator(
-                'input[placeholder*="link" i], '
-                'input[aria-label*="link" i], '
-                'input[id*="link" i]'
-            )
-            target_link = None
-            if link_input.count() > 0:
-                for i in range(link_input.count()):
-                    if link_input.nth(i).is_visible():
-                        target_link = link_input.nth(i)
-                        break
+            link_selectors = [
+                '[data-testid="pin-builder-link"]',
+                'input[placeholder*="link" i]',
+                'input[placeholder*="website" i]',
+                'input[placeholder*="URL" i]',
+                'input[id*="link" i]',
+                'input[aria-label*="link" i]'
+            ]
+            target_link = get_safe_input(page, link_selectors)
             if target_link:
+                target_link.scroll_into_view_if_needed()
+                time.sleep(1.5)
                 target_link.click()
-                time.sleep(2)
+                time.sleep(1.5)
                 target_link.fill("")
-                time.sleep(2)
+                time.sleep(1.5)
                 target_link.fill(pin_data["link"])
                 print(f"Destination link field filled: {pin_data['link']}")
                 time.sleep(3) # Delay after typing link
             else:
                 print("Warning: Could not find Destination Link input.")
                 
-            # 5. Handle Board Selection
+            # 5. Handle Product Tagging (New requested Feature)
+            print("Product Tag lagane ki koshish kar rahe hai...")
+            try:
+                # Search for Tag products button on the page
+                tag_btn = page.locator(
+                    'button:has-text("Tag products"), '
+                    '[aria-label*="Tag products" i], '
+                    '[data-testid="tag-button"], '
+                    'button:has-text("Tag"), '
+                    '[aria-label*="tag" i]'
+                )
+                target_tag_btn = None
+                if tag_btn.count() > 0:
+                    for i in range(tag_btn.count()):
+                        if tag_btn.nth(i).is_visible():
+                            target_tag_btn = tag_btn.nth(i)
+                            break
+                if target_tag_btn:
+                    target_tag_btn.scroll_into_view_if_needed()
+                    time.sleep(1.5)
+                    print("Tag products button mil gaya. Click kar rahe hai...")
+                    target_tag_btn.click()
+                    time.sleep(4)
+                    
+                    # Look for search or URL input
+                    tag_input = page.locator(
+                        'input[placeholder*="url" i], '
+                        'input[placeholder*="link" i], '
+                        'input[placeholder*="search" i], '
+                        'input[placeholder*="Search" i]'
+                    ).first
+                    if tag_input.count() > 0 and tag_input.is_visible():
+                        tag_input.click()
+                        time.sleep(1.5)
+                        tag_input.fill(pin_data["link"])
+                        time.sleep(1.5)
+                        tag_input.press("Enter")
+                        print(f"Product tag search me link fill kiya: {pin_data['link']}")
+                        time.sleep(5) # wait for results
+                        
+                        # Click the first product result or image
+                        first_result = page.locator(
+                            'div[role="listitem"] img, '
+                            '[data-testid*="product" i] img, '
+                            'div[class*="product"] img, '
+                            'canvas'
+                        ).first
+                        if first_result.count() > 0 and first_result.is_visible():
+                            first_result.click()
+                            print("Product result select kiya.")
+                            time.sleep(3)
+                            
+                            # Click Done/Save button
+                            done_btn = page.locator(
+                                'button:has-text("Done"), '
+                                'button:has-text("Save"), '
+                                'button:has-text("Create")'
+                            )
+                            target_done = None
+                            if done_btn.count() > 0:
+                                for i in range(done_btn.count()):
+                                    if done_btn.nth(i).is_visible():
+                                        target_done = done_btn.nth(i)
+                                        break
+                            if target_done:
+                                target_done.click()
+                                print("Product tag apply ho gaya!")
+                                time.sleep(3)
+                            else:
+                                print("Done button nahi mila. Esc pressing...")
+                                page.keyboard.press("Escape")
+                                time.sleep(2)
+                        else:
+                            print("Product result image nahi mila. Esc pressing...")
+                            page.keyboard.press("Escape")
+                            time.sleep(2)
+                    else:
+                        print("Tag input field nahi mila.")
+                else:
+                    print("Tag products button page par nahi mila. Skipping optional product tagging...")
+            except Exception as tag_err:
+                print(f"Product tagging process skip ho gaya (Issue): {tag_err}")
+                
+            # 6. Handle Board Selection
             if BOARD_NAME:
                 print(f"Board '{BOARD_NAME}' select karne ki koshish kar rahe hai...")
-                board_opener = page.locator(
-                    'button[data-testid="board-dropdown"], '
-                    'button[aria-haspopup="listbox"], '
-                    'button[aria-label*="board" i], '
-                    'div[role="button"][aria-label*="board" i], '
-                    'button[class*="board" i]'
-                )
+                board_opener_selectors = [
+                    '[data-testid="board-dropdown"]',
+                    'button[aria-label*="Select board" i]',
+                    'button[aria-label*="board" i]',
+                    'div[role="button"][aria-label*="board" i]',
+                    'button[class*="board" i]',
+                    'button:has-text("Select")'
+                ]
                 target_board_opener = None
-                if board_opener.count() > 0:
-                    for i in range(board_opener.count()):
-                        if board_opener.nth(i).is_visible():
-                            target_board_opener = board_opener.nth(i)
+                for sel in board_opener_selectors:
+                    loc = page.locator(sel)
+                    count = loc.count()
+                    for i in range(count):
+                        el = loc.nth(i)
+                        if el.is_visible():
+                            target_board_opener = el
                             break
+                    if target_board_opener:
+                        break
+                        
                 if target_board_opener:
+                    target_board_opener.scroll_into_view_if_needed()
+                    time.sleep(1.5)
                     target_board_opener.click()
                     print("Board dropdown open ho gaya, search kar rahe hai...")
                     time.sleep(4) # Delay for dropdown animation
                     
                     # Search box inside dropdown
-                    search_box = page.locator(
-                        'input[placeholder*="Search" i], '
-                        'input[placeholder*="search" i], '
-                        'input[aria-label*="search" i]'
-                    ).first
+                    search_box = page.locator('[role="listbox"] input, [class*="dropdown"] input, input[placeholder*="Search"]').first
                     if search_box.count() > 0 and search_box.is_visible():
+                        search_box.click()
+                        time.sleep(1.5)
                         search_box.fill(BOARD_NAME)
                         print(f"Board search input me '{BOARD_NAME}' type kiya...")
                         time.sleep(3)
@@ -397,7 +521,7 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 else:
                     print("Could not open board picker. Default board use kiya jayega.")
             
-            # 6. Click Publish / Save
+            # 7. Click Publish / Save
             print("Publish button locate kar rahe hai...")
             publish_btn = page.locator(
                 'button[data-testid="board-dropdown-select-button"], '
@@ -416,6 +540,8 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                         target_publish = publish_btn.nth(i)
                         break
             if target_publish:
+                target_publish.scroll_into_view_if_needed()
+                time.sleep(1.5)
                 print("Publish/Save button click kar rahe hai...")
                 target_publish.click()
                 print("Publish click ho gaya! Completion process ke liye 15 seconds wait kar rahe hai...")
