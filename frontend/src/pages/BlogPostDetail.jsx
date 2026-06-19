@@ -187,11 +187,18 @@ export default function BlogPostDetail() {
          {/* Main Content Card */}
          <article className="w-full lg:w-2/3 bg-white dark:bg-dark-800/20 border border-gray-200 dark:border-dark-700/50 rounded-3xl p-6 md:p-10 shadow-xl space-y-6">
            {/* Header image */}
-           <div className="aspect-video w-full rounded-2xl overflow-hidden shadow-lg border border-gray-200 dark:border-dark-700/40">
+           <div className="aspect-video w-full rounded-2xl overflow-hidden shadow-lg border border-gray-200 dark:border-dark-700/40 relative bg-dark-900 flex items-center justify-center">
+             {/* Ambient Blurred Backdrop */}
+             <img 
+               src={post.image} 
+               alt=""
+               className="absolute inset-0 w-full h-full object-cover blur-lg opacity-30 scale-110 pointer-events-none"
+             />
+             {/* Centered Sharp Image */}
              <img 
                src={post.image} 
                alt={post.title} 
-               className="w-full h-full object-cover"
+               className="relative z-10 w-full h-full object-contain"
              />
            </div>
  
@@ -213,6 +220,56 @@ export default function BlogPostDetail() {
            {/* Rendered content */}
            <div className="prose prose-invert max-w-none pt-2">
              {renderContent(post.content)}
+           </div>
+
+           {/* Social Share Section */}
+           <div className="border-t border-b border-gray-200 dark:border-dark-700/50 py-6 my-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+             <div>
+               <h4 className="font-bold text-gray-900 dark:text-white text-base">Share this guide with fellow creators!</h4>
+               <p className="text-xs text-gray-500 dark:text-gray-400">Help others scale their faceless trivia channels.</p>
+             </div>
+             <div className="flex flex-wrap gap-2.5">
+               {/* Twitter */}
+               <a 
+                 href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.title)}&url=${encodeURIComponent(window.location.href)}`} 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 className="p-2.5 rounded-xl bg-dark-800 hover:bg-dark-700 border border-dark-750 text-gray-200 hover:text-white transition-all flex items-center justify-center gap-2 text-xs font-semibold"
+               >
+                 <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                 Tweet
+               </a>
+               {/* Facebook */}
+               <a 
+                 href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`} 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 className="p-2.5 rounded-xl bg-[#1877F2]/10 hover:bg-[#1877F2]/20 border border-[#1877F2]/30 text-[#1877F2] dark:text-[#3b82f6] transition-all flex items-center justify-center gap-2 text-xs font-semibold"
+               >
+                 <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                 Share
+               </a>
+               {/* WhatsApp */}
+               <a 
+                 href={`https://api.whatsapp.com/send?text=${encodeURIComponent(post.title + ' - ' + window.location.href)}`} 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 className="p-2.5 rounded-xl bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 text-[#25D366] transition-all flex items-center justify-center gap-2 text-xs font-semibold"
+               >
+                 <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.665.989 3.3 1.478 4.965 1.479 5.48.002 9.94-4.453 9.943-9.932.002-2.654-1.026-5.15-2.895-7.022C16.732 1.797 14.238.77 11.584.77c-5.49 0-9.957 4.461-9.96 9.94-.001 1.777.47 3.501 1.365 5.011L1.93 20.35l4.717-1.196z"/></svg>
+                 WhatsApp
+               </a>
+               {/* Copy Link */}
+               <button 
+                 onClick={() => {
+                   navigator.clipboard.writeText(window.location.href);
+                   alert("Article link copied to clipboard! 📋");
+                 }}
+                 className="p-2.5 rounded-xl bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 text-brand-400 hover:text-brand-300 transition-all flex items-center justify-center gap-2 text-xs font-semibold"
+               >
+                 Copy Link
+               </button>
+             </div>
            </div>
  
            {/* Bottom callout inside blog content with site links and PH badge */}

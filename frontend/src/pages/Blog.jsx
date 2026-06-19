@@ -49,14 +49,21 @@ export default function Blog() {
           >
             <div>
               {/* Blog Image */}
-              <Link to={`/blog/${post.slug}`} className="block overflow-hidden relative aspect-video">
+              <Link to={`/blog/${post.slug}`} className="block overflow-hidden relative aspect-video bg-dark-900/60 border-b border-gray-200 dark:border-dark-700/40">
+                {/* Ambient Blurred Backdrop */}
+                <img 
+                  src={post.image} 
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover blur-md opacity-30 scale-110 pointer-events-none"
+                />
+                {/* Centered Sharp Image */}
                 <img 
                   src={post.image} 
                   alt={post.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="relative z-10 w-full h-full object-contain group-hover:scale-102 transition-transform duration-300"
                   loading="lazy"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-dark-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-t from-dark-900/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20" />
               </Link>
 
               {/* Card Body */}
