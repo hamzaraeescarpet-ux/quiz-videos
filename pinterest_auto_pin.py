@@ -6,17 +6,28 @@ import subprocess
 from playwright.sync_api import sync_playwright
 
 # Configurations
-# We have pre-populated the 4 Chrome profiles found on your computer!
+# We have mapped your 4 Chrome profiles to your specific Pinterest accounts!
+# Profile 1 (Index 0) -> hamzaraeescarpet
+# Profile 2 (Index 1) -> hamzarais2023
+# Profile 3 (Index 2) -> hamzarais354
+# Profile 4 (Index 3) -> deshkikhabar79
 CHROME_PROFILES = [
     r"C:\Users\hamza\Downloads\python development\browser automation\gemini video points\bulk scheduling fb videos\chrome_profile",
     r"C:\Users\hamza\Downloads\python development\browser automation\gemini video points\bulk scheduling fb videos\chrome_profile_2",
-    r"C:\Users\hamza\Downloads\python development\facebook post automation\hamzarais2023\chrome_profile",
-    r"C:\Users\hamza\Downloads\python development\facebook post automation\hamzarais2023\chrome_profile_2"
+    r"C:\Users\hamza\Downloads\facebook post automation\hamzarais2023\chrome_profile",
+    r"C:\Users\hamza\Downloads\facebook post automation\hamzarais2023\chrome_profile_2"
+]
+
+ACCOUNT_IDS = [
+    "hamzaraeescarpet",
+    "hamzarais2023",
+    "hamzarais354",
+    "deshkikhabar79"
 ]
 
 BOARD_NAME = "Trivia Quiz Videos" # Set this to your Pinterest board name or leave empty to use default board
 
-# HEADLESS Mode: Set to False to open Chrome visibly (strongly recommended for Pinterest to bypass bot-checks and login easily)
+# HEADLESS Mode: Set to False to open Chrome visibly (highly recommended for debugging and manual verification)
 HEADLESS = False
 
 def check_port_open(port=9222):
@@ -115,7 +126,56 @@ def download_temp_image(image_url):
         print(f"Failed to download image: {e}")
         return None
 
-def publish_pin_for_profile(profile_path, pin_data):
+def format_pinterest_title(title):
+    """Shortens the blog title to fit Pinterest's strict limit and makes it attractive (strictly under 70 chars)"""
+    title = title.strip()
+    
+    # Remove outer quotes if any
+    title = re.sub(r'^["\'`]+|["\'`]+$', '', title)
+    
+    # Try split by common dividers to get a punchy part
+    for divider in [":", "-", "|"]:
+        if divider in title:
+            parts = title.split(divider)
+            for part in parts:
+                cleaned_part = part.strip()
+                if 25 <= len(cleaned_part) <= 70:
+                    return cleaned_part
+                    
+    # Default truncation under 70 characters at a word boundary
+    if len(title) > 70:
+        truncated = title[:67]
+        last_space = truncated.rfind(" ")
+        if last_space > 20:
+            return truncated[:last_space] + "..."
+        return truncated + "..."
+    return title
+
+def format_pinterest_description(title, excerpt, url):
+    """Creates a rich description within Pinterest's 500-char limit including the post link"""
+    header = f"💡 {title}\n\n"
+    cta = f"\n\nRead the full blog post and take the interactive quiz here:\n👉 {url}\n\nCreate viral trivia quizzes instantly with QuizViral AI!\n#quiz #trivia #viral #quizviral #contentcreator"
+    
+    # Calculate space left for excerpt
+    max_excerpt_len = 500 - len(header) - len(cta) - 10 # buffer
+    
+    cleaned_excerpt = excerpt.strip()
+    if len(cleaned_excerpt) > max_excerpt_len:
+        truncated = cleaned_excerpt[:max_excerpt_len]
+        last_space = truncated.rfind(" ")
+        if last_space > 20:
+            cleaned_excerpt = truncated[:last_space] + "..."
+        else:
+            cleaned_excerpt = truncated + "..."
+            
+    desc = f"{header}{cleaned_excerpt}{cta}"
+    
+    # Final safety check to truncate to exactly 500 characters
+    if len(desc) > 500:
+        desc = desc[:497] + "..."
+    return desc
+
+def publish_pin_for_profile(profile_path, pin_data, idx):
     if not launch_chrome_with_profile(profile_path):
         print(f"Failed to start Chrome for profile: {profile_path}")
         return False
@@ -131,28 +191,49 @@ def publish_pin_for_profile(profile_path, pin_data):
             print("Navigating to Pinterest Pin Builder...")
             page.goto("https://www.pinterest.com/pin-builder/")
             
-            # Wait for loaded page state
-            time.sleep(7)
+            # Wait for loaded page state (delays added to allow fully rendering JS assets)
+            print("Pinterest page load hone ka wait kar rahe hai (10 seconds)...")
+            time.sleep(10)
             
             # Check if user is logged in
-            if "login" in page.url or page.locator('button:has-text("Log in")').count() > 0:
-                print(f"WARNING: Account is NOT logged in for profile: {profile_path}. Skipping...")
-                page.close()
-                browser.close()
-                return False
+            is_logged_out = False
+            if "login" in page.url or page.locator('button:has-text("Log in")').count() > 0 or page.locator('button:has-text("Log In")').count() > 0:
+                is_logged_out = True
                 
-            print("Account verified as logged in. Filling Pin details...")
+            if is_logged_out:
+                expected_id = ACCOUNT_IDS[idx] if idx < len(ACCOUNT_IDS) else "Pinterest Account"
+                print("\n" + "="*80)
+                print(f"👉 [IMPORTANT ALERT] Profile {idx + 1} logged in nahi hai! (Expected Account: {expected_id})")
+                print(f"Bhai, kripya open hui Chrome Window me Pinterest Account '{expected_id}' par log in karein.")
+                print("Log in hone ke baad jab aap Pinterest home feed ya Pin Builder page par pahunch jayein,")
+                print("tab yahan terminal me ENTER press karein aur automation continue ho jayegi...")
+                print("="*80 + "\n")
+                
+                input("Manually log in karne ke baad ENTER press karein...")
+                print("Settle hone ke liye 5 seconds wait kar rahe hai...")
+                time.sleep(5)
+                
+                # Re-navigate to Pin Builder after login
+                if "pin-builder" not in page.url:
+                    print("Pin Builder page par navigate kar rahe hai...")
+                    page.goto("https://www.pinterest.com/pin-builder/")
+                    time.sleep(10)
+            
+            print("Account verified as logged in. Filling Pin details with deliberate human delays...")
+            time.sleep(3)
             
             # 1. Upload the image file
+            print("Blog image upload kar rahe hai...")
             file_input = page.locator('input[type="file"]')
             if file_input.count() > 0:
                 file_input.first.set_input_files(pin_data["image_path"])
-                print("Image uploaded successfully!")
-                time.sleep(2)
+                print("Image upload complete!")
+                time.sleep(5) # Delay after upload
             else:
                 print("Error: Could not find image file input element on Pinterest.")
                 
-            # 2. Fill the Title (Search for visible title inputs)
+            # 2. Fill the Title
+            print("Title fill kar rahe hai...")
             title_input = page.locator(
                 'input[placeholder*="title" i], '
                 'textarea[placeholder*="title" i], '
@@ -168,16 +249,21 @@ def publish_pin_for_profile(profile_path, pin_data):
                         break
             if target_title:
                 target_title.click()
+                time.sleep(2)
+                target_title.fill("")
+                time.sleep(2)
                 target_title.fill(pin_data["title"])
-                print("Title filled.")
+                print(f"Title filled: {pin_data['title']}")
+                time.sleep(3) # Delay after typing title
             else:
                 print("Warning: Could not find Title input.")
                 
-            # 3. Fill the Description (Handles 'about' and 'description' placeholders)
+            # 3. Fill the Description
+            print("Description aur blog link fill kar rahe hai...")
             desc_input = page.locator(
-                'div[contenteditable="true"][aria-label*="description" i], '
+                'div[role="textbox"][placeholder*="about" i], '
+                'div[role="textbox"][aria-label*="description" i], '
                 'div[contenteditable="true"][placeholder*="about" i], '
-                'div[contenteditable="true"][placeholder*="description" i], '
                 'textarea[placeholder*="about" i], '
                 'textarea[placeholder*="description" i], '
                 'div[contenteditable="true"], '
@@ -191,12 +277,17 @@ def publish_pin_for_profile(profile_path, pin_data):
                         break
             if target_desc:
                 target_desc.click()
+                time.sleep(2)
+                target_desc.fill("")
+                time.sleep(2)
                 target_desc.fill(pin_data["description"])
-                print("Description filled.")
+                print("Description field filled successfully with full blog post URL.")
+                time.sleep(4) # Delay after typing description
             else:
                 print("Warning: Could not find Description input.")
                 
             # 4. Fill the Destination Link
+            print("Destination blog link fill kar rahe hai...")
             link_input = page.locator(
                 'input[placeholder*="link" i], '
                 'input[aria-label*="link" i], '
@@ -210,14 +301,18 @@ def publish_pin_for_profile(profile_path, pin_data):
                         break
             if target_link:
                 target_link.click()
+                time.sleep(2)
+                target_link.fill("")
+                time.sleep(2)
                 target_link.fill(pin_data["link"])
-                print("Destination link filled.")
+                print(f"Destination link field filled: {pin_data['link']}")
+                time.sleep(3) # Delay after typing link
             else:
                 print("Warning: Could not find Destination Link input.")
                 
             # 5. Handle Board Selection
             if BOARD_NAME:
-                print(f"Attempting to select board: '{BOARD_NAME}'...")
+                print(f"Board '{BOARD_NAME}' select karne ki koshish kar rahe hai...")
                 board_opener = page.locator(
                     'button[data-testid="board-dropdown"], '
                     'button[aria-haspopup="listbox"], '
@@ -233,7 +328,8 @@ def publish_pin_for_profile(profile_path, pin_data):
                             break
                 if target_board_opener:
                     target_board_opener.click()
-                    time.sleep(2)
+                    print("Board dropdown open ho gaya, search kar rahe hai...")
+                    time.sleep(4) # Delay for dropdown animation
                     
                     # Search box inside dropdown
                     search_box = page.locator(
@@ -243,7 +339,8 @@ def publish_pin_for_profile(profile_path, pin_data):
                     ).first
                     if search_box.count() > 0 and search_box.is_visible():
                         search_box.fill(BOARD_NAME)
-                        time.sleep(2)
+                        print(f"Board search input me '{BOARD_NAME}' type kiya...")
+                        time.sleep(3)
                     
                     # Click matching board option
                     board_item = page.locator(
@@ -254,16 +351,17 @@ def publish_pin_for_profile(profile_path, pin_data):
                     ).first
                     if board_item.count() > 0 and board_item.is_visible():
                         board_item.click()
-                        print(f"Board '{BOARD_NAME}' selected!")
-                        time.sleep(1)
+                        print(f"Board '{BOARD_NAME}' select ho gaya!")
+                        time.sleep(3)
                     else:
-                        print(f"Board '{BOARD_NAME}' not found in search list. Using default board.")
+                        print(f"Board '{BOARD_NAME}' nahi mila list me. Default board use karenge.")
                         page.keyboard.press("Escape")
-                        time.sleep(1)
+                        time.sleep(2)
                 else:
-                    print("Could not open board picker. Using default board.")
+                    print("Could not open board picker. Default board use kiya jayega.")
             
             # 6. Click Publish / Save
+            print("Publish button locate kar rahe hai...")
             publish_btn = page.locator(
                 'button[data-testid="board-dropdown-select-button"], '
                 'button[data-testid="create-pin-submit"], '
@@ -281,9 +379,10 @@ def publish_pin_for_profile(profile_path, pin_data):
                         target_publish = publish_btn.nth(i)
                         break
             if target_publish:
+                print("Publish/Save button click kar rahe hai...")
                 target_publish.click()
-                print("Publish button clicked! Waiting for success confirmation...")
-                time.sleep(8)  # Wait for Pinterest to process
+                print("Publish click ho gaya! Completion process ke liye 15 seconds wait kar rahe hai...")
+                time.sleep(15)  # Wait for Pinterest to process
                 print("Pin published successfully!")
                 success = True
             else:
@@ -297,6 +396,17 @@ def publish_pin_for_profile(profile_path, pin_data):
             kill_chrome_on_port_9222()
             
     return success
+
+def extract_js_field(content, field_name):
+    """Robust regex parser to extract javascript object field values regardless of quotes type"""
+    pattern = rf'(?:["\']?{field_name}["\']?)\s*:\s*([\"\'`])(.*?)\1\s*(?:,|$)'
+    match = re.search(pattern, content, re.DOTALL)
+    if match:
+        val = match.group(2)
+        # Unescape quotes and common characters
+        val = val.replace('\\"', '"').replace("\\'", "'").replace('\\n', '\n')
+        return val
+    return None
 
 def get_latest_blog_post():
     """Reads the latest blog post directly from frontend/src/data/blogPosts.js"""
@@ -312,23 +422,20 @@ def get_latest_blog_post():
             content = f.read()
             
         # Find the first object in the blogPosts array
-        match = re.search(r"export const blogPosts = \[\s*\{(.*?)\}\s*,", content, re.DOTALL)
-        if not match:
-            match = re.search(r"export const blogPosts = \[\s*\{(.*?)\}\s*\]", content, re.DOTALL)
+        array_match = re.search(r"export const blogPosts = \[\s*\{(.*?)\}\s*(?:,|\s*\])", content, re.DOTALL)
+        if not array_match:
+            # Fallback to search any first object after blogPosts
+            array_match = re.search(r"blogPosts\s*=\s*\[\s*\{(.*?)\}", content, re.DOTALL)
             
-        if match:
-            object_str = "{" + match.group(1).strip() + "}"
-            title_match = re.search(r"title:\s*['\"`](.*?)['\"']", object_str)
-            slug_match = re.search(r"slug:\s*['\"`](.*?)['\"']", object_str)
-            excerpt_match = re.search(r"excerpt:\s*['\"`](.*?)['\"']", object_str)
-            image_match = re.search(r"image:\s*['\"`](.*?)['\"']", object_str)
+        if array_match:
+            object_str = array_match.group(1)
             
             blog_data = {}
-            if title_match: blog_data["title"] = title_match.group(1)
-            if slug_match: blog_data["slug"] = slug_match.group(1)
-            if excerpt_match: blog_data["excerpt"] = excerpt_match.group(1)
-            if image_match: blog_data["image"] = image_match.group(1)
-            
+            for field in ["title", "slug", "excerpt", "image"]:
+                val = extract_js_field(object_str, field)
+                if val:
+                    blog_data[field] = val
+                    
             if "title" in blog_data and "slug" in blog_data:
                 print(f"Loaded latest blog post: '{blog_data['title']}'")
                 return blog_data
@@ -339,22 +446,36 @@ def get_latest_blog_post():
 def run_pinterest_syndication(blog_data):
     print("=================== PINTEREST SYNDICATION START ===================")
     
-    local_image = download_temp_image(blog_data["image"])
+    # Pre-check for image field
+    image_url = blog_data.get("image")
+    if not image_url:
+        print("Aborting Pinterest syndication: 'image' field not found in blog post data.")
+        return
+        
+    local_image = download_temp_image(image_url)
     if not local_image:
         print("Aborting Pinterest syndication: Could not download image.")
         return
         
+    full_url = f"https://quizviral-nine.vercel.app/blog/{blog_data['slug']}"
+    
+    # We truncate the title to 70 characters for Pinterest's strict character limits
+    short_title = format_pinterest_title(blog_data["title"])
+    
+    # Generate long, rich description containing the full blog post URL
+    rich_description = format_pinterest_description(blog_data["title"], blog_data.get("excerpt", ""), full_url)
+    
     pin_data = {
-        "title": blog_data["title"],
-        "description": f"{blog_data['excerpt']}\n\nRead full article at: {blog_data['slug']} #quiz #trivia #ai #creator",
-        "link": f"https://quizviral-nine.vercel.app/blog/{blog_data['slug']}",
+        "title": short_title,
+        "description": rich_description,
+        "link": full_url,
         "image_path": local_image
     }
     
     successful_pins = 0
     for idx, profile in enumerate(CHROME_PROFILES):
         print(f"\n--- Processing Profile {idx + 1}/{len(CHROME_PROFILES)} ---")
-        if publish_pin_for_profile(profile, pin_data):
+        if publish_pin_for_profile(profile, pin_data, idx):
             successful_pins += 1
             
     print(f"\n=================== PINTEREST SYNDICATION COMPLETE ({successful_pins}/{len(CHROME_PROFILES)} posted) ===================")
