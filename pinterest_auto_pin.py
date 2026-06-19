@@ -28,8 +28,8 @@ ACCOUNT_IDS = [
 
 BOARD_NAME = "Trivia Quiz Videos" # Set this to your Pinterest board name or leave empty to use default board
 
-# HEADLESS Mode: Set to False to open Chrome visibly (highly recommended for debugging and manual verification)
-HEADLESS = False
+# HEADLESS Mode: Set to True to run invisibly in the background. It will automatically open headfully if login is needed!
+HEADLESS = True
 
 def check_port_open(port=9222):
     import socket
@@ -91,14 +91,14 @@ def kill_chrome_on_port_9222():
         print(f"Error checking/killing Chrome on port 9222: {e}")
     return False
 
-def launch_chrome_with_profile(profile_path):
+def launch_chrome_with_profile(profile_path, headless_mode=False):
     # Ensure port is clean
     kill_chrome_on_port_9222()
     
     # Clear session crash popup state in Chrome JSON preferences
     reset_chrome_crash_state(profile_path)
     
-    print(f"Launching Chrome with profile: {profile_path}...")
+    print(f"Launching Chrome (Headless={headless_mode}) with profile: {profile_path}...")
     paths = [
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
@@ -141,7 +141,7 @@ def launch_chrome_with_profile(profile_path):
         "--hide-crash-restore-bubble",
         "--simulate-outdated-no-updater"
     ]
-    if HEADLESS:
+    if headless_mode:
         cmd.extend(["--headless=new"])
         
     try:
@@ -233,152 +233,81 @@ def format_pinterest_description(title, excerpt, url):
 def find_builder_fields(page):
     """
     Scans the Pin Builder page and detects Title, Description, and Link fields
-    by scoping the search strictly within the Pin Builder form container.
+    by using highly targeted, unique selectors scoped within the Pin Builder editor.
     """
     fields = {"title": None, "desc": None, "link": None}
     
-    # 1. First look for the Pin Builder form container to avoid matching header elements
-    container_selectors = [
-        'div[data-testid="pin-builder"]',
-        'div[class*="pin-builder" i]',
-        'div[class*="PinBuilder" i]',
-        'div[class*="creationCard" i]',
-        'div[class*="workspace" i]'
+    # 1. Scopes container to avoid matching elements in the header or navigation
+    container = page.locator('div[data-testid="pin-builder"], div[class*="pin-builder" i], div[class*="PinBuilder" i]').first
+    scope = container if (container.count() > 0 and container.is_visible()) else page
+    
+    # 2. Locate Title Input
+    title_selectors = [
+        '[data-testid="pin-builder-title"]',
+        'textarea[placeholder*="title" i]',
+        'input[placeholder*="title" i]',
+        'textarea[placeholder*="Title" i]',
+        'input[placeholder*="Title" i]',
+        '[aria-label*="title" i]'
     ]
-    container = None
-    for sel in container_selectors:
-        loc = page.locator(sel)
+    for sel in title_selectors:
+        loc = scope.locator(sel)
         if loc.count() > 0 and loc.first.is_visible():
-            container = loc.first
+            fields["title"] = loc.first
             break
             
-    # If no container is found, default to page scope
-    scope = container if container else page
-    
-    # 2. Try direct data-testids inside the scope
-    title_loc = scope.locator('[data-testid="pin-builder-title"]')
-    if title_loc.count() > 0 and title_loc.first.is_visible():
-        fields["title"] = title_loc.first
-        
-    desc_loc = scope.locator('[data-testid="pin-builder-description"]')
-    if desc_loc.count() > 0 and desc_loc.first.is_visible():
-        fields["desc"] = desc_loc.first
-        
-    link_loc = scope.locator('[data-testid="pin-builder-link"]')
-    if link_loc.count() > 0 and link_loc.first.is_visible():
-        fields["link"] = link_loc.first
-        
-    # 3. If any field is missing, search inside the scope and filter out global search boxes
-    candidates = scope.locator('input, textarea, div[contenteditable="true"], div[role="textbox"]')
-    count = candidates.count()
-    candidate_list = []
-    
-    for i in range(count):
-        el = candidates.nth(i)
-        try:
-            if not el.is_visible():
-                continue
-                
-            # Filter out non-text inputs (like checkboxes, radios, buttons, files, hidden, etc.)
-            el_type = (el.get_attribute("type") or "").lower()
-            if el_type in ["checkbox", "radio", "file", "submit", "button", "hidden", "image", "reset"]:
-                continue
-                
-            placeholder = (el.get_attribute("placeholder") or "").lower()
-            el_id = (el.get_attribute("id") or "").lower()
-            aria_label = (el.get_attribute("aria-label") or "").lower()
-            role = (el.get_attribute("role") or "").lower()
-            name = (el.get_attribute("name") or "").lower()
+    # 3. Locate Description Textbox (typically contenteditable div or textarea)
+    desc_selectors = [
+        '[data-testid="pin-builder-description"]',
+        'div[role="textbox"][placeholder*="about" i]',
+        'div[contenteditable="true"][placeholder*="about" i]',
+        '[aria-label*="description" i]',
+        '[aria-label*="about" i]',
+        'textarea[placeholder*="about" i]',
+        'textarea[placeholder*="description" i]'
+    ]
+    for sel in desc_selectors:
+        loc = scope.locator(sel)
+        if loc.count() > 0 and loc.first.is_visible():
+            fields["desc"] = loc.first
+            break
             
-            combined = placeholder + el_id + aria_label + role + name
-            if "search" in combined:
-                continue
-                
-            candidate_list.append(el)
-            
-            # Map based on keyword matching
-            if not fields["title"] and ("title" in combined or "header" in combined):
-                fields["title"] = el
-            elif not fields["desc"] and ("about" in combined or "desc" in combined):
-                fields["desc"] = el
-            elif not fields["link"] and ("link" in combined or "website" in combined or "destination" in combined or "url" in combined):
-                fields["link"] = el
-        except Exception:
-            continue
-            
-    # 4. Scoped Layout-Order Fallback: If fields are still missing, map remaining by order
-    # (Since we are scoped inside the Pin Builder container and non-text inputs are filtered,
-    # the order is guaranteed to be Title -> Desc -> Link)
-    if (not fields["title"] or not fields["desc"] or not fields["link"]) and len(candidate_list) >= 3:
-        print("Using scoped layout-order mapping...")
-        if not fields["title"]:
-            fields["title"] = candidate_list[0]
-        if not fields["desc"]:
-            fields["desc"] = candidate_list[1]
-        if not fields["link"]:
-            fields["link"] = candidate_list[2]
+    # 4. Locate Destination Link Input
+    link_selectors = [
+        '[data-testid="pin-builder-link"]',
+        'input[placeholder*="link" i]',
+        'input[placeholder*="website" i]',
+        'input[placeholder*="url" i]',
+        'input[id*="link" i]',
+        '[aria-label*="link" i]'
+    ]
+    for sel in link_selectors:
+        loc = scope.locator(sel)
+        if loc.count() > 0 and loc.first.is_visible():
+            fields["link"] = loc.first
+            break
             
     return fields
 
 def publish_pin_for_profile(profile_path, pin_data, idx):
-    if not launch_chrome_with_profile(profile_path):
-        print(f"Failed to start Chrome for profile: {profile_path}")
-        return False
-        
-    success = False
-    with sync_playwright() as p:
-        try:
-            print("Connecting Playwright to Chrome remote debugger (using 127.0.0.1 to prevent loopback lag)...")
-            browser = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
-            context = browser.contexts[0]
-            page = context.new_page()
+    # This wrapper triggers the Playwright automation flow, and switches Chrome 
+    # back to headful mode dynamically if a manual login is required.
+    
+    def execute_flow(headless_mode):
+        if not launch_chrome_with_profile(profile_path, headless_mode=headless_mode):
+            print(f"Failed to start Chrome for profile: {profile_path}")
+            return "failed"
             
-            # Set viewport to 1280x800 to make sure all components are visible on screen
-            page.set_viewport_size({"width": 1280, "height": 800})
-            
-            # Navigate to Pinterest Pin Builder with a retry loop to handle page load errors/redirection aborts
-            print("Navigating to Pinterest Pin Builder...")
-            for attempt in range(3):
-                try:
-                    page.goto("https://www.pinterest.com/pin-builder/", wait_until="domcontentloaded", timeout=45000)
-                    break
-                except Exception as e:
-                    if attempt == 2:
-                        raise e
-                    print(f"Navigation error (attempt {attempt + 1}/3): {e}. Retrying in 5 seconds...")
-                    time.sleep(5)
-            
-            # Wait 10s for the page components to render
-            print("Pinterest components load hone ka wait kar rahe hai (10 seconds)...")
-            time.sleep(10)
-            
-            # Find fields first to verify login state
-            fields = find_builder_fields(page)
-            
-            is_logged_out = False
-            # Only declare logged out if both Title and Description fields are missing, and we see login page
-            if not fields["title"] and not fields["desc"]:
-                # Re-verify after a short wait
-                print("Checking elements again in 5 seconds to prevent false logout trigger...")
-                time.sleep(5)
-                fields = find_builder_fields(page)
-                if not fields["title"] and not fields["desc"]:
-                    is_logged_out = True
+        with sync_playwright() as p:
+            try:
+                print(f"Connecting Playwright (Headless={headless_mode}) to Chrome remote debugger...")
+                browser = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
+                context = browser.contexts[0]
+                page = context.new_page()
+                page.set_viewport_size({"width": 1280, "height": 800})
                 
-            if is_logged_out:
-                expected_id = ACCOUNT_IDS[idx] if idx < len(ACCOUNT_IDS) else "Pinterest Account"
-                print("\n" + "="*80)
-                print(f"👉 [IMPORTANT ALERT] Profile {idx + 1} logged in nahi hai! (Expected Account: {expected_id})")
-                print(f"Bhai, kripya open hui Chrome Window me Pinterest Account '{expected_id}' par log in/sign in karein.")
-                print("Log in hone ke baad jab aap Pinterest home feed ya Pin Builder page par pahunch/navigate ho jayein,")
-                print("tab yahan terminal me ENTER press karein aur automation continue ho jayegi...")
-                print("="*80 + "\n")
-                
-                input("Manually log in karne ke baad ENTER press karein...")
-                print("Settle hone ke liye 5 seconds wait kar rahe hai...")
-                time.sleep(5)
-                
-                # Re-navigate to Pin Builder after login with retry loop
+                # Navigate to Pin Builder with a retry loop
+                print("Navigating to Pinterest Pin Builder...")
                 for attempt in range(3):
                     try:
                         page.goto("https://www.pinterest.com/pin-builder/", wait_until="domcontentloaded", timeout=45000)
@@ -389,274 +318,314 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                         print(f"Navigation error (attempt {attempt + 1}/3): {e}. Retrying in 5 seconds...")
                         time.sleep(5)
                 
-                time.sleep(8)
+                # Wait 10s for the page elements to settle/render
+                print("Pinterest components load hone ka wait kar rahe hai (10 seconds)...")
+                time.sleep(10)
+                
                 fields = find_builder_fields(page)
-            
-            print("Account verified as logged in. Filling Pin details with deliberate human delays...")
-            time.sleep(3)
-            
-            # 1. Upload the image file
-            print("Blog image upload kar rahe hai...")
-            file_input = page.locator('input[type="file"]')
-            if file_input.count() > 0:
-                file_input.first.set_input_files(pin_data["image_path"])
-                print("Image upload complete!")
-                time.sleep(5) # Delay after upload
-            else:
-                print("Error: Could not find image file input element on Pinterest.")
                 
-            # 2. Fill the Title
-            print("Title fill kar rahe hai...")
-            target_title = fields["title"]
-            if target_title:
-                target_title.scroll_into_view_if_needed()
-                time.sleep(1.5)
-                target_title.click()
-                time.sleep(1.5)
-                target_title.fill("")
-                time.sleep(1.5)
-                target_title.fill(pin_data["title"])
-                print(f"Title filled successfully: {pin_data['title']}")
-                time.sleep(3) # Delay after typing title
-            else:
-                print("Warning: Could not find Title input.")
-                
-            # 3. Fill the Description
-            print("Description aur blog link fill kar rahe hai...")
-            target_desc = fields["desc"]
-            if target_desc:
-                target_desc.scroll_into_view_if_needed()
-                time.sleep(1.5)
-                target_desc.click()
-                time.sleep(1.5)
-                target_desc.fill("")
-                time.sleep(1.5)
-                target_desc.fill(pin_data["description"])
-                print("Description field filled successfully with full blog post URL.")
-                time.sleep(4) # Delay after typing description
-            else:
-                print("Warning: Could not find Description input.")
-                
-            # 4. Fill the Destination Link
-            print("Destination blog link fill kar rahe hai...")
-            target_link = fields["link"]
-            if target_link:
-                target_link.scroll_into_view_if_needed()
-                time.sleep(1.5)
-                target_link.click()
-                time.sleep(1.5)
-                target_link.fill("")
-                time.sleep(1.5)
-                target_link.fill(pin_data["link"])
-                print(f"Destination link field filled: {pin_data['link']}")
-                time.sleep(3) # Delay after typing link
-            else:
-                print("Warning: Could not find Destination Link input.")
-                
-            # Find form container to scope subsequent searches
-            container_selectors = [
-                'div[data-testid="pin-builder"]',
-                'div[class*="pin-builder" i]',
-                'div[class*="PinBuilder" i]',
-                'div[class*="creationCard" i]',
-                'div[class*="workspace" i]'
-            ]
-            scope = None
-            for sel in container_selectors:
-                loc = page.locator(sel)
-                if loc.count() > 0 and loc.first.is_visible():
-                    scope = loc.first
-                    break
-            if not scope:
-                scope = page
-                
-            # 5. Handle Product Tagging
-            print("Product Tag lagane ki koshish kar rahe hai...")
-            try:
-                # Search for Tag products button on the page
-                tag_btn = scope.locator(
-                    'button:has-text("Tag products"), '
-                    '[aria-label*="Tag products" i], '
-                    '[data-testid="tag-button"], '
-                    'button:has-text("Tag"), '
-                    '[aria-label*="tag" i]'
-                )
-                target_tag_btn = None
-                if tag_btn.count() > 0:
-                    for i in range(tag_btn.count()):
-                        if tag_btn.nth(i).is_visible():
-                            target_tag_btn = tag_btn.nth(i)
-                            break
-                if target_tag_btn:
-                    target_tag_btn.scroll_into_view_if_needed()
-                    time.sleep(1.5)
-                    print("Tag products button mil gaya. Click kar rahe hai...")
-                    target_tag_btn.click()
-                    time.sleep(4)
-                    
-                    # Look for search or URL input
-                    tag_input = page.locator(
-                        'input[placeholder*="url" i], '
-                        'input[placeholder*="link" i], '
-                        'input[placeholder*="search" i], '
-                        'input[placeholder*="Search" i]'
-                    ).first
-                    if tag_input.count() > 0 and tag_input.is_visible():
-                        tag_input.click()
-                        time.sleep(1.5)
-                        tag_input.fill(pin_data["link"])
-                        time.sleep(1.5)
-                        tag_input.press("Enter")
-                        print(f"Product tag search me link fill kiya: {pin_data['link']}")
-                        time.sleep(5) # wait for results
+                # Verify login state
+                is_logged_out = False
+                if not fields["title"] and not fields["desc"]:
+                    print("Re-checking elements in 5 seconds to prevent false logout trigger...")
+                    time.sleep(5)
+                    fields = find_builder_fields(page)
+                    if not fields["title"] and not fields["desc"]:
+                        is_logged_out = True
                         
-                        # Click the first product result or image
-                        first_result = page.locator(
-                            'div[role="listitem"] img, '
-                            '[data-testid*="product" i] img, '
-                            'div[class*="product"] img, '
-                            'canvas'
+                if is_logged_out:
+                    page.close()
+                    browser.close()
+                    return "logged_out"
+                    
+                print("Account verified as logged in. Filling Pin details...")
+                time.sleep(3)
+                
+                # 1. Upload the image file
+                print("Blog image upload kar rahe hai...")
+                file_input = page.locator('input[type="file"]')
+                if file_input.count() > 0:
+                    file_input.first.set_input_files(pin_data["image_path"])
+                    print("Image upload complete!")
+                    time.sleep(5)
+                else:
+                    print("Error: Could not find image file input element.")
+                    
+                # 2. Fill the Title
+                print("Title fill kar rahe hai...")
+                target_title = fields["title"]
+                if target_title:
+                    target_title.scroll_into_view_if_needed()
+                    time.sleep(1.5)
+                    target_title.click()
+                    time.sleep(1.5)
+                    target_title.fill("")
+                    time.sleep(1.5)
+                    target_title.fill(pin_data["title"])
+                    print(f"Title filled: {pin_data['title']}")
+                    time.sleep(3)
+                else:
+                    print("Warning: Could not find Title input.")
+                    
+                # 3. Fill the Description
+                print("Description aur blog link fill kar rahe hai...")
+                target_desc = fields["desc"]
+                if target_desc:
+                    target_desc.scroll_into_view_if_needed()
+                    time.sleep(1.5)
+                    target_desc.click()
+                    time.sleep(1.5)
+                    target_desc.fill("")
+                    time.sleep(1.5)
+                    target_desc.fill(pin_data["description"])
+                    print("Description filled successfully with full blog post URL.")
+                    time.sleep(4)
+                else:
+                    print("Warning: Could not find Description input.")
+                    
+                # 4. Fill the Destination Link
+                print("Destination blog link fill kar rahe hai...")
+                target_link = fields["link"]
+                if target_link:
+                    target_link.scroll_into_view_if_needed()
+                    time.sleep(1.5)
+                    target_link.click()
+                    time.sleep(1.5)
+                    target_link.fill("")
+                    time.sleep(1.5)
+                    target_link.fill(pin_data["link"])
+                    print(f"Destination link filled: {pin_data['link']}")
+                    time.sleep(3)
+                else:
+                    print("Warning: Could not find Destination Link input.")
+                    
+                # Find container scope for subsequent operations
+                container_selectors = [
+                    'div[data-testid="pin-builder"]',
+                    'div[class*="pin-builder" i]',
+                    'div[class*="PinBuilder" i]',
+                    'div[class*="creationCard" i]',
+                    'div[class*="workspace" i]'
+                ]
+                scope = None
+                for sel in container_selectors:
+                    loc = page.locator(sel)
+                    if loc.count() > 0 and loc.first.is_visible():
+                        scope = loc.first
+                        break
+                if not scope:
+                    scope = page
+                    
+                # 5. Handle Product Tagging
+                print("Product Tag lagane ki koshish kar rahe hai...")
+                try:
+                    tag_btn = scope.locator(
+                        'button:has-text("Tag products"), '
+                        '[aria-label*="Tag products" i], '
+                        '[data-testid="tag-button"], '
+                        'button:has-text("Tag"), '
+                        '[aria-label*="tag" i]'
+                    )
+                    target_tag_btn = None
+                    if tag_btn.count() > 0:
+                        for i in range(tag_btn.count()):
+                            if tag_btn.nth(i).is_visible():
+                                target_tag_btn = tag_btn.nth(i)
+                                break
+                    if target_tag_btn:
+                        target_tag_btn.scroll_into_view_if_needed()
+                        time.sleep(1.5)
+                        print("Tag products button mil gaya. Click kar rahe hai...")
+                        target_tag_btn.click()
+                        time.sleep(4)
+                        
+                        tag_input = page.locator(
+                            'input[placeholder*="url" i], '
+                            'input[placeholder*="link" i], '
+                            'input[placeholder*="search" i]',
+                            'input[placeholder*="Search" i]'
                         ).first
-                        if first_result.count() > 0 and first_result.is_visible():
-                            first_result.click()
-                            print("Product result select kiya.")
-                            time.sleep(3)
+                        if tag_input.count() > 0 and tag_input.is_visible():
+                            tag_input.click()
+                            time.sleep(1.5)
+                            tag_input.fill(pin_data["link"])
+                            time.sleep(1.5)
+                            tag_input.press("Enter")
+                            print(f"Product tag link fill kiya: {pin_data['link']}")
+                            time.sleep(5)
                             
-                            # Click Done/Save button
-                            done_btn = page.locator(
-                                'button:has-text("Done"), '
-                                'button:has-text("Save"), '
-                                'button:has-text("Create")'
-                            )
-                            target_done = None
-                            if done_btn.count() > 0:
-                                for i in range(done_btn.count()):
-                                    if done_btn.nth(i).is_visible():
-                                        target_done = done_btn.nth(i)
-                                        break
-                            if target_done:
-                                target_done.click()
-                                print("Product tag apply ho gaya!")
+                            first_result = page.locator(
+                                'div[role="listitem"] img, '
+                                '[data-testid*="product" i] img, '
+                                'div[class*="product"] img, '
+                                'canvas'
+                            ).first
+                            if first_result.count() > 0 and first_result.is_visible():
+                                first_result.click()
+                                print("Product result select kiya.")
                                 time.sleep(3)
+                                
+                                done_btn = page.locator(
+                                    'button:has-text("Done"), '
+                                    'button:has-text("Save"), '
+                                    'button:has-text("Create")'
+                                )
+                                target_done = None
+                                if done_btn.count() > 0:
+                                    for i in range(done_btn.count()):
+                                        if done_btn.nth(i).is_visible():
+                                            target_done = done_btn.nth(i)
+                                            break
+                                if target_done:
+                                    target_done.click()
+                                    print("Product tag apply ho gaya!")
+                                    time.sleep(3)
+                                else:
+                                    page.keyboard.press("Escape")
+                                    time.sleep(2)
                             else:
-                                print("Done button nahi mila. Esc pressing...")
                                 page.keyboard.press("Escape")
                                 time.sleep(2)
                         else:
-                            print("Product result image nahi mila. Esc pressing...")
+                            print("Tag input field nahi mila.")
+                    else:
+                        print("Tag products button page par nahi mila. Skipping optional product tagging...")
+                except Exception as tag_err:
+                    print(f"Product tagging process skip ho gaya (Issue): {tag_err}")
+                    
+                # 6. Handle Board Selection
+                if BOARD_NAME:
+                    print(f"Board '{BOARD_NAME}' select karne ki koshish kar rahe hai...")
+                    board_opener_selectors = [
+                        '[data-testid="board-dropdown"]',
+                        'button[aria-haspopup="listbox"]',
+                        'button[aria-haspopup="true"]',
+                        'button[id*="board" i]',
+                        'button[class*="board" i]',
+                        '[aria-label*="board" i]'
+                    ]
+                    target_board_opener = None
+                    for sel in board_opener_selectors:
+                        loc = scope.locator(sel)
+                        count = loc.count()
+                        for i in range(count):
+                            el = loc.nth(i)
+                            if el.is_visible():
+                                target_board_opener = el
+                                break
+                        if target_board_opener:
+                            break
+                            
+                    if target_board_opener:
+                        target_board_opener.scroll_into_view_if_needed()
+                        time.sleep(1.5)
+                        target_board_opener.click()
+                        time.sleep(4) # Delay for dropdown animation
+                        
+                        search_box = page.locator('[role="listbox"] input, [class*="dropdown"] input, input[placeholder*="Search"]').first
+                        if search_box.count() > 0 and search_box.is_visible():
+                            search_box.click()
+                            time.sleep(1.5)
+                            search_box.fill(BOARD_NAME)
+                            time.sleep(3)
+                            
+                        board_item = page.locator(
+                            f'div[role="listitem"] div:has-text("{BOARD_NAME}"), '
+                            f'div[role="option"] div:has-text("{BOARD_NAME}"), '
+                            f'div[class*="board"]:has-text("{BOARD_NAME}"), '
+                            f':has-text("{BOARD_NAME}")'
+                        ).first
+                        if board_item.count() > 0 and board_item.is_visible():
+                            board_item.click()
+                            print(f"Board '{BOARD_NAME}' select ho gaya!")
+                            time.sleep(3)
+                        else:
                             page.keyboard.press("Escape")
                             time.sleep(2)
                     else:
-                        print("Tag input field nahi mila.")
-                else:
-                    print("Tag products button page par nahi mila. Skipping optional product tagging...")
-            except Exception as tag_err:
-                print(f"Product tagging process skip ho gaya (Issue): {tag_err}")
-                
-            # 6. Handle Board Selection
-            if BOARD_NAME:
-                print(f"Board '{BOARD_NAME}' select karne ki koshish kar rahe hai...")
-                board_opener_selectors = [
-                    '[data-testid="board-dropdown"]',
-                    'button[aria-haspopup="listbox"]',
-                    'button[aria-haspopup="true"]',
-                    'button[id*="board" i]',
-                    'button[class*="board" i]',
-                    '[aria-label*="board" i]'
+                        print("Could not open board picker. Default board use kiya jayega.")
+                        
+                # 7. Click Publish / Save
+                print("Publish button locate kar rahe hai...")
+                publish_selectors = [
+                    '[data-testid="board-dropdown-select-button"]',
+                    '[data-testid="create-pin-submit"]',
+                    'button:has-text("Publish")',
+                    'button:has-text("Save")',
+                    'button[aria-label*="Publish" i]',
+                    'button[aria-label*="Save" i]',
+                    'div[role="button"]:has-text("Publish")',
+                    'div[role="button"]:has-text("Save")'
                 ]
-                target_board_opener = None
-                for sel in board_opener_selectors:
-                    loc = scope.locator(sel)
+                target_publish = None
+                for sel in publish_selectors:
+                    loc = page.locator(sel)
                     count = loc.count()
                     for i in range(count):
-                        el = loc.nth(i)
-                        if el.is_visible():
-                            target_board_opener = el
-                            break
-                    if target_board_opener:
+                        btn = loc.nth(i)
+                        try:
+                            if btn.is_visible():
+                                target_publish = btn
+                                break
+                        except Exception:
+                            continue
+                    if target_publish:
                         break
                         
-                if target_board_opener:
-                    target_board_opener.scroll_into_view_if_needed()
-                    time.sleep(1.5)
-                    target_board_opener.click()
-                    print("Board dropdown open ho gaya, search kar rahe hai...")
-                    time.sleep(4) # Delay for dropdown animation
-                    
-                    # Search box inside dropdown
-                    search_box = page.locator('[role="listbox"] input, [class*="dropdown"] input, input[placeholder*="Search"]').first
-                    if search_box.count() > 0 and search_box.is_visible():
-                        search_box.click()
-                        time.sleep(1.5)
-                        search_box.fill(BOARD_NAME)
-                        print(f"Board search input me '{BOARD_NAME}' type kiya...")
-                        time.sleep(3)
-                    
-                    # Click matching board option
-                    board_item = page.locator(
-                        f'div[role="listitem"] div:has-text("{BOARD_NAME}"), '
-                        f'div[role="option"] div:has-text("{BOARD_NAME}"), '
-                        f'div[class*="board"]:has-text("{BOARD_NAME}"), '
-                        f':has-text("{BOARD_NAME}")'
-                    ).first
-                    if board_item.count() > 0 and board_item.is_visible():
-                        board_item.click()
-                        print(f"Board '{BOARD_NAME}' select ho gaya!")
-                        time.sleep(3)
-                    else:
-                        print(f"Board '{BOARD_NAME}' nahi mila list me. Default board use karenge.")
-                        page.keyboard.press("Escape")
-                        time.sleep(2)
-                else:
-                    print("Could not open board picker. Default board use kiya jayega.")
-            
-            # 7. Click Publish / Save
-            print("Publish button locate kar rahe hai...")
-            publish_selectors = [
-                '[data-testid="board-dropdown-select-button"]',
-                '[data-testid="create-pin-submit"]',
-                'button:has-text("Publish")',
-                'button:has-text("Save")',
-                'button[aria-label*="Publish" i]',
-                'button[aria-label*="Save" i]',
-                'div[role="button"]:has-text("Publish")',
-                'div[role="button"]:has-text("Save")'
-            ]
-            target_publish = None
-            for sel in publish_selectors:
-                loc = page.locator(sel)
-                count = loc.count()
-                for i in range(count):
-                    btn = loc.nth(i)
-                    try:
-                        if btn.is_visible():
-                            target_publish = btn
-                            break
-                    except Exception:
-                        continue
                 if target_publish:
-                    break
-                    
-            if target_publish:
-                target_publish.scroll_into_view_if_needed()
-                time.sleep(1.5)
-                print("Publish/Save button click kar rahe hai...")
-                target_publish.click()
-                print("Publish click ho gaya! Completion process ke liye 15 seconds wait kar rahe hai...")
-                time.sleep(15)  # Wait for Pinterest to process
-                print("Pin published successfully!")
-                success = True
-            else:
-                print("Error: Could not locate Publish/Save button.")
-                
-            page.close()
-            browser.close()
-        except Exception as e:
-            print(f"Error automating Pinterest on profile: {e}")
-        finally:
-            kill_chrome_on_port_9222()
+                    target_publish.scroll_into_view_if_needed()
+                    time.sleep(1.5)
+                    print("Publish/Save button click kar rahe hai...")
+                    target_publish.click()
+                    print("Publish click ho gaya! Completion ke liye wait kar rahe hai (15 seconds)...")
+                    time.sleep(15)  # Wait for Pinterest to process
+                    print("Pin published successfully!")
+                    page.close()
+                    browser.close()
+                    return "success"
+                else:
+                    print("Error: Could not locate Publish/Save button.")
+                    page.close()
+                    browser.close()
+                    return "failed"
+            except Exception as ex:
+                print(f"Error during execution: {ex}")
+                try:
+                    page.close()
+                    browser.close()
+                except Exception:
+                    pass
+                return "failed"
+            finally:
+                kill_chrome_on_port_9222()
+
+    # Step 1: Run in Headless mode by default (True)
+    result = execute_flow(headless_mode=HEADLESS)
+    
+    # Step 2: If logged out, override to headful mode and let user login manually
+    if result == "logged_out":
+        expected_id = ACCOUNT_IDS[idx] if idx < len(ACCOUNT_IDS) else "Pinterest Account"
+        print("\n" + "="*80)
+        print(f"👉 [IMPORTANT ALERT] Profile {idx + 1} logged in nahi hai! (Expected Account: {expected_id})")
+        print(f"Humne Chrome ko visible/headful mode me open kiya hai taaki aap login kar sakein.")
+        print(f"Kripya open hui Chrome Window me '{expected_id}' account par log in/sign in karein.")
+        print("Log in hone ke baad jab Pinterest homepage ya Pin Builder load ho jaye,")
+        print("tab yahan terminal me ENTER press karein aur automation continue ho jayegi...")
+        print("="*80 + "\n")
+        
+        # Start Chrome in headful mode so user can see and log in
+        if not launch_chrome_with_profile(profile_path, headless_mode=False):
+            print("Failed to start headful Chrome.")
+            return False
             
-    return success
+        input("Manually log in karne ke baad ENTER press karein...")
+        print("Settle hone ke liye 5 seconds wait kar rahe hai...")
+        time.sleep(5)
+        
+        # Execute the flow again in headful mode to complete publishing
+        result = execute_flow(headless_mode=False)
+        
+    return result == "success"
 
 def extract_js_field(content, field_name):
     """Robust regex parser to extract javascript object field values regardless of quotes type"""
