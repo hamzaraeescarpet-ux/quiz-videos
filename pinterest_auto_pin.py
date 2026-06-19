@@ -232,74 +232,84 @@ def format_pinterest_description(title, excerpt, url):
 
 def find_builder_fields(page):
     """
-    Scans the Pin Builder page and detects Title, Description, and Link fields.
-    This is highly specific and robust against Pinterest changes.
+    Scans the Pin Builder page and detects Title, Description, and Link fields
+    by scoping the search strictly within the Pin Builder form container.
     """
     fields = {"title": None, "desc": None, "link": None}
     
-    # 1. Look for standard test-ids first
-    title_loc = page.locator('[data-testid="pin-builder-title"]')
+    # 1. First look for the Pin Builder form container to avoid matching header elements
+    container_selectors = [
+        'div[data-testid="pin-builder"]',
+        'div[class*="pin-builder" i]',
+        'div[class*="PinBuilder" i]',
+        'div[class*="creationCard" i]',
+        'div[class*="workspace" i]'
+    ]
+    container = None
+    for sel in container_selectors:
+        loc = page.locator(sel)
+        if loc.count() > 0 and loc.first.is_visible():
+            container = loc.first
+            break
+            
+    # If no container is found, default to page scope
+    scope = container if container else page
+    
+    # 2. Try direct data-testids inside the scope
+    title_loc = scope.locator('[data-testid="pin-builder-title"]')
     if title_loc.count() > 0 and title_loc.first.is_visible():
         fields["title"] = title_loc.first
         
-    desc_loc = page.locator('[data-testid="pin-builder-description"]')
+    desc_loc = scope.locator('[data-testid="pin-builder-description"]')
     if desc_loc.count() > 0 and desc_loc.first.is_visible():
         fields["desc"] = desc_loc.first
         
-    link_loc = page.locator('[data-testid="pin-builder-link"]')
+    link_loc = scope.locator('[data-testid="pin-builder-link"]')
     if link_loc.count() > 0 and link_loc.first.is_visible():
         fields["link"] = link_loc.first
         
-    # 2. Scanner fallback: check properties of all input/textarea/contenteditable fields, excluding search boxes
-    if not fields["title"] or not fields["desc"] or not fields["link"]:
-        candidates = page.locator('input, textarea, div[contenteditable="true"], div[role="textbox"]')
-        count = candidates.count()
-        for i in range(count):
-            el = candidates.nth(i)
-            try:
-                if not el.is_visible():
-                    continue
-                placeholder = (el.get_attribute("placeholder") or "").lower()
-                el_id = (el.get_attribute("id") or "").lower()
-                aria_label = (el.get_attribute("aria-label") or "").lower()
-                role = (el.get_attribute("role") or "").lower()
-                name = (el.get_attribute("name") or "").lower()
-                
-                combined = placeholder + el_id + aria_label + role + name
-                if "search" in combined:
-                    continue
-                    
-                if not fields["title"] and ("title" in combined or "header" in combined):
-                    fields["title"] = el
-                elif not fields["desc"] and ("about" in combined or "desc" in combined):
-                    fields["desc"] = el
-                elif not fields["link"] and ("link" in combined or "website" in combined or "destination" in combined or "url" in combined):
-                    fields["link"] = el
-            except Exception:
+    # 3. If any field is missing, search inside the scope and filter out global search boxes
+    candidates = scope.locator('input, textarea, div[contenteditable="true"], div[role="textbox"]')
+    count = candidates.count()
+    candidate_list = []
+    
+    for i in range(count):
+        el = candidates.nth(i)
+        try:
+            if not el.is_visible():
+                continue
+            placeholder = (el.get_attribute("placeholder") or "").lower()
+            el_id = (el.get_attribute("id") or "").lower()
+            aria_label = (el.get_attribute("aria-label") or "").lower()
+            role = (el.get_attribute("role") or "").lower()
+            name = (el.get_attribute("name") or "").lower()
+            
+            combined = placeholder + el_id + aria_label + role + name
+            if "search" in combined:
                 continue
                 
-    # 3. Layout order fallback (First is Title, Second is Description, Third is Link)
-    if not fields["title"] or not fields["desc"] or not fields["link"]:
-        print("Using layout-order fallback scanner...")
-        all_inputs = []
-        candidates = page.locator('input, textarea, div[contenteditable="true"], div[role="textbox"]')
-        for i in range(candidates.count()):
-            el = candidates.nth(i)
-            try:
-                if el.is_visible():
-                    placeholder = (el.get_attribute("placeholder") or "").lower()
-                    el_id = (el.get_attribute("id") or "").lower()
-                    aria_label = (el.get_attribute("aria-label") or "").lower()
-                    combined = placeholder + el_id + aria_label
-                    if "search" in combined:
-                        continue
-                    all_inputs.append(el)
-            except Exception:
-                continue
-        if len(all_inputs) >= 3:
-            if not fields["title"]: fields["title"] = all_inputs[0]
-            if not fields["desc"]: fields["desc"] = all_inputs[1]
-            if not fields["link"]: fields["link"] = all_inputs[2]
+            candidate_list.append(el)
+            
+            # Map based on keyword matching
+            if not fields["title"] and ("title" in combined or "header" in combined):
+                fields["title"] = el
+            elif not fields["desc"] and ("about" in combined or "desc" in combined):
+                fields["desc"] = el
+            elif not fields["link"] and ("link" in combined or "website" in combined or "destination" in combined or "url" in combined):
+                fields["link"] = el
+        except Exception:
+            continue
+            
+    # 4. Scoped Layout-Order Fallback: If fields are still missing, map remaining by order
+    # (Since we are scoped inside the Pin Builder container, the order is guaranteed to be Title -> Desc -> Link)
+    if (not fields["title"] or not fields["desc"] or not fields["link"]) and len(candidate_list) >= 3:
+        print("Using scoped layout-order mapping...")
+        if not fields["title"]:
+            fields["title"] = candidate_list[0]
+        if not fields["desc"]:
+            fields["desc"] = candidate_list[1]
+        if not fields["link"]:
+            fields["link"] = candidate_list[2]
             
     return fields
 
@@ -331,35 +341,22 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                     print(f"Navigation error (attempt {attempt + 1}/3): {e}. Retrying in 5 seconds...")
                     time.sleep(5)
             
-            # Wait up to 15s for either Title Input (logged-in) OR Login Button (logged-out) to appear
-            print("Pinterest components load hone ka wait kar rahe hai...")
-            try:
-                page.wait_for_selector(
-                    'input[placeholder*="title" i], textarea[placeholder*="title" i], button:has-text("Log in"), button:has-text("Log In"), a[href*="login"]',
-                    timeout=15000
-                )
-            except Exception:
-                pass
-                
-            # Double check login state
-            is_logged_out = False
-            has_login_btn = (
-                page.locator('button:has-text("Log in")').is_visible() or 
-                page.locator('button:has-text("Log In")').is_visible() or 
-                "login" in page.url
-            )
+            # Wait 10s for the page components to render
+            print("Pinterest components load hone ka wait kar rahe hai (10 seconds)...")
+            time.sleep(10)
             
-            # Check if title input is visible
-            has_title_input = False
-            title_input_loc = page.locator('input[placeholder*="title" i], textarea[placeholder*="title" i]')
-            if title_input_loc.count() > 0:
-                for i in range(title_input_loc.count()):
-                    if title_input_loc.nth(i).is_visible():
-                        has_title_input = True
-                        break
-                        
-            if has_login_btn or (not has_title_input and "pin-builder" not in page.url):
-                is_logged_out = True
+            # Find fields first to verify login state
+            fields = find_builder_fields(page)
+            
+            is_logged_out = False
+            # Only declare logged out if both Title and Description fields are missing, and we see login page
+            if not fields["title"] and not fields["desc"]:
+                # Re-verify after a short wait
+                print("Checking elements again in 5 seconds to prevent false logout trigger...")
+                time.sleep(5)
+                fields = find_builder_fields(page)
+                if not fields["title"] and not fields["desc"]:
+                    is_logged_out = True
                 
             if is_logged_out:
                 expected_id = ACCOUNT_IDS[idx] if idx < len(ACCOUNT_IDS) else "Pinterest Account"
@@ -384,6 +381,9 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                             raise e
                         print(f"Navigation error (attempt {attempt + 1}/3): {e}. Retrying in 5 seconds...")
                         time.sleep(5)
+                
+                time.sleep(8)
+                fields = find_builder_fields(page)
             
             print("Account verified as logged in. Filling Pin details with deliberate human delays...")
             time.sleep(3)
@@ -398,9 +398,6 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
             else:
                 print("Error: Could not find image file input element on Pinterest.")
                 
-            # Scan fields on Pin Builder
-            fields = find_builder_fields(page)
-            
             # 2. Fill the Title
             print("Title fill kar rahe hai...")
             target_title = fields["title"]
@@ -449,11 +446,28 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
             else:
                 print("Warning: Could not find Destination Link input.")
                 
+            # Find form container to scope subsequent searches
+            container_selectors = [
+                'div[data-testid="pin-builder"]',
+                'div[class*="pin-builder" i]',
+                'div[class*="PinBuilder" i]',
+                'div[class*="creationCard" i]',
+                'div[class*="workspace" i]'
+            ]
+            scope = None
+            for sel in container_selectors:
+                loc = page.locator(sel)
+                if loc.count() > 0 and loc.first.is_visible():
+                    scope = loc.first
+                    break
+            if not scope:
+                scope = page
+                
             # 5. Handle Product Tagging
             print("Product Tag lagane ki koshish kar rahe hai...")
             try:
                 # Search for Tag products button on the page
-                tag_btn = page.locator(
+                tag_btn = scope.locator(
                     'button:has-text("Tag products"), '
                     '[aria-label*="Tag products" i], '
                     '[data-testid="tag-button"], '
@@ -537,15 +551,15 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 print(f"Board '{BOARD_NAME}' select karne ki koshish kar rahe hai...")
                 board_opener_selectors = [
                     '[data-testid="board-dropdown"]',
-                    'button[aria-label*="Select board" i]',
-                    'button[aria-label*="board" i]',
-                    'div[role="button"][aria-label*="board" i]',
+                    'button[aria-haspopup="listbox"]',
+                    'button[aria-haspopup="true"]',
+                    'button[id*="board" i]',
                     'button[class*="board" i]',
-                    'button:has-text("Select")'
+                    '[aria-label*="board" i]'
                 ]
                 target_board_opener = None
                 for sel in board_opener_selectors:
-                    loc = page.locator(sel)
+                    loc = scope.locator(sel)
                     count = loc.count()
                     for i in range(count):
                         el = loc.nth(i)
@@ -591,22 +605,31 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
             
             # 7. Click Publish / Save
             print("Publish button locate kar rahe hai...")
-            publish_btn = page.locator(
-                'button[data-testid="board-dropdown-select-button"], '
-                'button[data-testid="create-pin-submit"], '
-                'button:has-text("Publish"), '
-                'button:has-text("Save"), '
-                'button[aria-label*="Publish" i], '
-                'button[aria-label*="Save" i], '
-                'div[role="button"]:has-text("Publish"), '
+            publish_selectors = [
+                '[data-testid="board-dropdown-select-button"]',
+                '[data-testid="create-pin-submit"]',
+                'button:has-text("Publish")',
+                'button:has-text("Save")',
+                'button[aria-label*="Publish" i]',
+                'button[aria-label*="Save" i]',
+                'div[role="button"]:has-text("Publish")',
                 'div[role="button"]:has-text("Save")'
-            )
+            ]
             target_publish = None
-            if publish_btn.count() > 0:
-                for i in range(publish_btn.count()):
-                    if publish_btn.nth(i).is_visible():
-                        target_publish = publish_btn.nth(i)
-                        break
+            for sel in publish_selectors:
+                loc = page.locator(sel)
+                count = loc.count()
+                for i in range(count):
+                    btn = loc.nth(i)
+                    try:
+                        if btn.is_visible():
+                            target_publish = btn
+                            break
+                    except Exception:
+                        continue
+                if target_publish:
+                    break
+                    
             if target_publish:
                 target_publish.scroll_into_view_if_needed()
                 time.sleep(1.5)
