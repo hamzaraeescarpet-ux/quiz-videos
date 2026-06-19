@@ -279,9 +279,11 @@ def cleanup_expired_video_jobs():
                     if (now - job_time).total_seconds() > 86400: # 24 hours
                         should_delete = True
                 except Exception:
-                    should_delete = True
+                    if job.status != "Processing":
+                        should_delete = True
             else:
-                should_delete = True
+                if job.status != "Processing":
+                    should_delete = True
 
             if should_delete:
                 print(f"CLEANUP: Deleting expired job {job.session_id} (Created at: {job.created_at})", flush=True)
@@ -383,7 +385,6 @@ def get_debug_logs():
     else:
         res["error_logs"] = "No error_logs.txt found"
         
-    # Also grab stdout/stderr from server if possible, or print directory structure
     try:
         cache_dir = os.path.join(BASE_DIR, "backgrounds_cache")
         res["cache_exists"] = os.path.exists(cache_dir)
@@ -392,6 +393,41 @@ def get_debug_logs():
     except Exception as e:
         res["cache_error"] = str(e)
         
+    # Enhanced debug info: Disk Usage
+    try:
+        total, used, free = shutil.disk_usage("/")
+        res["disk_total_gb"] = total / (1024**3)
+        res["disk_used_gb"] = used / (1024**3)
+        res["disk_free_gb"] = free / (1024**3)
+    except Exception as e:
+        res["disk_usage_error"] = str(e)
+        
+    # List files in output directory
+    try:
+        if os.path.exists(OUTPUT_DIR):
+            res["output_files"] = []
+            for item in os.listdir(OUTPUT_DIR):
+                item_path = os.path.join(OUTPUT_DIR, item)
+                if os.path.isdir(item_path):
+                    res["output_files"].append({"name": item, "is_dir": True, "files_count": len(os.listdir(item_path))})
+                else:
+                    res["output_files"].append({"name": item, "is_dir": False, "size_mb": os.path.getsize(item_path) / (1024**2)})
+    except Exception as e:
+        res["output_files_error"] = str(e)
+
+    # List files in temp directory
+    try:
+        if os.path.exists(TEMP_FOLDER):
+            res["temp_files"] = []
+            for item in os.listdir(TEMP_FOLDER):
+                item_path = os.path.join(TEMP_FOLDER, item)
+                if os.path.isdir(item_path):
+                    res["temp_files"].append({"name": item, "is_dir": True, "files_count": len(os.listdir(item_path))})
+                else:
+                    res["temp_files"].append({"name": item, "is_dir": False, "size_mb": os.path.getsize(item_path) / (1024**2)})
+    except Exception as e:
+        res["temp_files_error"] = str(e)
+
     return res
 
 from video_generator import create_video_from_row
