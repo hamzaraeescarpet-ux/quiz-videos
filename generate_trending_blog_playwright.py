@@ -112,10 +112,11 @@ def check_port_open(port):
 
 def launch_chrome_if_needed():
     if check_port_open(9222):
-        print("Chrome is already running with remote debugging on port 9222.")
-        return True
+        print("Chrome remote debugger is already running. Closing it to launch fresh in headless mode...")
+        kill_chrome_on_port_9222()
+        time.sleep(2)
         
-    print("Chrome is not running on port 9222. Attempting to launch it automatically...")
+    print("Launching Chrome in headless mode...")
     
     # Common Chrome executable paths on Windows
     paths = [
@@ -142,7 +143,9 @@ def launch_chrome_if_needed():
     cmd = [
         chrome_path,
         "--remote-debugging-port=9222",
-        f"--user-data-dir={CHROME_PROFILE_PATH}"
+        f"--user-data-dir={CHROME_PROFILE_PATH}",
+        "--headless=new",
+        "--disable-gpu"
     ]
     
     print(f"Launching Chrome: {' '.join(cmd)}")
