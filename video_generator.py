@@ -336,18 +336,18 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
 
     try:
         try:
-            loop = asyncio.get_event_loop()
+            async_loop = asyncio.get_event_loop()
         except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            async_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(async_loop)
             
-        if loop.is_running():
+        if async_loop.is_running():
             from concurrent.futures import ThreadPoolExecutor
             with ThreadPoolExecutor() as executor:
                 future = executor.submit(lambda: asyncio.run(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2)))
                 future.result()
         else:
-            loop.run_until_complete(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2))
+            async_loop.run_until_complete(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2))
     except Exception as e:
         print(f"edge-tts failed: {e}. Falling back to gTTS...", flush=True)
         try:
