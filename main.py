@@ -16,7 +16,7 @@ import json
 import uuid
 import shutil
 import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, text, inspect
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 app = FastAPI(title="QuizViral AI Backend")
@@ -64,13 +64,17 @@ class Feedback(Base):
 
 Base.metadata.create_all(bind=engine)
 
-# Migration to add created_at column safely if not exists
+# Migration to add columns safely if they do not exist
 try:
+    inspector = inspect(engine)
+    columns = [col["name"] for col in inspector.get_columns("video_jobs")]
+    
     with engine.begin() as conn:
-        cursor = conn.execute("PRAGMA table_info(video_jobs)")
-        columns = [row[1] for row in cursor.fetchall()]
+        if "user_email" not in columns:
+            conn.execute(text("ALTER TABLE video_jobs ADD COLUMN user_email VARCHAR"))
+            print("Migration: Added user_email column to video_jobs table.", flush=True)
         if "created_at" not in columns:
-            conn.execute("ALTER TABLE video_jobs ADD COLUMN created_at VARCHAR")
+            conn.execute(text("ALTER TABLE video_jobs ADD COLUMN created_at VARCHAR"))
             print("Migration: Added created_at column to video_jobs table.", flush=True)
 except Exception as e:
     print(f"Migration Error: {e}", flush=True)
