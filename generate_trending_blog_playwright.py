@@ -557,8 +557,14 @@ def main():
             build_res = subprocess.run(["npm", "run", "build"], cwd=os.path.join(SCRIPT_DIR, "frontend"), shell=True)
             if build_res.returncode == 0:
                 git_push_changes(blog_data["title"])
+                # 7. Pinterest Auto-Pin Syndication
+                try:
+                    from pinterest_auto_pin import run_pinterest_syndication
+                    run_pinterest_syndication(blog_data)
+                except Exception as e:
+                    print(f"Pinterest syndication failed: {e}")
             else:
-                print("Local build check failed! Aborting Git Push to avoid breaking production.")
+                print("Local build check failed! Aborting Git Push & Pinterest Pinning to avoid breaking production.")
     finally:
         # Always make sure the browser process is killed before exiting
         kill_chrome_on_port_9222()
