@@ -278,6 +278,12 @@ def find_builder_fields(page):
         try:
             if not el.is_visible():
                 continue
+                
+            # Filter out non-text inputs (like checkboxes, radios, buttons, files, hidden, etc.)
+            el_type = (el.get_attribute("type") or "").lower()
+            if el_type in ["checkbox", "radio", "file", "submit", "button", "hidden", "image", "reset"]:
+                continue
+                
             placeholder = (el.get_attribute("placeholder") or "").lower()
             el_id = (el.get_attribute("id") or "").lower()
             aria_label = (el.get_attribute("aria-label") or "").lower()
@@ -301,7 +307,8 @@ def find_builder_fields(page):
             continue
             
     # 4. Scoped Layout-Order Fallback: If fields are still missing, map remaining by order
-    # (Since we are scoped inside the Pin Builder container, the order is guaranteed to be Title -> Desc -> Link)
+    # (Since we are scoped inside the Pin Builder container and non-text inputs are filtered,
+    # the order is guaranteed to be Title -> Desc -> Link)
     if (not fields["title"] or not fields["desc"] or not fields["link"]) and len(candidate_list) >= 3:
         print("Using scoped layout-order mapping...")
         if not fields["title"]:
