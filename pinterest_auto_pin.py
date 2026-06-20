@@ -29,7 +29,7 @@ ACCOUNT_IDS = [
 BOARD_NAME = "Trivia Quiz Videos" # Set this to your Pinterest board name or leave empty to use default board
 
 # HEADLESS Mode: Set to True to run invisibly in the background. It will automatically open headfully if login is needed!
-HEADLESS = True
+HEADLESS = False
 
 def check_port_open(port=9222):
     import socket
@@ -118,28 +118,19 @@ def launch_chrome_with_profile(profile_path, headless_mode=False):
         print("Error: Could not locate chrome.exe.")
         return False
         
-    # Optimized performance flags to prevent Chrome background tasks from hogging internet bandwidth
+    # Use standard Chrome flags that don't block background networking or resource loading,
+    # and disable automation indicators to prevent bot detection.
     cmd = [
         chrome_path,
         "--remote-debugging-port=9222",
         "--remote-debugging-address=127.0.0.1",
         f"--user-data-dir={profile_path}",
-        "--disable-gpu",
-        "--disable-background-networking",
-        "--disable-background-timer-throttling",
-        "--disable-backgrounding-occluded-windows",
-        "--disable-breakpad",
-        "--disable-client-side-phishing-detection",
-        "--disable-default-apps",
-        "--disable-hang-monitor",
-        "--disable-prompt-on-repost",
-        "--disable-sync",
-        "--metrics-recording-only",
         "--no-first-run",
-        "--safebrowsing-disable-auto-update",
+        "--disable-default-apps",
+        "--disable-sync",
         "--disable-session-crashed-bubble",
         "--hide-crash-restore-bubble",
-        "--simulate-outdated-no-updater"
+        "--disable-blink-features=AutomationControlled"
     ]
     if headless_mode:
         cmd.extend(["--headless=new"])
@@ -444,7 +435,7 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                         tag_input = page.locator(
                             'input[placeholder*="url" i], '
                             'input[placeholder*="link" i], '
-                            'input[placeholder*="search" i]',
+                            'input[placeholder*="search" i], '
                             'input[placeholder*="Search" i]'
                         ).first
                         if tag_input.count() > 0 and tag_input.is_visible():
@@ -551,9 +542,9 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 # 7. Click Publish / Save
                 print("Publish button locate kar rahe hai...")
                 publish_selectors = [
-                    '[data-test-id="board-dropdown-select-button"]',
+                    '[data-test-id="board-dropdown-save-button"]',
+                    '[data-testid="board-dropdown-save-button"]',
                     '[data-test-id="create-pin-submit"]',
-                    '[data-testid="board-dropdown-select-button"]',
                     '[data-testid="create-pin-submit"]',
                     'button:has-text("Publish")',
                     'button:has-text("Save")',
