@@ -72,7 +72,27 @@ def get_unsplash_image(keyword):
                 print(f"Successfully retrieved aesthetic Unsplash image: {optimized_url}")
                 return optimized_url
     except Exception as e:
-        print(f"Unsplash image search failed: {e}. Trying Wikipedia fallback...")
+        print(f"Unsplash image search failed: {e}. Trying LoremFlickr fallback...")
+        
+    # LoremFlickr Fallback (Highly aesthetic 16:9 keyword-relevant photos from Flickr)
+    try:
+        context = ssl._create_unverified_context()
+        # Replace spaces with commas to search multiple tags on LoremFlickr
+        lorem_query = query.replace(" ", ",")
+        lorem_url = f"https://loremflickr.com/1200/675/{urllib.parse.quote(lorem_query)}"
+        req = urllib.request.Request(
+            lorem_url,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        )
+        with urllib.request.urlopen(req, timeout=12, context=context) as response:
+            redirected_url = response.geturl()
+            if redirected_url and redirected_url.startswith("http") and "loremflickr.com" in redirected_url:
+                print(f"Successfully retrieved relevant LoremFlickr image: {redirected_url}")
+                return redirected_url
+    except Exception as e:
+        print(f"LoremFlickr fallback failed: {e}. Trying Wikipedia fallback...")
         
     # Wikipedia Fallback
     try:
