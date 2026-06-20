@@ -237,52 +237,54 @@ def find_builder_fields(page):
     """
     fields = {"title": None, "desc": None, "link": None}
     
-    # 1. Scopes container to avoid matching elements in the header or navigation
-    container = page.locator('div[data-testid="pin-builder"], div[class*="pin-builder" i], div[class*="PinBuilder" i]').first
-    scope = container if (container.count() > 0 and container.is_visible()) else page
-    
-    # 2. Locate Title Input
+    # 1. Locate Title Input
     title_selectors = [
+        '#storyboard-selector-title',
+        '[data-test-id="storyboard-selector-title"]',
+        'input[placeholder*="Tell everyone" i]',
+        'input[placeholder*="Pin is about" i]',
         '[data-testid="pin-builder-title"]',
         'textarea[placeholder*="title" i]',
         'input[placeholder*="title" i]',
-        'textarea[placeholder*="Title" i]',
-        'input[placeholder*="Title" i]',
         '[aria-label*="title" i]'
     ]
     for sel in title_selectors:
-        loc = scope.locator(sel)
+        loc = page.locator(sel)
         if loc.count() > 0 and loc.first.is_visible():
             fields["title"] = loc.first
             break
             
-    # 3. Locate Description Textbox (typically contenteditable div or textarea)
+    # 2. Locate Description Textbox (typically contenteditable div or textarea)
     desc_selectors = [
+        'div.public-DraftEditor-content',
+        '[data-test-id="editor-with-mentions"]',
+        '[aria-label*="Describe your Pin" i]',
+        '[aria-label*="Describe" i]',
+        '[data-test-id="storyboard-description-field-container"] [contenteditable="true"]',
         '[data-testid="pin-builder-description"]',
         'div[role="textbox"][placeholder*="about" i]',
-        'div[contenteditable="true"][placeholder*="about" i]',
         '[aria-label*="description" i]',
-        '[aria-label*="about" i]',
-        'textarea[placeholder*="about" i]',
         'textarea[placeholder*="description" i]'
     ]
     for sel in desc_selectors:
-        loc = scope.locator(sel)
+        loc = page.locator(sel)
         if loc.count() > 0 and loc.first.is_visible():
             fields["desc"] = loc.first
             break
             
-    # 4. Locate Destination Link Input
+    # 3. Locate Destination Link Input
     link_selectors = [
+        '#WebsiteField',
+        '[data-test-id="WebsiteField"]',
+        'input[placeholder*="Add a link" i]',
         '[data-testid="pin-builder-link"]',
         'input[placeholder*="link" i]',
         'input[placeholder*="website" i]',
         'input[placeholder*="url" i]',
-        'input[id*="link" i]',
         '[aria-label*="link" i]'
     ]
     for sel in link_selectors:
-        loc = scope.locator(sel)
+        loc = page.locator(sel)
         if loc.count() > 0 and loc.first.is_visible():
             fields["link"] = loc.first
             break
@@ -497,6 +499,7 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 if BOARD_NAME:
                     print(f"Board '{BOARD_NAME}' select karne ki koshish kar rahe hai...")
                     board_opener_selectors = [
+                        '[data-test-id="board-dropdown-select-button"]',
                         '[data-testid="board-dropdown"]',
                         'button[aria-haspopup="listbox"]',
                         'button[aria-haspopup="true"]',
@@ -548,6 +551,8 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 # 7. Click Publish / Save
                 print("Publish button locate kar rahe hai...")
                 publish_selectors = [
+                    '[data-test-id="board-dropdown-select-button"]',
+                    '[data-test-id="create-pin-submit"]',
                     '[data-testid="board-dropdown-select-button"]',
                     '[data-testid="create-pin-submit"]',
                     'button:has-text("Publish")',
