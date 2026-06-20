@@ -516,7 +516,12 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                         target_board_opener.click()
                         time.sleep(4) # Delay for dropdown animation
                         
-                        search_box = page.locator('[role="listbox"] input, [class*="dropdown"] input, input[placeholder*="Search"]').first
+                        search_box = page.locator(
+                             '[role="listbox"] input, '
+                             '[class*="dropdown"] input, '
+                             '[data-testid="board-dropdown"] input, '
+                             '[data-test-id="board-dropdown"] input'
+                         ).first
                         if search_box.count() > 0 and search_box.is_visible():
                             search_box.click()
                             time.sleep(1.5)
@@ -599,27 +604,11 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
     result = execute_flow(headless_mode=HEADLESS)
     
     # Step 2: If logged out, override to headful mode and let user login manually
+    # Step 2: If logged out, just print warning and skip, no manual intervention needed!
     if result == "logged_out":
         expected_id = ACCOUNT_IDS[idx] if idx < len(ACCOUNT_IDS) else "Pinterest Account"
-        print("\n" + "="*80)
-        print(f"👉 [IMPORTANT ALERT] Profile {idx + 1} logged in nahi hai! (Expected Account: {expected_id})")
-        print(f"Humne Chrome ko visible/headful mode me open kiya hai taaki aap login kar sakein.")
-        print(f"Kripya open hui Chrome Window me '{expected_id}' account par log in/sign in karein.")
-        print("Log in hone ke baad jab Pinterest homepage ya Pin Builder load ho jaye,")
-        print("tab yahan terminal me ENTER press karein aur automation continue ho jayegi...")
-        print("="*80 + "\n")
-        
-        # Start Chrome in headful mode so user can see and log in
-        if not launch_chrome_with_profile(profile_path, headless_mode=False):
-            print("Failed to start headful Chrome.")
-            return False
-            
-        input("Manually log in karne ke baad ENTER press karein...")
-        print("Settle hone ke liye 5 seconds wait kar rahe hai...")
-        time.sleep(5)
-        
-        # Execute the flow again in headful mode to complete publishing
-        result = execute_flow(headless_mode=False)
+        print(f"⚠️ Profile {idx + 1} logged in nahi hai (Expected Account: {expected_id}). Skipping this profile...")
+        return False
         
     return result == "success"
 
@@ -704,6 +693,13 @@ def run_pinterest_syndication(blog_data):
         if publish_pin_for_profile(profile, pin_data, idx):
             successful_pins += 1
             
+        # Add a delay between profiles (except for the last profile) to make it feel human
+        if idx < len(CHROME_PROFILES) - 1:
+            import random
+            delay_sec = random.randint(35, 65)
+            print(f"Waiting for {delay_sec} seconds before starting the next profile (human touch delay)...")
+            time.sleep(delay_sec)
+            
     print(f"\n=================== PINTEREST SYNDICATION COMPLETE ({successful_pins}/{len(CHROME_PROFILES)} posted) ===================")
     
     # Cleanup temp file
@@ -714,6 +710,32 @@ def run_pinterest_syndication(blog_data):
         pass
 
 if __name__ == "__main__":
+    # Check if user wants to login manually to a specific profile
+    if len(sys.argv) > 1 and sys.argv[1] == "--login":
+        try:
+            profile_num = int(sys.argv[2])
+            if 1 <= profile_num <= len(CHROME_PROFILES):
+                idx = profile_num - 1
+                profile_path = CHROME_PROFILES[idx]
+                expected_id = ACCOUNT_IDS[idx]
+                print("\n" + "="*80)
+                print(f"👉 Profile {profile_num} ({expected_id}) par log in karne ke liye Chrome open kiya ja raha hai...")
+                print("Kripya open hui browser window me login/signin karein.")
+                print("Kaam poora hone ke baad, browser window ko close kar dein ya terminal me ENTER press karein...")
+                print("="*80 + "\n")
+                
+                if launch_chrome_with_profile(profile_path, headless_mode=False):
+                    input("\nLog in karne ke baad browser window ko close karein ya exit karne ke liye yahan ENTER press karein...")
+                    kill_chrome_on_port_9222()
+                else:
+                    print("Failed to start Chrome.")
+            else:
+                print(f"Invalid profile number. Choose between 1 and {len(CHROME_PROFILES)}")
+        except Exception as e:
+            print(f"Error launching login mode: {e}")
+            print("Usage: python pinterest_auto_pin.py --login <profile_number_1_to_4>")
+        sys.exit(0)
+
     # If executed standalone, automatically fetch the latest post and syndicate it!
     print("Pinterest Auto-Pinning standalone run initiated.")
     latest_blog = get_latest_blog_post()
