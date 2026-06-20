@@ -29,7 +29,7 @@ ACCOUNT_IDS = [
 BOARD_NAME = "Trivia Quiz Videos" # Set this to your Pinterest board name or leave empty to use default board
 
 # HEADLESS Mode: Set to True to run invisibly in the background. It will automatically open headfully if login is needed!
-HEADLESS = False
+HEADLESS = True
 
 def check_port_open(port=9222):
     import socket

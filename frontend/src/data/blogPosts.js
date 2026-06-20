@@ -1,24 +1,5 @@
 export const blogPosts = [
   {
-  title: "How to Ride the Brian Brobbey Trend: Create Viral Football Quiz Videos in 1-Click with QuizViral AI",
-  excerpt: "Discover how content creators can leverage the massive search volume around football star Brian Brobbey using QuizViral AI to generate hundreds of automated, high-earning faceless quiz videos instantly.",
-  metaDescription: "Learn how to capitalize on the Brian Brobbey trend. Create viral faceless football quiz videos using QuizViral AI and skyrocket your social views.",
-  seoKeywords: [
-    "brian brobbey trivia",
-    "QuizViral AI",
-    "faceless channel",
-    "viral quiz",
-    "football shorts maker",
-    "tiktok automation"
-  ],
-  content: "# How to Ride the Brian Brobbey Trend: Create Viral Football Quiz Videos in 1-Click with QuizViral AI\n\nWhen a football star like Brian Brobbey dominates social media trends, search volumes skyrocket across TikTok, YouTube Shorts, and Instagram Reels. For content creators, this represents a golden window of opportunity. The challenge? Traditional video editing takes hours, and by the time your video is ready, the trend might already be fading.\n\nThat is where QuizViral AI changes the game. Instead of manually editing videos, you can tap into the massive hype surrounding trending athletes and launch a fully automated, high-performing faceless channel overnight.\n\n---\n\n## Why Brian Brobbey is a Goldmine for Content Creators\n\nFootball fans are among the most passionate and engaged audiences on the internet. When a player makes headlines, fans immediately rush to social media to argue stats, test their knowledge, and watch content related to their favorite stars. \n\nCreating a interactive trivia challenge around Brian Brobbey is a proven strategy to hook viewers in the first 3 seconds. Trivia naturally drives engagement because users stay until the very end to see if their answers are correct, and they flood the comment section to brag about their scores. This high watch time and engagement rate tell the algorithm to push your video to millions of users.\n\n---\n\n## Streamlining Your Content Workflow with QuizViral AI\n\nTo truly capitalize on viral trends, you need speed and volume. QuizViral AI is designed to help creators generate over 100+ highly engaging, faceless quiz and trivia videos in just a single click.\n\nHere is how you can build a massive library of football trivia videos instantly:\n\n* Bulk Import Content: Simply organize your Brian Brobbey facts, stats, and multiple-choice questions into a standard CSV file and upload it.\n* Automated Voiceovers: Say goodbye to expensive voice actors or generic text-to-speech tools. The platform generates realistic, engaging voiceovers automatically.\n* Dynamic Audio Elements: The system automatically embeds ticking clock sound effects to build psychological suspense during the countdown phase.\n* Perfect Social Framing: It automatically applies a perfect center-crop to engaging background visuals, such as satisfying Minecraft parkour or high-speed space journeys, keeping the viewer visually stimulated.\n\n---\n\n## Monetizing Your Football Trivia Channel\n\nOnce the algorithmic views start rolling in from trending topics, turning those impressions into revenue is straightforward:\n\n1. Creator Fund Programs: Platforms like the TikTok Creator Rewards Program and YouTube Shorts Monetization pay top dollar for high-retention vertical videos.\n2. Sponsorships and Affiliate Marketing: Place affiliate links for football jerseys, gaming gear, or sports apps directly in your bio or pinned comments.\n3. Build a Sellable Asset: Consistent automated publishing builds a loyal subscriber base quickly, establishing a digital asset that can be monetized through merchandise or direct brand deals.\n\nStop spending endless hours behind complex video editing software. Leverage viral traffic today by visiting QuizViral AI and launching your automated content empire with ease.",
-  slug: "how-to-ride-the-brian-brobbey-trend-create-viral-football-quiz-videos-in-1-click-with-quizviral-ai",
-  date: "June 20, 2026",
-  readTime: "5 min read",
-  author: "QuizViral AI Team",
-  image: "https://loremflickr.com/cache/resized/defaultImage.small_1200_675_nofilter.jpg"
-},
-  {
   title: "Capitalizing on the M&Ms Trend: How to Build a Viral Faceless Quiz Channel in One Click with QuizViral AI",
   excerpt: "Discover how the latest M&Ms viral trend is creating a massive opportunity for content creators. Learn how to use QuizViral AI to generate hundreds of high-quality trivia videos instantly and dominate TikTok, YouTube Shorts, and Instagram Reels.",
   metaDescription: "Learn how to leverage the trending M&Ms topic to build a viral faceless trivia channel using QuizViral AI. Automate your short-form video creation now.",
