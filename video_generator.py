@@ -237,7 +237,7 @@ def load_bg_clip_safely(bg_video_path, category, custom_bg_paths=None):
         tried_paths.add(bg_video_path)
         
         try:
-            clip = VideoFileClip(bg_video_path, audio=False)
+            clip = VideoFileClip(bg_video_path, audio=False, target_resolution=(720, 1280))
             fps = clip.fps
             if not fps or fps <= 0:
                 raise ValueError("Video file has invalid FPS metadata.")
