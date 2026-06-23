@@ -36,91 +36,163 @@ def get_trending_keyword(index=0):
             print(f"Index {index} out of bounds (found {len(items)} items). Using fallback.")
             return f"TikTok Quiz Videos {index}"
     except Exception as e:
-        print(f"Error fetching trends: {e}. Falling back to default keyword.")
-        return f"TikTok Quiz Videos {index}"
+ 
+# =============================================================================
+# IMAGE CASCADE: Pixabay → Pexels → Unsplash → Wikipedia
+# All free, all HD, 3 API keys each for rotation & rate-limit bypass
+# =============================================================================
+_PIXABAY_KEYS = [
+    "54314916-5f365780e5c27849c23bc950f",   # hamzaraeescarpet
+    "56417685-c45a05a6f9a78c8d4170368f9",   # deshkikhabar
+    "56417696-67f37932e14092cf9a67139f9",   # aajkikhabar34
+]
+_PEXELS_KEYS = [
+    "NqX67bkvlFlTSnZmIFSFNIchLP0ARNW0X2OfaTWJvp7IJNXsIzOWQ1bH",  # hamzaraeescarpet
+    "GT9G57i8szub34xyk134pm4BbdVwgKzYsvjCFTer1lyF7u9nhe1vxrBT",  # aajkikhabar34
+    "PKiIguzl3Pox7aMpM7PKb4iX7kKi2JJJC6r2pidstpUAFgHdA6HgM2CL",  # deshkikhabar34
+]
+_pix_idx = 0
+_pex_idx = 0
 
-def get_unsplash_image(keyword):
-    """Unsplash internal search API se highly aesthetic aur relevant HD image URL fetch karta hai (100% Free)"""
+def _get_pixabay_key():
+    global _pix_idx
+    k = _PIXABAY_KEYS[_pix_idx % len(_PIXABAY_KEYS)]
+    _pix_idx += 1
+    return k
+
+def _get_pexels_key():
+    global _pex_idx
+    k = _PEXELS_KEYS[_pex_idx % len(_PEXELS_KEYS)]
+    _pex_idx += 1
+    return k
+
+def get_blog_image(keyword):
+    """
+    Fetches an HD blog featured image using a 4-tier cascade:
+      1. Pixabay  (HD/4K, 3 rotating keys) — PRIMARY
+      2. Pexels   (HD/4K, 3 rotating keys) — SECONDARY
+      3. Unsplash (napi search, unofficial but widely used) — TERTIARY
+      4. Wikipedia thumbnail — LAST RESORT
+    Returns a landscape image URL (1200x675 / 16:9) suitable for blog headers.
+    """
     import ssl
-    import json
     import urllib.parse
-    import urllib.request
-    
+    ssl_ctx = ssl._create_unverified_context()
+
+    # Use a richer query for blog-style imagery
     query = f"{keyword} technology creator" if "quiz" in keyword.lower() else keyword
-    print(f"Searching Unsplash for attractive image: '{query}'...")
-    
+    encoded = urllib.parse.quote(query)
+
+    # ------------------------------------------------------------------
+    # TIER 1: Pixabay (HD photos, 3 rotating API keys)
+    # ------------------------------------------------------------------
+    print(f"[BlogImage] Trying Pixabay for: '{query}'...")
+    for _ in range(len(_PIXABAY_KEYS)):
+        api_key = _get_pixabay_key()
+        try:
+            url = (
+                f"https://pixabay.com/api/?key={api_key}"
+                f"&q={encoded}&image_type=photo&per_page=5"
+                f"&safesearch=true&min_width=1200&order=popular"
+                f"&orientation=horizontal"
+            )
+            req = urllib.request.Request(url, headers={'User-Agent': 'QuizViralBot/2.0'})
+            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                hits = data.get("hits", [])
+                if hits:
+                    img = hits[0]
+                    img_url = (
+                        img.get("fullHDURL") or
+                        img.get("largeImageURL") or
+                        img.get("webformatURL")
+                    )
+                    if img_url:
+                        print(f"[BlogImage] Pixabay SUCCESS: {img_url[:80]}...")
+                        return img_url
+        except Exception as e:
+            print(f"[BlogImage] Pixabay attempt failed: {e}")
+
+    # ------------------------------------------------------------------
+    # TIER 2: Pexels (HD photos, 3 rotating API keys)
+    # ------------------------------------------------------------------
+    print(f"[BlogImage] Pixabay failed — trying Pexels...")
+    for _ in range(len(_PEXELS_KEYS)):
+        api_key = _get_pexels_key()
+        try:
+            url = f"https://api.pexels.com/v1/search?query={encoded}&per_page=5&size=large&orientation=landscape"
+            req = urllib.request.Request(
+                url,
+                headers={'Authorization': api_key, 'User-Agent': 'QuizViralBot/2.0'}
+            )
+            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                photos = data.get("photos", [])
+                if photos:
+                    src = photos[0].get("src", {})
+                    img_url = src.get("large2x") or src.get("original") or src.get("large")
+                    if img_url:
+                        print(f"[BlogImage] Pexels SUCCESS: {img_url[:80]}...")
+                        return img_url
+        except Exception as e:
+            print(f"[BlogImage] Pexels attempt failed: {e}")
+
+    # ------------------------------------------------------------------
+    # TIER 3: Unsplash (unofficial napi, reliable enough as tertiary)
+    # ------------------------------------------------------------------
+    print(f"[BlogImage] Pexels failed — trying Unsplash napi...")
     try:
-        context = ssl._create_unverified_context()
-        encoded_query = urllib.parse.quote(query)
-        search_url = f"https://unsplash.com/napi/search/photos?query={encoded_query}&per_page=5"
-        
+        search_url = f"https://unsplash.com/napi/search/photos?query={encoded}&per_page=5"
         req = urllib.request.Request(
-            search_url, 
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
+            search_url,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         )
-        with urllib.request.urlopen(req, timeout=10, context=context) as response:
+        with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as response:
             data = json.loads(response.read().decode('utf-8'))
             results = data.get("results", [])
             if results:
-                # Get the first image url
-                img_url = results[0]["urls"]["regular"]
-                # We can append custom sizing to optimize loading speed and quality to 16:9 aspect ratio
-                base_url = img_url.split("?")[0]
-                optimized_url = f"{base_url}?auto=format&fit=crop&w=1200&h=675&q=80"
-                print(f"Successfully retrieved aesthetic Unsplash image: {optimized_url}")
-                return optimized_url
+                base_url = results[0]["urls"]["regular"].split("?")[0]
+                img_url = f"{base_url}?auto=format&fit=crop&w=1200&h=675&q=80"
+                print(f"[BlogImage] Unsplash SUCCESS: {img_url[:80]}...")
+                return img_url
     except Exception as e:
-        print(f"Unsplash image search failed: {e}. Trying LoremFlickr fallback...")
-        
-    # LoremFlickr Fallback (Highly aesthetic 16:9 keyword-relevant photos from Flickr)
+        print(f"[BlogImage] Unsplash napi failed: {e}")
+
+    # ------------------------------------------------------------------
+    # TIER 4: Wikipedia thumbnail (last resort)
+    # ------------------------------------------------------------------
+    print(f"[BlogImage] Unsplash failed — trying Wikipedia fallback...")
     try:
-        context = ssl._create_unverified_context()
-        # Replace spaces with commas to search multiple tags on LoremFlickr
-        lorem_query = query.replace(" ", ",")
-        lorem_url = f"https://loremflickr.com/1200/675/{urllib.parse.quote(lorem_query)}"
-        req = urllib.request.Request(
-            lorem_url,
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-        )
-        with urllib.request.urlopen(req, timeout=12, context=context) as response:
-            redirected_url = response.geturl()
-            if redirected_url and redirected_url.startswith("http") and "loremflickr.com" in redirected_url:
-                print(f"Successfully retrieved relevant LoremFlickr image: {redirected_url}")
-                return redirected_url
-    except Exception as e:
-        print(f"LoremFlickr fallback failed: {e}. Trying Wikipedia fallback...")
-        
-    # Wikipedia Fallback
-    try:
-        context = ssl._create_unverified_context()
         search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(keyword)}&utf8=&format=json&srlimit=1"
         req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=10, context=context) as response:
+        with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as response:
             search_data = json.loads(response.read().decode('utf-8'))
             search_results = search_data.get("query", {}).get("search", [])
             if search_results:
                 best_title = search_results[0]["title"]
                 image_url_api = f"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=thumbnail&pithumbsize=1280&titles={urllib.parse.quote(best_title)}&redirects=1"
                 req2 = urllib.request.Request(image_url_api, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req2, timeout=10, context=context) as response2:
+                with urllib.request.urlopen(req2, timeout=10, context=ssl_ctx) as response2:
                     img_data = json.loads(response2.read().decode('utf-8'))
                     pages = img_data.get("query", {}).get("pages", {})
                     for page_id, page_data in pages.items():
                         if "thumbnail" in page_data:
                             wiki_img = page_data["thumbnail"]["source"]
-                            print(f"Wikipedia Image Found: {wiki_img}")
+                            print(f"[BlogImage] Wikipedia SUCCESS: {wiki_img}")
                             return wiki_img
     except Exception as e:
-        print(f"Wikipedia fallback failed: {e}")
+        print(f"[BlogImage] Wikipedia fallback failed: {e}")
 
-    # Standard hardcoded fallback
+    # Hardcoded safe fallback
+    print("[BlogImage] All sources failed. Using hardcoded fallback image.")
     return "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&h=675&q=80"
 
+# Keep old name as alias for backward compatibility
+def get_unsplash_image(keyword):
+    return get_blog_image(keyword)
+
 def check_port_open(port):
+
     import socket
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
