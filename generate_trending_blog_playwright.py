@@ -296,8 +296,8 @@ def launch_chrome_if_needed():
         chrome_path,
         "--remote-debugging-port=9222",
         f"--user-data-dir={CHROME_PROFILE_PATH}",
-        # NOTE: NOT headless — Gemini requires an active Google login session
-        # which dies silently in headless mode, causing TargetClosedError
+        "--headless=new",
+        "--disable-gpu",
         "--no-first-run",
         "--disable-default-apps",
         "--disable-session-crashed-bubble",
@@ -559,6 +559,7 @@ Format:
             print(f"Raw response was: {turn1_response}")
             page.close()
             browser.close()
+            kill_chrome_on_port_9222()
             return None
 
         # -------------------------------------------------------------
@@ -599,6 +600,7 @@ REQUIREMENTS:
 
         page.close()
         browser.close()
+        kill_chrome_on_port_9222()
 
         # Clean markdown and attach to meta_data
         markdown_content = clean_markdown_response(turn2_response)
@@ -654,7 +656,6 @@ def git_push_changes(title):
         subprocess.run(["git", "add", "."], cwd=SCRIPT_DIR, check=True)
         subprocess.run(["git", "commit", "-m", f"chore(blog): auto-publish post about {title}"], cwd=SCRIPT_DIR, check=True)
         subprocess.run(["git", "push", "github", "main"], cwd=SCRIPT_DIR, check=True)
-        subprocess.run(["git", "push", "github", "main:master"], cwd=SCRIPT_DIR, check=True)
         print("Git Push Completed! Vercel build triggered.")
     except Exception as e:
         print(f"Git push failed: {e}")
