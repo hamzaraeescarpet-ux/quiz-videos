@@ -62,7 +62,7 @@ def get_trending_keyword(index=0):
     ]
 
     # Try both US and IN trends to get variety
-    geo_list = ["US", "IN"]
+    geo_list = ["US"]
     all_topics = []
 
     for geo in geo_list:
