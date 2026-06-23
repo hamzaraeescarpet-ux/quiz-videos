@@ -391,62 +391,68 @@ def generate_blog_content_via_playwright(trend_keyword):
     print(f"Connecting to running Chrome on port 9222 for trend: {trend_keyword}...")
     
     # -----------------------------------------------------------------------
-    # SMART ANGLE: Transform trending topic into a searchable SEO keyword
-    # Example: "Taylor Swift" → "Taylor Swift Trivia Questions for YouTube Shorts"
+    # CORRECT SEO STRATEGY:
+    # Target keyword = what creators actually Google (high volume)
+    # Trending topic = just the content HOOK/ANGLE inside the article
     # -----------------------------------------------------------------------
-    prompt = f"""You are an expert SEO blog writer for a product called QuizViral AI.
+    prompt = f"""You are an expert SEO content writer. Your goal is to write a blog post that ranks on Google.
 
-QuizViral AI lets content creators generate 100+ viral faceless trivia/quiz videos in 1 click by importing a CSV file. It auto-generates voiceovers (text-to-speech), adds ticking clock sounds, shows 4 answer options on screen with a reveal animation, and supports background videos (Minecraft, Space, Animals, Nature, Cars) for TikTok, YouTube Shorts, Instagram Reels, and Facebook Reels.
+The product is QuizViral AI: a tool that lets content creators generate 100+ viral faceless trivia/quiz videos in 1 click by importing a CSV file. It auto-generates voiceovers (TTS), adds ticking clock sounds, shows 4 answer options with a reveal animation, and supports Minecraft, Space, Nature background videos for YouTube Shorts, TikTok, Instagram Reels, and Facebook Reels.
 
-Today's trending topic from Google Trends is: "{trend_keyword}"
+Today's trending news topic: "{trend_keyword}"
 
-YOUR MISSION:
-1. Use "{trend_keyword}" as inspiration to find the BEST long-tail SEO keyword angle that:
-   - People ACTUALLY type into Google (high search intent)
-   - Is related to trivia, quiz, YouTube, TikTok, faceless channels, or content creation
-   - Combines the trending topic with quiz/trivia/faceless content creation
-   - Has medium-to-low competition (long-tail, specific phrases)
+---
 
-2. Write a FULL blog post targeting that long-tail keyword, NOT just the raw trend topic.
+YOUR TASK:
+Write an SEO blog post that targets ONE of the following HIGH-VOLUME keywords that real content creators actually type into Google:
 
-EXAMPLE TRANSFORMATION (follow this pattern):
-- Trend: "Taylor Swift" → Target keyword: "Taylor Swift trivia questions for YouTube Shorts"
-- Trend: "World Cup" → Target keyword: "World Cup quiz questions for faceless YouTube channel"
-- Trend: "Elon Musk" → Target keyword: "Elon Musk trivia questions viral TikTok quiz"
-- Trend: "Olympics" → Target keyword: "Olympics trivia questions for content creators"
-- Trend: "AI tools" → Target keyword: "best AI tools to make faceless YouTube quiz videos"
+KEYWORD POOL (pick the ONE that fits best with "{trend_keyword}"):
+- "how to make quiz videos for youtube"
+- "how to start a faceless youtube channel in 2025"
+- "best quiz video maker free"
+- "viral youtube shorts ideas 2025"
+- "how to make money with a faceless youtube channel"
+- "how to make 100 youtube shorts fast"
+- "faceless youtube channel ideas that make money"
+- "how to automate youtube shorts"
+- "best ai video generator for youtube"
+- "tiktok quiz ideas that go viral"
+- "how to grow youtube channel fast 2025"
+- "youtube quiz channel monetization strategy"
 
-SEO BLOG REQUIREMENTS:
-- Minimum 1,500 words of rich content
-- Use the exact target long-tail keyword in: title, first paragraph, at least 3 H2 headings
-- Include 15-20 actual sample trivia questions about "{trend_keyword}" (numbered list)
-- Add sections: Introduction, Why This Topic Gets Views, [Topic] Trivia Questions List, How to Turn These Into Videos with QuizViral AI, Monetization Tips, Conclusion
-- Add 2 FAQ blocks (Question + Answer format) at the end for Google featured snippets
-- Naturally include these keyword variations throughout:
-  * "{trend_keyword} trivia questions"
-  * "{trend_keyword} quiz for YouTube"
-  * "faceless YouTube channel quiz ideas"
-  * "viral quiz video maker"
-  * "how to make quiz videos automatically"
-  * "QuizViral AI"
-- Include at least 2 links to https://quizviral-nine.vercel.app
+HOW TO USE THE TRENDING TOPIC "{trend_keyword}":
+- Use it as a REAL EXAMPLE inside the article
+- e.g. "For example, right now '{trend_keyword}' is trending — here is how you can make a quiz video about it in minutes using QuizViral AI..."
+- Do NOT make it the main keyword. It is just a timely hook to make the article feel fresh.
+
+STRUCTURE REQUIREMENTS:
+- Title: Must include the chosen high-volume keyword EXACTLY (60-70 chars)
+- Introduction: Hook + why this topic matters for creators right now (mention "{trend_keyword}" as a current example)
+- At least 5 H2 sections covering the main keyword topic in depth
+- A practical step-by-step section showing how QuizViral AI solves the problem
+- 10 real example quiz questions about "{trend_keyword}" (shows the tool in action)
+- A monetization/income section (creators love this)
+- 2 FAQ blocks at the end (helps get Google featured snippets)
+- Include 2 links to https://quizviral-nine.vercel.app
+- Minimum 1,500 words total
 
 CRITICAL JSON FORMATTING RULES:
 1. Inside JSON string values, do NOT use double quotes ("). Use single quotes (') instead.
-2. Double quotes ONLY for JSON property names and to wrap string values.
-3. Ensure JSON is 100% valid.
-4. The 'title' must contain the long-tail SEO keyword (not just the raw trend).
-5. The 'seoKeywords' array must have 8-10 specific long-tail keywords people actually search.
+2. Double quotes ONLY for JSON property names and to wrap top-level string values.
+3. JSON must be 100% valid.
+4. The 'title' must contain the chosen high-volume keyword exactly.
+5. The 'seoKeywords' must have 8-10 long-tail keywords that real users actually search.
 
-Respond ONLY with this JSON object (no markdown code blocks):
+Respond ONLY with this JSON (no markdown code blocks):
 {{
-  "title": "Long-tail SEO title with {trend_keyword} + trivia/quiz angle (60-70 chars)",
-  "excerpt": "2-3 sentence hook summary that includes the main keyword naturally",
-  "metaDescription": "SEO meta description under 155 characters including main keyword",
-  "seoKeywords": ["{trend_keyword} trivia questions", "{trend_keyword} quiz YouTube", "faceless YouTube quiz channel", "viral trivia video maker", "quiz video automation tool", "how to make quiz videos", "QuizViral AI review", "{trend_keyword} facts for content creators"],
-  "content": "Full 1500+ word Markdown blog post starting with # [Title]. Must include H2 headings, 15 trivia questions, FAQ section, and 2 links to https://quizviral-nine.vercel.app"
+  "title": "Title containing the chosen high-volume keyword (60-70 chars)",
+  "excerpt": "2-3 sentence summary using the main keyword naturally + mention of {trend_keyword} as a timely hook",
+  "metaDescription": "Under 155 chars, includes main keyword, compelling CTA",
+  "seoKeywords": ["how to make quiz videos for youtube", "faceless youtube channel 2025", "viral quiz video maker", "youtube shorts automation", "how to make money faceless youtube", "best ai quiz video generator", "quiz video ideas 2025", "QuizViral AI"],
+  "content": "Full 1500+ word Markdown blog post. Start with # [Title]. Use H2/H3 headings, include 10 quiz questions about {trend_keyword}, step-by-step QuizViral AI tutorial, monetization tips, 2 FAQ blocks, 2 links to https://quizviral-nine.vercel.app"
 }}
 """
+
 
 
     with sync_playwright() as p:
