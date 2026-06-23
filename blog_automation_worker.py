@@ -21,7 +21,7 @@ def run_blog_generator(index):
     log_message(f"Starting blog generation for trend index {index}...")
     try:
         cmd = ["python", GENERATOR_SCRIPT, "--trend-index", str(index)]
-        result = subprocess.run(cmd, cwd=SCRIPT_DIR, capture_output=True, text=True)
+        result = subprocess.run(cmd, cwd=SCRIPT_DIR, capture_output=True, text=True, encoding="utf-8")
         
         if result.stdout:
             log_message(f"STDOUT:\n{result.stdout}")

@@ -6,6 +6,15 @@ import json
 import subprocess
 from playwright.sync_api import sync_playwright
 
+# Set UTF-8 encoding for standard output and error to prevent CP1252 charmap crashes on Windows
+try:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 # Configurations
 # We have mapped your 4 Chrome profiles to your specific Pinterest accounts!
 # Profile 1 (Index 0) -> hamzaraeescarpet
