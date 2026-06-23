@@ -327,7 +327,7 @@ def fallback_json_parser(raw_json):
     This fallback uses regex and substring slicing to extract the fields.
     """
     try:
-        keys = ["title", "excerpt", "metaDescription", "seoKeywords", "content"]
+        keys = ["title", "excerpt", "metaDescription", "seoKeywords", "content", "outline"]
         key_positions = []
         for k in keys:
             pattern = rf'"{k}"\s*:'
@@ -376,14 +376,85 @@ def fallback_json_parser(raw_json):
                 val_str = val_str.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"')
                 data[key] = val_str
                 
-        if "title" in data and "content" in data:
+        if "title" in data:
             return data
     except Exception as e:
         print(f"Fallback regex parser failed: {e}")
     return None
 
+def clean_markdown_response(text):
+    """Clean up markdown response by removing leading/trailing code blocks or fluff."""
+    text = text.strip()
+    # Remove leading ```markdown or ```
+    text = re.sub(r"^```markdown\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"^```\s*", "", text)
+    # Remove trailing ```
+    if text.endswith("```"):
+        text = text[:-3].strip()
+    return text
+
+def wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=180):
+    """Wait for Gemini response to finish generating and return the response text."""
+    start_time = time.time()
+    generation_done = False
+    last_text = ""
+
+    while time.time() - start_time < max_wait_seconds:
+        try:
+            # Check if mic button is visible
+            is_mic_visible = False
+            if mic_locator.count() > 0:
+                for i in range(mic_locator.count()):
+                    if mic_locator.nth(i).is_visible():
+                        is_mic_visible = True
+                        break
+
+            # Check if stop button is visible (Gemini is still generating)
+            is_stop_visible = False
+            if stop_locator.count() > 0:
+                for i in range(stop_locator.count()):
+                    if stop_locator.nth(i).is_visible():
+                        is_stop_visible = True
+                        break
+
+            print(f"Waiting for Gemini... (Mic visible: {is_mic_visible}, Stop visible: {is_stop_visible})")
+
+            # If mic button is visible and stop button is NOT visible, we are done
+            if is_mic_visible and not is_stop_visible:
+                print("Gemini response is ready!")
+                generation_done = True
+                break
+
+        except Exception as loop_err:
+            err_name = type(loop_err).__name__
+            print(f"Warning: {err_name} during wait loop — page may have navigated. Falling back to text check...")
+            break
+
+        time.sleep(2)
+
+    # Fallback text stability check if mic detection timed out
+    if not generation_done:
+        print("Warning: Timed out waiting for mic button state. Using stable text fallback...")
+        for _ in range(15):
+            time.sleep(2)
+            responses = page.locator(".model-response, .message-content, message-content")
+            if responses.count() > 0:
+                current_text = responses.last.inner_text()
+                if current_text == last_text and len(current_text) > 100:
+                    break
+                last_text = current_text
+
+    # Fetch the final response text
+    responses = page.locator(".model-response, .message-content, message-content")
+    if responses.count() > 0:
+        final_response = responses.last.inner_text()
+    else:
+        final_response = last_text
+
+    return final_response
+
 def generate_blog_content_via_playwright(trend_keyword):
-    """Playwright का उपयोग करके localhost:9222 पर चल रहे Chrome के ज़रिए विशिष्ट Gemini Chat से फ़्री ब्लॉग पोस्ट लिखवाता है"""
+    """Playwright का उपयोग करके localhost:9222 पर चल रहे Chrome के ज़रie 2-Turn dialogue से फ़्री ब्लॉग पोस्ट लिखवाता है"""
     
     # Ensure Chrome is running on port 9222
     launched = launch_chrome_if_needed()
@@ -393,23 +464,14 @@ def generate_blog_content_via_playwright(trend_keyword):
         
     print(f"Connecting to running Chrome on port 9222 for trend: {trend_keyword}...")
     
-    # -----------------------------------------------------------------------
-    # CORRECT SEO STRATEGY:
-    # Target keyword = what creators actually Google (high volume)
-    # Trending topic = just the content HOOK/ANGLE inside the article
-    # -----------------------------------------------------------------------
-    prompt = f"""You are an expert SEO content writer. Your goal is to write a blog post that ranks on Google.
-
-The product is QuizViral AI: a tool that lets content creators generate 100+ viral faceless trivia/quiz videos in 1 click by importing a CSV file. It auto-generates voiceovers (TTS), adds ticking clock sounds, shows 4 answer options with a reveal animation, and supports Minecraft, Space, Nature background videos for YouTube Shorts, TikTok, Instagram Reels, and Facebook Reels.
+    # TURN 1 PROMPT: Metadata & Outline creation
+    prompt_metadata = f"""You are an expert SEO content writer. Your goal is to plan a highly optimized blog post for "QuizViral AI".
+Product details: QuizViral AI lets creators make 100+ viral faceless quiz/trivia videos in 1 click via CSV import. Features include TTS voiceovers, ticking clocks, answer reveal animations, and Minecraft/Space/Nature background videos.
 
 Today's trending news topic: "{trend_keyword}"
 
----
-
 YOUR TASK:
-Write an SEO blog post that targets ONE of the following HIGH-VOLUME keywords that real content creators actually type into Google:
-
-KEYWORD POOL (pick the ONE that fits best with "{trend_keyword}"):
+Step 1: Choose the single best SEO high-volume keyword from this keyword pool:
 - "how to make quiz videos for youtube"
 - "how to start a faceless youtube channel in 2025"
 - "best quiz video maker free"
@@ -423,40 +485,23 @@ KEYWORD POOL (pick the ONE that fits best with "{trend_keyword}"):
 - "how to grow youtube channel fast 2025"
 - "youtube quiz channel monetization strategy"
 
-HOW TO USE THE TRENDING TOPIC "{trend_keyword}":
-- Use it as a REAL EXAMPLE inside the article
-- e.g. "For example, right now '{trend_keyword}' is trending — here is how you can make a quiz video about it in minutes using QuizViral AI..."
-- Do NOT make it the main keyword. It is just a timely hook to make the article feel fresh.
-
-STRUCTURE REQUIREMENTS:
-- Title: Must include the chosen high-volume keyword EXACTLY (60-70 chars)
-- Introduction: Hook + why this topic matters for creators right now (mention "{trend_keyword}" as a current example)
-- At least 5 H2 sections covering the main keyword topic in depth
-- A practical step-by-step section showing how QuizViral AI solves the problem
-- 10 real example quiz questions about "{trend_keyword}" (shows the tool in action)
-- A monetization/income section (creators love this)
-- 2 FAQ blocks at the end (helps get Google featured snippets)
-- Include 2 links to https://quizviral-nine.vercel.app
-- Minimum 1,500 words total
+Step 2: Create a metadata block and a detailed article outline for this post.
+The outline should use H2 headings, targeting the chosen SEO keyword. It should include sections covering the chosen keyword, a step-by-step tutorial of QuizViral AI, 10 quiz questions about "{trend_keyword}", a monetization strategies section, and FAQ ideas.
 
 CRITICAL JSON FORMATTING RULES:
-1. Inside JSON string values, do NOT use double quotes ("). Use single quotes (') instead.
-2. Double quotes ONLY for JSON property names and to wrap top-level string values.
-3. JSON must be 100% valid.
-4. The 'title' must contain the chosen high-volume keyword exactly.
-5. The 'seoKeywords' must have 8-10 long-tail keywords that real users actually search.
+1. Inside JSON values, do NOT use double quotes ("). Use single quotes (') instead.
+2. Double quotes ONLY for JSON property names and to wrap top-level values.
+3. Respond ONLY with the JSON format (no markdown code blocks, no text before or after).
 
-Respond ONLY with this JSON (no markdown code blocks):
+Format:
 {{
-  "title": "Title containing the chosen high-volume keyword (60-70 chars)",
+  "title": "SEO Title containing the chosen high-volume keyword (60-70 chars)",
   "excerpt": "2-3 sentence summary using the main keyword naturally + mention of {trend_keyword} as a timely hook",
   "metaDescription": "Under 155 chars, includes main keyword, compelling CTA",
-  "seoKeywords": ["how to make quiz videos for youtube", "faceless youtube channel 2025", "viral quiz video maker", "youtube shorts automation", "how to make money faceless youtube", "best ai quiz video generator", "quiz video ideas 2025", "QuizViral AI"],
-  "content": "Full 1500+ word Markdown blog post. Start with # [Title]. Use H2/H3 headings, include 10 quiz questions about {trend_keyword}, step-by-step QuizViral AI tutorial, monetization tips, 2 FAQ blocks, 2 links to https://quizviral-nine.vercel.app"
+  "seoKeywords": ["keyword 1", "keyword 2", "keyword 3", "QuizViral AI"],
+  "outline": "Detailed outline of the blog post structure with H2 and H3 headings"
 }}
 """
-
-
 
     with sync_playwright() as p:
         try:
@@ -473,104 +518,97 @@ Respond ONLY with this JSON (no markdown code blocks):
         page.goto("https://gemini.google.com/app/5d22a66bd735a3fe")
         time.sleep(5)
 
-        print("Typing prompt into Gemini...")
+        # -------------------------------------------------------------
+        # TURN 1: Send Metadata Prompt & Receive JSON
+        # -------------------------------------------------------------
+        print("Typing metadata prompt into Gemini (Turn 1)...")
         textbox = page.locator("div[role='textbox']")
         textbox.click()
-        textbox.fill(prompt)
+        textbox.fill(prompt_metadata)
         time.sleep(1)
 
-        print("Submitting prompt...")
-        # Send बटन क्लिक करें
+        print("Submitting metadata prompt...")
         submit_btn = page.locator("button[aria-label*='Send' i], button[aria-label*='Submit' i], button[aria-label*='भेजें' i], button[class*='send-button']").first
         submit_btn.click()
 
-        print("Waiting for Gemini to finish generating (until the mic button icon reappears)...")
-        time.sleep(3)  # Give it a moment to transition to thinking/stop state
-
-        # Locators to detect when Gemini goes back to the ready state (has mic button)
+        print("Waiting for Gemini to finish Turn 1...")
+        time.sleep(3)
         mic_locator = page.locator("button[aria-label*='microphone' i], button[aria-label*='mic' i], button[aria-label*='माइक्रो' i]")
         stop_locator = page.locator("button[aria-label*='Stop' i], button[aria-label*='रोकें' i]")
         
-        start_time = time.time()
-        max_wait_seconds = 180  # 3 minutes max
-        generation_done = False
-        last_text = ""
-
-        while time.time() - start_time < max_wait_seconds:
-            try:
-                # Check if mic button is visible
-                is_mic_visible = False
-                if mic_locator.count() > 0:
-                    for i in range(mic_locator.count()):
-                        if mic_locator.nth(i).is_visible():
-                            is_mic_visible = True
-                            break
-
-                # Check if stop button is visible (Gemini is still generating)
-                is_stop_visible = False
-                if stop_locator.count() > 0:
-                    for i in range(stop_locator.count()):
-                        if stop_locator.nth(i).is_visible():
-                            is_stop_visible = True
-                            break
-
-                print(f"Waiting for Gemini... (Mic visible: {is_mic_visible}, Stop visible: {is_stop_visible})")
-
-                # If mic button is visible and stop button is NOT visible, we are done
-                if is_mic_visible and not is_stop_visible:
-                    print("Gemini response is ready!")
-                    generation_done = True
-                    break
-
-            except Exception as loop_err:
-                err_name = type(loop_err).__name__
-                print(f"Warning: {err_name} during wait loop — page may have navigated. Falling back to text check...")
-                break
-
-            time.sleep(2)
-
-        # Fallback text stability check if mic detection timed out
-        if not generation_done:
-            print("Warning: Timed out waiting for mic button state. Using stable text fallback...")
-            for _ in range(15):
-                time.sleep(2)
-                responses = page.locator(".model-response, .message-content, message-content")
-                if responses.count() > 0:
-                    current_text = responses.last.inner_text()
-                    if current_text == last_text and len(current_text) > 100:
-                        break
-                    last_text = current_text
-
-        # Fetch the final response text
-        responses = page.locator(".model-response, .message-content, message-content")
-        if responses.count() > 0:
-            final_response = responses.last.inner_text()
-        else:
-            final_response = last_text
-
-        print("Successfully read Gemini response.")
-        page.close()
-        browser.close()
+        turn1_response = wait_for_gemini_response(page, mic_locator, stop_locator)
+        print("Successfully read Turn 1 response.")
 
         # JSON ढूँढें
-        json_match = re.search(r"\{.*\}", final_response, re.DOTALL)
+        meta_data = None
+        json_match = re.search(r"\{.*\}", turn1_response, re.DOTALL)
         if json_match:
             raw_json = json_match.group(0).strip()
             raw_json = raw_json.replace("{trend_keyword}", trend_keyword)
             try:
-                return json.loads(raw_json)
+                meta_data = json.loads(raw_json)
             except Exception as e:
-                print(f"Standard JSON parser failed: {e}. Trying custom regex fallback...")
-                parsed_data = fallback_json_parser(raw_json)
-                if parsed_data:
-                    return parsed_data
-                print(f"Error parsing JSON from Gemini response: {e}")
-                print(f"Raw response was: {final_response}")
-                return None
+                print(f"Standard JSON parser failed for Turn 1: {e}. Trying custom regex fallback...")
+                meta_data = fallback_json_parser(raw_json)
         else:
-            print("No JSON block found in the response.")
-            print(f"Raw response was: {final_response}")
+            print("No JSON block found in Turn 1 response. Trying custom regex fallback...")
+            meta_data = fallback_json_parser(turn1_response)
+
+        if not meta_data or "title" not in meta_data:
+            print("Error: Could not parse metadata or outline from Gemini Turn 1.")
+            print(f"Raw response was: {turn1_response}")
+            page.close()
+            browser.close()
             return None
+
+        # -------------------------------------------------------------
+        # TURN 2: Send Content Prompt & Receive Pure Markdown
+        # -------------------------------------------------------------
+        outline = meta_data.get("outline", "Detailed blog sections")
+        title = meta_data.get("title", "SEO Blog Post")
+        
+        prompt_content = f"""Excellent outline. Now, write the complete, extremely in-depth and high-quality blog post in Markdown format following that outline.
+
+Outline to follow:
+{outline}
+
+REQUIREMENTS:
+- Word Count: Minimum 1,500 words. Make the paragraphs highly informative, engaging, and detailed. No short fluffy paragraphs.
+- Title: Start directly with '# {title}' at the very beginning of the article.
+- Headings: Use proper H2 and H3 markdown tags.
+- Example Section: Include 10 complete quiz questions about '{trend_keyword}' (with 4 multiple-choice options each and the correct answer indicated).
+- Product Integration: Write a step-by-step guide on how content creators can make a quiz video about '{trend_keyword}' in 1 click using QuizViral AI.
+- Links: Naturally include exactly 2 links to https://quizviral-nine.vercel.app in the article body (e.g. as '[QuizViral AI](https://quizviral-nine.vercel.app)').
+- FAQs: Include 2 FAQs at the end.
+- Formatting: Do NOT wrap the response in a JSON block or code fence. Respond with pure Markdown text only. Start writing the post immediately.
+"""
+
+        print("Typing content prompt into Gemini (Turn 2)...")
+        textbox.click()
+        textbox.fill(prompt_content)
+        time.sleep(1)
+
+        print("Submitting content prompt...")
+        submit_btn.click()
+
+        print("Waiting for Gemini to finish Turn 2 (Writing full blog post)...")
+        time.sleep(3)
+        
+        turn2_response = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=240)
+        print("Successfully read Turn 2 response.")
+
+        page.close()
+        browser.close()
+
+        # Clean markdown and attach to meta_data
+        markdown_content = clean_markdown_response(turn2_response)
+        
+        # Replace template placeholders
+        markdown_content = markdown_content.replace("{trend_keyword}", trend_keyword)
+        markdown_content = markdown_content.replace("{title}", title)
+
+        meta_data["content"] = markdown_content
+        return meta_data
 
 def update_blog_posts_file(new_post):
     """Generated ब्लॉग को frontend/src/data/blogPosts.js में ऑटोमैटिक जोड़ता है"""
