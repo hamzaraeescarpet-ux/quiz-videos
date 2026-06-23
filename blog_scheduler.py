@@ -3,11 +3,25 @@ import sys
 import json
 import time
 import subprocess
+import threading
 from datetime import datetime
 import tkinter as tk
+from tkinter import messagebox
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(SCRIPT_DIR, "blog_scheduler_state.json")
+LOG_FILE   = os.path.join(SCRIPT_DIR, "blog_scheduler.log")
+
+# ─────────────────────────────────────────────────────────────────────────────
+def log(msg):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{ts}] {msg}"
+    print(line)
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
 
 def get_today_date():
     return datetime.now().strftime("%Y-%m-%d")
@@ -19,171 +33,222 @@ def load_state():
                 return json.load(f)
         except Exception:
             pass
-    return {"last_date": "", "status": "pending"}
+    return {"last_date": "", "status": "pending", "blogs_done": 0}
 
-def save_state(status):
-    state = {"last_date": get_today_date(), "status": status}
+def save_state(status, blogs_done=None):
+    state = load_state()
+    state["last_date"] = get_today_date()
+    state["status"]    = status
+    if blogs_done is not None:
+        state["blogs_done"] = blogs_done
     try:
         with open(STATE_FILE, "w") as f:
             json.dump(state, f)
     except Exception as e:
-        print(f"Failed to save state: {e}")
+        log(f"Failed to save state: {e}")
 
+# ─────────────────────────────────────────────────────────────────────────────
 def check_and_register_startup():
-    startup_dir = os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs\Startup")
+    """Register script in Windows Startup folder (only once)."""
+    startup_dir   = os.path.join(os.environ.get("APPDATA", ""),
+                                 r"Microsoft\Windows\Start Menu\Programs\Startup")
     shortcut_path = os.path.join(startup_dir, "QuizViralBlogScheduler.lnk")
-    
+
     if os.path.exists(shortcut_path):
-        return
-        
-    print("Registering blog scheduler in Windows Startup...")
-    pythonw_exe = sys.executable.replace("python.exe", "pythonw.exe")
+        return  # Already registered
+
+    log("Registering blog scheduler in Windows Startup...")
+    # Use python.exe (not pythonw) so the console + tkinter popup work correctly
+    python_exe  = sys.executable
     script_path = os.path.abspath(__file__)
-    working_dir = SCRIPT_DIR
-    
-    # PowerShell command to create the Startup shortcut (run minimized/hidden)
+
     ps_cmd = (
         f'$WshShell = New-Object -ComObject WScript.Shell; '
         f'$Shortcut = $WshShell.CreateShortcut("{shortcut_path}"); '
-        f'$Shortcut.TargetPath = "{pythonw_exe}"; '
-        f'$Shortcut.Arguments = "{script_path}"; '
-        f'$Shortcut.WorkingDirectory = "{working_dir}"; '
-        f'$Shortcut.WindowStyle = 7; '
+        f'$Shortcut.TargetPath = "{python_exe}"; '
+        f'$Shortcut.Arguments = \\"{script_path}\\"; '
+        f'$Shortcut.WorkingDirectory = "{SCRIPT_DIR}"; '
+        f'$Shortcut.WindowStyle = 1; '   # 1 = normal window (not hidden)
         f'$Shortcut.Save()'
     )
-    
     try:
-        subprocess.run(["powershell", "-Command", ps_cmd], capture_output=True, text=True, check=True)
-        print("Successfully registered in Windows Startup!")
+        subprocess.run(["powershell", "-Command", ps_cmd],
+                       capture_output=True, text=True, check=True)
+        log("Successfully registered in Windows Startup!")
     except Exception as e:
-        print(f"Failed to register in Windows Startup: {e}")
+        log(f"Failed to register in Windows Startup: {e}")
 
-def run_automation_in_background():
-    worker_script = os.path.join(SCRIPT_DIR, "blog_automation_worker.py")
+# ─────────────────────────────────────────────────────────────────────────────
+def run_one_blog(trend_index):
+    """Run a single blog generation synchronously and return True/False."""
+    generator_script = os.path.join(SCRIPT_DIR, "generate_trending_blog_playwright.py")
+    log(f"Starting blog #{trend_index + 1} generation (trend index {trend_index})...")
     try:
-        if sys.platform == "win32":
-            # DETACHED_PROCESS flag = 0x00000008
-            subprocess.Popen([sys.executable, worker_script], creationflags=0x00000008)
-        else:
-            subprocess.Popen([sys.executable, worker_script])
+        result = subprocess.run(
+            [sys.executable, generator_script, "--trend-index", str(trend_index)],
+            cwd=SCRIPT_DIR
+        )
+        success = result.returncode == 0
+        log(f"Blog #{trend_index + 1} {'SUCCESS' if success else 'FAILED'} "
+            f"(return code: {result.returncode})")
+        return success
     except Exception as e:
-        print(f"Failed to launch worker: {e}")
+        log(f"Error running blog generator for index {trend_index}: {e}")
+        return False
 
+def run_all_blogs_with_gaps():
+    """
+    Generates 3 blogs with a 2-hour gap between each.
+    Runs in a background thread so the main process stays alive.
+    Shows a small status notification after each blog completes.
+    """
+    def _worker():
+        total = 3
+        for i in range(total):
+            ok = run_one_blog(i)
+            save_state("in_progress", blogs_done=i + 1)
+
+            # Show a brief system notification (no blocking popup)
+            _toast(
+                f"Blog {i+1}/{total} {'✅ Done' if ok else '❌ Failed'}",
+                f"Blog generation #{i+1} has {'completed successfully!' if ok else 'failed. Check log for details.'}"
+            )
+
+            if i < total - 1:
+                log(f"Waiting 2 hours before next blog...")
+                time.sleep(7200)   # 2-hour gap
+
+        save_state("completed", blogs_done=total)
+        log("=== All 3 blogs generated successfully! ===")
+        _toast("QuizViral Blog Automation", "All 3 blogs for today are done! ✅")
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+    return t
+
+def _toast(title, message):
+    """Show a small non-blocking Windows toast notification via PowerShell."""
+    try:
+        ps = (
+            f"Add-Type -AssemblyName System.Windows.Forms; "
+            f"$n = New-Object System.Windows.Forms.NotifyIcon; "
+            f"$n.Icon = [System.Drawing.SystemIcons]::Information; "
+            f"$n.Visible = $true; "
+            f"$n.ShowBalloonTip(5000, '{title}', '{message}', "
+            f"[System.Windows.Forms.ToolTipIcon]::Info); "
+            f"Start-Sleep -Seconds 6; $n.Dispose()"
+        )
+        subprocess.Popen(
+            ["powershell", "-WindowStyle", "Hidden", "-Command", ps],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+    except Exception:
+        pass  # Toast is optional — never crash because of it
+
+# ─────────────────────────────────────────────────────────────────────────────
 def show_popup():
+    """
+    Show the Yes/Remind/Skip popup.
+    FIX: 'Remind Later' no longer calls time.sleep() inside tkinter mainloop
+    (which used to freeze the window). Instead it schedules a re-check via
+    root.after() and exits the current window cleanly.
+    """
     root = tk.Tk()
-    root.title("QuizViral AI Blog Automation")
-    
-    # Center window
-    window_width = 460
-    window_height = 200
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    x = (screen_width - window_width) // 2
-    y = (screen_height - window_height) // 2
-    root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+    root.title("QuizViral AI — Blog Automation")
+
+    window_width, window_height = 480, 230
+    sw = root.winfo_screenwidth()
+    sh = root.winfo_screenheight()
+    root.geometry(f"{window_width}x{window_height}+{(sw-window_width)//2}+{(sh-window_height)//2}")
     root.resizable(False, False)
-    
-    # Dark modern colors
     root.configure(bg="#1e1e2e")
-    
-    label_title = tk.Label(
-        root, 
-        text="Daily Blog Generation Automation", 
-        font=("Segoe UI", 16, "bold"), 
-        fg="#cdd6f4", 
-        bg="#1e1e2e"
-    )
-    label_title.pack(pady=(20, 10))
-    
-    label_desc = tk.Label(
-        root, 
-        text="Would you like to start the daily blog automation?\nThis will generate 3 distinct blogs (one every 2 hours).",
-        font=("Segoe UI", 10),
-        fg="#a6adc8",
-        bg="#1e1e2e",
-        justify="center"
-    )
-    label_desc.pack(pady=(0, 20))
-    
+    root.attributes("-topmost", True)   # Always on top so it's visible after startup
+
+    # --- State indicator ---
+    state      = load_state()
+    blogs_done = state.get("blogs_done", 0)
+    status_txt = f"Today so far: {blogs_done}/3 blog(s) generated." if blogs_done > 0 else ""
+
+    tk.Label(root, text="Daily Blog Generation Automation",
+             font=("Segoe UI", 15, "bold"), fg="#cdd6f4", bg="#1e1e2e"
+             ).pack(pady=(18, 4))
+
+    tk.Label(root,
+             text="Would you like to start today's blog automation?\n"
+                  "3 blogs will be published — one every 2 hours.\n"
+                  + (f"📊 {status_txt}" if status_txt else ""),
+             font=("Segoe UI", 10), fg="#a6adc8", bg="#1e1e2e", justify="center"
+             ).pack(pady=(0, 16))
+
+    result = {"action": None}
+
     def on_yes():
-        save_state("completed")
-        run_automation_in_background()
-        root.destroy()
-        
-    def on_remind():
-        root.destroy()
-        # Sleep 1 hour, then run again
-        time.sleep(3600)
-        main()
-        
-    def on_skip():
-        save_state("skipped")
+        result["action"] = "yes"
         root.destroy()
 
-    btn_frame = tk.Frame(root, bg="#1e1e2e")
-    btn_frame.pack()
-    
-    btn_yes = tk.Button(
-        btn_frame, 
-        text="Yes, Start Now", 
-        command=on_yes,
-        font=("Segoe UI", 10, "bold"),
-        fg="#1e1e2e",
-        bg="#a6e3a1",  # Pastel green
-        activebackground="#89b4fa",
-        cursor="hand2",
-        padx=12,
-        pady=6,
-        bd=0
-    )
-    btn_yes.grid(row=0, column=0, padx=10)
-    
-    btn_remind = tk.Button(
-        btn_frame, 
-        text="Remind Later", 
-        command=on_remind,
-        font=("Segoe UI", 10),
-        fg="#1e1e2e",
-        bg="#f9e2af",  # Pastel yellow
-        activebackground="#f2cdcd",
-        cursor="hand2",
-        padx=12,
-        pady=6,
-        bd=0
-    )
-    btn_remind.grid(row=0, column=1, padx=10)
-    
-    btn_skip = tk.Button(
-        btn_frame, 
-        text="Skip Today", 
-        command=on_skip,
-        font=("Segoe UI", 10),
-        fg="#cdd6f4",
-        bg="#313244",  # Muted dark button
-        activebackground="#45475a",
-        cursor="hand2",
-        padx=12,
-        pady=6,
-        bd=0
-    )
-    btn_skip.grid(row=0, column=2, padx=10)
-    
+    def on_remind():
+        result["action"] = "remind"
+        root.destroy()
+
+    def on_skip():
+        result["action"] = "skip"
+        root.destroy()
+
+    frame = tk.Frame(root, bg="#1e1e2e")
+    frame.pack()
+
+    for text, cmd, fg, bg in [
+        ("✅  Start Now",    on_yes,    "#1e1e2e", "#a6e3a1"),
+        ("⏰  Remind in 1h", on_remind, "#1e1e2e", "#f9e2af"),
+        ("🚫  Skip Today",   on_skip,   "#cdd6f4", "#313244"),
+    ]:
+        tk.Button(frame, text=text, command=cmd,
+                  font=("Segoe UI", 10, "bold"), fg=fg, bg=bg,
+                  activebackground="#89b4fa", cursor="hand2",
+                  padx=14, pady=7, bd=0, relief="flat"
+                  ).pack(side="left", padx=8)
+
     root.protocol("WM_DELETE_WINDOW", on_remind)
     root.mainloop()
+    return result["action"]
 
+# ─────────────────────────────────────────────────────────────────────────────
 def main():
-    # Register script in Windows Startup on first execution
     check_and_register_startup()
-    
+
     state = load_state()
     today = get_today_date()
-    
-    # If completed or skipped today, exit silently
-    if state["last_date"] == today and state["status"] in ("completed", "skipped"):
-        print(f"Blog automation for today ({today}) is already marked as {state['status']}. Exiting.")
+
+    # Already fully done today → exit silently
+    if state["last_date"] == today and state["status"] == "completed":
+        log(f"Blog automation already completed today ({today}). Exiting.")
         return
-        
-    show_popup()
+
+    log("Showing blog automation popup...")
+    action = show_popup()
+
+    if action == "yes":
+        log("User clicked 'Start Now'. Launching blog automation in background...")
+        save_state("in_progress", blogs_done=state.get("blogs_done", 0))
+        worker_thread = run_all_blogs_with_gaps()
+        # Keep main thread alive while background blogs are running
+        log("Blog generation running in background. Main process keeping alive...")
+        worker_thread.join()
+        log("All done. Exiting scheduler.")
+
+    elif action == "remind":
+        log("User clicked 'Remind in 1h'. Will re-show popup after 60 minutes.")
+        time.sleep(3600)
+        main()   # Recursive call after 1 hour (safe — not inside tkinter loop)
+
+    elif action == "skip":
+        log("User clicked 'Skip Today'. Marking as skipped.")
+        save_state("skipped")
+
+    else:
+        log("Popup closed without action. Treating as Remind.")
+        time.sleep(3600)
+        main()
 
 if __name__ == "__main__":
     main()

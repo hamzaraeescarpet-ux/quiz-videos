@@ -36,7 +36,9 @@ def get_trending_keyword(index=0):
             print(f"Index {index} out of bounds (found {len(items)} items). Using fallback.")
             return f"TikTok Quiz Videos {index}"
     except Exception as e:
- 
+        print(f"Error fetching trends: {e}. Falling back to default keyword.")
+        return f"TikTok Quiz Videos {index}"
+
 # =============================================================================
 # IMAGE CASCADE: Pixabay → Pexels → Unsplash → Wikipedia
 # All free, all HD, 3 API keys each for rotation & rate-limit bypass
