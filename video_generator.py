@@ -168,6 +168,13 @@ async def generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2):
         generate_voice(speech_2, audio_path_2)
     )
 
+def fetch_wikipedia_image_sync(subject):
+    """Synchronous wrapper around fetch_wikipedia_image for use in ThreadPoolExecutor."""
+    try:
+        return fetch_wikipedia_image(subject)
+    except Exception:
+        return None
+
 def hex_to_rgb(hex_str, default_rgb):
     if not hex_str:
         return default_rgb
@@ -237,7 +244,8 @@ def load_bg_clip_safely(bg_video_path, category, custom_bg_paths=None):
         tried_paths.add(bg_video_path)
         
         try:
-            clip = VideoFileClip(bg_video_path, audio=False, target_resolution=(720, 1280))
+            # Load without target_resolution — lazy resize is much faster than pre-scaling the full decode
+            clip = VideoFileClip(bg_video_path, audio=False)
             fps = clip.fps
             if not fps or fps <= 0:
                 raise ValueError("Video file has invalid FPS metadata.")
@@ -327,39 +335,61 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
         except Exception as e:
             raise Exception(f"Error finding background: {e}")
 
-    # 2) Audio generation
+    # 2) Audio generation + optional Wikipedia prefetch — run BOTH in parallel
     audio_path_1 = os.path.join(TEMP_FOLDER, f"temp_q_{vid_id}.mp3")
     speech_1 = f"Question... {q_text} ... Is it ... {opt1_val} ... {opt2_val} ... {opt3_val} ... or {opt4_val}"
 
     audio_path_2 = os.path.join(TEMP_FOLDER, f"temp_a_{vid_id}.mp3")
     speech_2 = f"The correct answer is ... {ans_val}"
 
-    try:
-        try:
-            async_loop = asyncio.get_event_loop()
-        except RuntimeError:
-            async_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(async_loop)
-            
-        if async_loop.is_running():
-            from concurrent.futures import ThreadPoolExecutor
-            with ThreadPoolExecutor() as executor:
-                future = executor.submit(lambda: asyncio.run(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2)))
-                future.result()
-        else:
-            async_loop.run_until_complete(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2))
-    except Exception as e:
-        print(f"edge-tts failed: {e}. Falling back to gTTS...", flush=True)
-        try:
-            from gtts import gTTS
-            gTTS(text=speech_1, lang='en', tld='us').save(audio_path_1)
-            gTTS(text=speech_2, lang='en', tld='us').save(audio_path_2)
-        except Exception as e2:
-            raise Exception(f"Both edge-tts and gTTS failed. gTTS Error: {e2}")
+    # Prefetch Wikipedia image URL concurrently while TTS audio is generating
+    prefetched_image_url = None
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    import time
-    time.sleep(1.0) # Ensure files are written
+    def _run_tts():
+        try:
+            try:
+                async_loop = asyncio.get_event_loop()
+            except RuntimeError:
+                async_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(async_loop)
+            if async_loop.is_running():
+                with ThreadPoolExecutor(max_workers=1) as ex:
+                    fut = ex.submit(lambda: asyncio.run(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2)))
+                    fut.result()
+            else:
+                async_loop.run_until_complete(generate_both_audios(speech_1, audio_path_1, speech_2, audio_path_2))
+            return True
+        except Exception as e:
+            safe_print(f"edge-tts failed: {e}. Falling back to gTTS...")
+            try:
+                from gtts import gTTS
+                gTTS(text=speech_1, lang='en', tld='us').save(audio_path_1)
+                gTTS(text=speech_2, lang='en', tld='us').save(audio_path_2)
+                return True
+            except Exception as e2:
+                raise Exception(f"Both edge-tts and gTTS failed. gTTS Error: {e2}")
 
+    is_image_category = "image" in category.lower()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        tts_future = pool.submit(_run_tts)
+        wiki_future = None
+        if is_image_category:
+            subject = extract_subject(row)
+            safe_print(f"Prefetching Wikipedia image in parallel for: '{subject}'")
+            wiki_future = pool.submit(fetch_wikipedia_image_sync, subject)
+
+        # Wait for TTS (mandatory)
+        tts_future.result()
+
+        # Collect Wikipedia result if it was fetched
+        if wiki_future is not None:
+            try:
+                prefetched_image_url = wiki_future.result(timeout=20)
+            except Exception as wi_err:
+                safe_print(f"Wikipedia prefetch failed: {wi_err}")
+
+    # Quick existence check — no artificial sleep needed
     if not (os.path.exists(audio_path_1) and os.path.exists(audio_path_2)):
         raise Exception("Audio files were not created on disk")
 
@@ -399,11 +429,14 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     temp_image_clips = []
     temp_image_paths = []
     
-    if "image" in category.lower():
+    if is_image_category:
         try:
-            subject = extract_subject(row)
-            safe_print(f"Extracted subject for contextual image: '{subject}'")
-            image_url = fetch_wikipedia_image(subject)
+            # Use the prefetched URL from the parallel fetch above (no extra network wait!)
+            image_url = prefetched_image_url
+            if image_url:
+                safe_print(f"Using prefetched Wikipedia image URL: {image_url}")
+            else:
+                safe_print("Prefetched Wikipedia image URL was None. Falling back to video background.")
             if image_url:
                 safe_print(f"Found Wikipedia image URL: {image_url}")
                 parsed_url = urllib.parse.urlparse(image_url)
@@ -551,7 +584,7 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
         temp_audiofile=temp_audio_file_path,
         remove_temp=True,
         preset="ultrafast",
-        threads=2,
+        threads=4,      # ← increased from 2 to 4 for faster encoding
         verbose=False,
         logger=None
     )
