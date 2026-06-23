@@ -102,25 +102,6 @@ def get_blog_image(keyword):
             with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
                 hits = data.get("hits", [])
-                if target_publish:
-                    target_publish.scroll_into_view_if_needed()
-                    time.sleep(1.5)
-                    # Wait for button to be enabled (image might still be uploading)
-                    for _w in range(10):
-                        try:
-                            is_disabled = target_publish.get_attribute("disabled") is not None
-                            aria_disabled = target_publish.get_attribute("aria-disabled")
-                            if not is_disabled and aria_disabled != "true":
-                                break
-                        except Exception:
-                            break
-                        print(f"Publish button abhi disabled hai, 2 sec wait kar rahe hai... ({_w+1}/10)")
-                        time.sleep(2)
-                    print("Publish/Save button click kar rahe hai...")
-                    target_publish.click()
-                    print("Publish click ho gaya! Completion ke liye wait kar rahe hai (20 seconds)...")
-                    time.sleep(20)  # Wait for Pinterest to process
-                    print("Pin published successfully!")
                 if hits:
                     img = hits[0]
                     img_url = (
@@ -265,49 +246,7 @@ def launch_chrome_if_needed():
     try:
         # Start Chrome detached in the background
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        # Wait a few seconds for Chrome to spin up and bind the port
-        if target_board_opener:
-                        target_board_opener.scroll_into_view_if_needed()
-                        time.sleep(1.5)
-                        target_board_opener.click()
-                        time.sleep(4) # Delay for dropdown animation
-                        
-                        search_box = page.locator(
-                             '[role="listbox"] input, '
-                             '[class*="dropdown"] input, '
-                             '[data-testid="board-dropdown"] input, '
-                             '[data-test-id="board-dropdown"] input'
-                         ).first
-                        if search_box.count() > 0 and search_box.is_visible():
-                            search_box.click()
-                            time.sleep(1.5)
-                            search_box.fill(BOARD_NAME)
-                            time.sleep(3)
-                            
-                        # Try board selection up to 3 times (Pinterest dropdown can be flaky)
-                        board_selected = False
-                        for _attempt in range(3):
-                            board_item = page.locator(
-                                f'div[role="listitem"] div:has-text("{BOARD_NAME}"), '
-                                f'div[role="option"]:has-text("{BOARD_NAME}"), '
-                                f'div[role="option"] span:has-text("{BOARD_NAME}"), '
-                                f'[data-test-id*="board"]:has-text("{BOARD_NAME}")'
-                            ).first
-                            if board_item.count() > 0:
-                                try:
-                                    board_item.wait_for(state="visible", timeout=5000)
-                                    board_item.click()
-                                    print(f"Board '{BOARD_NAME}' select ho gaya! (attempt {_attempt+1})")
-                                    board_selected = True
-                                    time.sleep(3)
-                                    break
-                                except Exception:
-                                    pass
-                            time.sleep(2)
-                        if not board_selected:
-                            print(f"Board '{BOARD_NAME}' dropdown mein nahi mila. Default board use hoga.")
-                            page.keyboard.press("Escape")
-                            time.sleep(2)
+        # Wait for Chrome to spin up and bind the port
         for _ in range(8):
             time.sleep(1)
             if check_port_open(9222):
