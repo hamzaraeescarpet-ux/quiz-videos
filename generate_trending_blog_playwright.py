@@ -17,27 +17,85 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BLOG_POSTS_FILE = os.path.join(SCRIPT_DIR, "frontend", "src", "data", "blogPosts.js")
 # ========================================================
 
+
+# Topics to SKIP — US legal/medical ad-spend keywords that pollute trends
+_SKIP_KEYWORDS = [
+    "lawyer", "attorney", "lawsuit", "accident", "injury", "mesothelioma",
+    "rehab", "treatment center", "drug rehab", "insurance", "settlement",
+    "compensation", "mortgage", "loan", "credit", "debt", "bankruptcy",
+    "addiction", "detox", "clinic", "hospital", "cancer", "disease",
+    "symptoms", "diagnosis", "medicare", "medicaid", "tax relief",
+    "car crash", "truck accident", "slip and fall", "personal injury",
+    "class action", "malpractice", "dui", "divorce", "custody",
+]
+
+def _is_relevant_topic(topic):
+    """Returns True if topic is relevant (pop culture, sports, tech, entertainment)."""
+    topic_lower = topic.lower()
+    # Skip if any spam keyword is in the topic
+    for skip in _SKIP_KEYWORDS:
+        if skip in topic_lower:
+            return False
+    # Skip very short or generic topics
+    if len(topic.strip()) < 4:
+        return False
+    return True
+
 def get_trending_keyword(index=0):
-    """Google Trends RSS Feed से ट्रेंडिंग कीवर्ड निकालता है (100% फ़्री)"""
-    print(f"Fetching trending keyword at index {index} from Google Trends...")
-    url = "https://trends.google.com/trending/rss?geo=US"
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
-            xml_data = response.read()
-        
-        root = ET.fromstring(xml_data)
-        items = root.findall(".//item")
-        if items and len(items) > index:
-            title = items[index].find("title").text
-            print(f"Trending topic found at index {index}: {title}")
-            return title
-        else:
-            print(f"Index {index} out of bounds (found {len(items)} items). Using fallback.")
-            return f"TikTok Quiz Videos {index}"
-    except Exception as e:
-        print(f"Error fetching trends: {e}. Falling back to default keyword.")
-        return f"TikTok Quiz Videos {index}"
+    """
+    Google Trends RSS Feed se trending keyword nikalta hai.
+    Spam/irrelevant topics (lawyers, rehab etc) ko skip karta hai.
+    Agar koi relevant topic nahi milta, creator-friendly fallback use karta hai.
+    """
+    print(f"Fetching trending keywords from Google Trends (want index ~{index})...")
+
+    # Curated fallbacks if Google Trends gives only garbage
+    CREATOR_FALLBACKS = [
+        "viral YouTube Shorts ideas",
+        "faceless YouTube channel tips",
+        "how to grow on TikTok 2025",
+        "best AI tools for content creators",
+        "YouTube automation income",
+        "trending quiz topics for YouTube",
+        "viral trivia video ideas",
+        "how to go viral on Instagram Reels",
+    ]
+
+    # Try both US and IN trends to get variety
+    geo_list = ["US", "IN"]
+    all_topics = []
+
+    for geo in geo_list:
+        url = f"https://trends.google.com/trending/rss?geo={geo}"
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                xml_data = response.read()
+            root = ET.fromstring(xml_data)
+            items = root.findall(".//item")
+            for item in items:
+                title_el = item.find("title")
+                if title_el is not None and title_el.text:
+                    all_topics.append(title_el.text.strip())
+        except Exception as e:
+            print(f"Google Trends ({geo}) fetch failed: {e}")
+
+    # Filter relevant topics
+    relevant = [t for t in all_topics if _is_relevant_topic(t)]
+    print(f"Total trends fetched: {len(all_topics)}, Relevant after filtering: {len(relevant)}")
+
+    if relevant:
+        # Pick by index (mod to stay in bounds)
+        picked = relevant[index % len(relevant)]
+        print(f"Selected trending topic: '{picked}'")
+        return picked
+
+    # Nothing relevant — use creator-friendly fallback
+    fallback = CREATOR_FALLBACKS[index % len(CREATOR_FALLBACKS)]
+    print(f"No relevant trends found. Using creator fallback: '{fallback}'")
+    return fallback
+
+
 
 # =============================================================================
 # IMAGE CASCADE: Pixabay → Pexels → Unsplash → Wikipedia
