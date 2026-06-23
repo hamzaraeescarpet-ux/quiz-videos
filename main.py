@@ -1,0 +1,1210 @@
+import sys
+import os
+
+# --- PATH FIX ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Request
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from typing import List, Optional
+import json
+import uuid
+import shutil
+import datetime
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, text, inspect
+from sqlalchemy.orm import sessionmaker, declarative_base
+
+app = FastAPI(title="QuizViral AI Backend")
+
+# CORS setup
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Database Setup
+DATABASE_URL = "sqlite:///./quizviral.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    videos_generated_count = Column(Integer, default=0)
+    is_premium = Column(Boolean, default=False)
+
+class VideoJob(Base):
+    __tablename__ = "video_jobs"
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, unique=True, index=True)
+    status = Column(String, default="Processing") 
+    total_expected = Column(Integer, default=0)
+    completed_so_far = Column(Integer, default=0)
+    zip_file_path = Column(String, nullable=True)
+    user_email = Column(String, nullable=True)
+    created_at = Column(String, nullable=True)
+
+class Feedback(Base):
+    __tablename__ = "feedbacks"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, index=True)
+    rating = Column(Integer)
+    comment = Column(String)
+    submitted_at = Column(String)
+
+Base.metadata.create_all(bind=engine)
+
+# Migration to add columns safely if they do not exist
+try:
+    inspector = inspect(engine)
+    columns = [col["name"] for col in inspector.get_columns("video_jobs")]
+    
+    with engine.begin() as conn:
+        if "user_email" not in columns:
+            conn.execute(text("ALTER TABLE video_jobs ADD COLUMN user_email VARCHAR"))
+            print("Migration: Added user_email column to video_jobs table.", flush=True)
+        if "created_at" not in columns:
+            conn.execute(text("ALTER TABLE video_jobs ADD COLUMN created_at VARCHAR"))
+            print("Migration: Added created_at column to video_jobs table.", flush=True)
+except Exception as e:
+    print(f"Migration Error: {e}", flush=True)
+
+# Paths (Adjusted for root)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BG_DIR = os.path.join(BASE_DIR, "backgrounds")
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+OUTPUT_DIR = os.path.join(BASE_DIR, "output")
+FRONTEND_DIST = os.path.join(BASE_DIR, "frontend", "dist")
+TEMP_FOLDER = os.path.join(BASE_DIR, "temp")
+BG_CACHE_DIR = os.path.join(BASE_DIR, "backgrounds_cache")
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(TEMP_FOLDER, exist_ok=True)
+os.makedirs(BG_CACHE_DIR, exist_ok=True)
+
+import time
+import urllib.request
+import urllib.parse
+import hashlib
+import json
+
+def is_valid_video_file(path: str) -> bool:
+    if not os.path.exists(path):
+        return False
+    size = os.path.getsize(path)
+    if size < 50000:  # 50 KB is a safe minimum for a vertical background video
+        return False
+    try:
+        # Read the first 100 bytes to check for HTML/JSON error text instead of raw media
+        with open(path, "rb") as f:
+            header = f.read(100).lower()
+        if b"<!doctype" in header or b"<html" in header or b"{" in header or b"[" in header:
+            return False
+    except Exception:
+        return False
+    return True
+
+def download_and_cache_video(url: str) -> str:
+    # Auto-convert Dropbox links from dl=0 (preview page) to raw=1 (direct download link)
+    if "dropbox.com" in url:
+        if "dl=0" in url:
+            url = url.replace("dl=0", "raw=1")
+        elif "dl=1" not in url and "raw=1" not in url:
+            if "?" in url:
+                url = url + "&raw=1"
+            else:
+                url = url + "?raw=1"
+        print(f"Dropbox URL auto-converted to raw download link: {url}", flush=True)
+
+    # Generate a unique stable filename from the URL hash
+    url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
+    parsed = urllib.parse.urlparse(url)
+    ext = os.path.splitext(parsed.path)[1]
+    if not ext:
+        ext = ".mp4"
+    filename = f"bg_{url_hash}{ext}"
+    local_path = os.path.join(BG_CACHE_DIR, filename)
+    
+    if is_valid_video_file(local_path):
+        return local_path
+    else:
+        if os.path.exists(local_path):
+            try:
+                os.remove(local_path)
+            except Exception:
+                pass
+        
+    print(f"Downloading background video: {url} -> {local_path}", flush=True)
+    try:
+        # Check if it's a Google Drive link
+        gd_id = None
+        if "drive.google.com" in url or "docs.google.com" in url:
+            if "/file/d/" in url:
+                parts = url.split("/file/d/")
+                if len(parts) > 1:
+                    gd_id = parts[1].split("/")[0].split("?")[0]
+            elif "id=" in url:
+                parsed_qs = urllib.parse.parse_qs(parsed.query)
+                if "id" in parsed_qs:
+                    gd_id = parsed_qs["id"][0]
+
+        if gd_id:
+            print(f"Detected Google Drive URL with file ID: {gd_id}. Downloading with requests...", flush=True)
+            import requests
+            session = requests.Session()
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            gd_url = "https://docs.google.com/uc?export=download"
+            res = session.get(gd_url, params={'id': gd_id}, headers=headers, stream=True)
+            
+            token = None
+            for key, value in res.cookies.items():
+                if key.startswith('download_warning'):
+                    token = value
+                    break
+                    
+            if token:
+                res = session.get(gd_url, params={'id': gd_id, 'confirm': token}, headers=headers, stream=True)
+                
+            res.raise_for_status()
+            with open(local_path, "wb") as f:
+                for chunk in res.iter_content(chunk_size=65536):
+                    if chunk:
+                        f.write(chunk)
+        else:
+            import requests
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+            print(f"Downloading non-GD video from: {url} using requests...", flush=True)
+            res = requests.get(url, headers=headers, stream=True, timeout=45)
+            res.raise_for_status()
+            
+            # Check content type
+            content_type = res.headers.get("content-type", "").lower()
+            if "text/html" in content_type:
+                raise ValueError("Downloaded URL returned HTML page, not a direct video stream.")
+                
+            with open(local_path, "wb") as f:
+                for chunk in res.iter_content(chunk_size=65536):
+                    if chunk:
+                        f.write(chunk)
+                        
+        # Post-download validation
+        if not is_valid_video_file(local_path):
+            raise ValueError("Downloaded file is empty or contains an invalid format (corrupt video file).")
+            
+        return local_path
+    except Exception as e:
+        import traceback
+        download_err_msg = f"Error downloading background video {url}: {e}\n{traceback.format_exc()}"
+        print(download_err_msg, flush=True)
+        try:
+            with open("error_logs.txt", "a") as f:
+                f.write(download_err_msg + "\n")
+        except Exception:
+            pass
+        if os.path.exists(local_path):
+            try:
+                os.remove(local_path)
+            except Exception:
+                pass
+        return None
+
+def update_job_progress(session_id: str, completed_increment: int = 0, status: str = None, zip_file_path: str = None):
+    """Update progress or status of a VideoJob in a short-lived transaction."""
+    db = SessionLocal()
+    try:
+        job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
+        if job:
+            if completed_increment > 0:
+                job.completed_so_far += completed_increment
+            if status:
+                job.status = status
+            if zip_file_path:
+                job.zip_file_path = zip_file_path
+            db.commit()
+    except Exception as e:
+        print(f"Error updating job progress: {e}", flush=True)
+    finally:
+        db.close()
+
+def finalize_job_and_user_credits(session_id: str, user_email: str, default_status: str = "Completed"):
+    """Determine final job status and update user credit count in a short transaction."""
+    db = SessionLocal()
+    try:
+        job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
+        if job:
+            if job.status == "Processing":
+                if job.completed_so_far == 0:
+                    job.status = "Failed"
+                else:
+                    job.status = default_status
+            
+            if user_email and job.completed_so_far > 0:
+                user_rec = db.query(User).filter(User.username == user_email).first()
+                if user_rec:
+                    user_rec.videos_generated_count += job.completed_so_far
+            db.commit()
+            return job.status, job.completed_so_far
+    except Exception as e:
+        print(f"Error finalizing job credits: {e}", flush=True)
+    finally:
+        db.close()
+    return "Failed", 0
+
+def cleanup_expired_video_jobs():
+    """
+    Deletes all VideoJob records, output session directories, and zip files 
+    that are older than 24 hours. Also cleans up stray files in output and temp.
+    """
+    db = SessionLocal()
+    try:
+        now = datetime.datetime.now()
+        jobs = db.query(VideoJob).all()
+        for job in jobs:
+            should_delete = False
+            if job.created_at:
+                try:
+                    job_time = datetime.datetime.fromisoformat(job.created_at)
+                    if (now - job_time).total_seconds() > 86400: # 24 hours
+                        should_delete = True
+                except Exception:
+                    if job.status != "Processing":
+                        should_delete = True
+            else:
+                if job.status != "Processing":
+                    should_delete = True
+
+            if should_delete:
+                print(f"CLEANUP: Deleting expired job {job.session_id} (Created at: {job.created_at})", flush=True)
+                session_dir = os.path.join(OUTPUT_DIR, job.session_id)
+                if os.path.exists(session_dir):
+                    try:
+                        shutil.rmtree(session_dir)
+                    except Exception as e:
+                        print(f"Error deleting dir {session_dir}: {e}", flush=True)
+                
+                if job.zip_file_path and os.path.exists(job.zip_file_path):
+                    try:
+                        os.remove(job.zip_file_path)
+                    except Exception as e:
+                        print(f"Error deleting zip {job.zip_file_path}: {e}", flush=True)
+                
+                fallback_zip = os.path.join(OUTPUT_DIR, f"{job.session_id}.zip")
+                if os.path.exists(fallback_zip):
+                    try:
+                        os.remove(fallback_zip)
+                    except Exception as e:
+                        print(f"Error deleting zip {fallback_zip}: {e}", flush=True)
+                
+                db.delete(job)
+        db.commit()
+    except Exception as e:
+        print(f"Error during DB jobs cleanup: {e}", flush=True)
+    finally:
+        db.close()
+
+    try:
+        now_ts = time.time()
+        if os.path.exists(OUTPUT_DIR):
+            for item in os.listdir(OUTPUT_DIR):
+                item_path = os.path.join(OUTPUT_DIR, item)
+                if os.path.getmtime(item_path) < now_ts - 86400:
+                    print(f"CLEANUP: Removing stray output item: {item_path}", flush=True)
+                    try:
+                        if os.path.isdir(item_path):
+                            shutil.rmtree(item_path)
+                        else:
+                            os.remove(item_path)
+                    except Exception as e:
+                        print(f"Error removing stray output {item_path}: {e}", flush=True)
+        if os.path.exists(TEMP_FOLDER):
+            for item in os.listdir(TEMP_FOLDER):
+                item_path = os.path.join(TEMP_FOLDER, item)
+                if os.path.getmtime(item_path) < now_ts - 86400:
+                    try:
+                        if os.path.isdir(item_path):
+                            shutil.rmtree(item_path)
+                        else:
+                            os.remove(item_path)
+                    except Exception as e:
+                        print(f"Error removing temp item {item_path}: {e}", flush=True)
+    except Exception as e:
+        print(f"Error during stray files cleanup: {e}", flush=True)
+
+# Run startup cleanup
+try:
+    cleanup_expired_video_jobs()
+    print("Startup Cleanup: Completed cleaning expired video jobs and files.", flush=True)
+except Exception as e:
+    print(f"Startup Cleanup Error: {e}", flush=True)
+
+class QuestionRow(BaseModel):
+    id: int
+    question: str
+    option1: str
+    option2: str
+    option3: str
+    option4: str
+    answer: str
+
+active_sessions = {}
+
+@app.get("/api/categories")
+def get_categories():
+    config_path = os.path.join(BASE_DIR, "backgrounds_config.json")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                data = json.load(f)
+            return {"categories": list(data.keys())}
+        except Exception as e:
+            print(f"Error loading backgrounds_config.json: {e}", flush=True)
+
+    if not os.path.exists(BG_DIR):
+        return {"categories": []}
+    categories = [d for d in os.listdir(BG_DIR) if os.path.isdir(os.path.join(BG_DIR, d))]
+    return {"categories": categories}
+
+@app.get("/api/debug-logs")
+def get_debug_logs():
+    res = {}
+    if os.path.exists("error_logs.txt"):
+        with open("error_logs.txt", "r", encoding="utf-8") as f:
+            res["error_logs"] = f.read()
+    else:
+        res["error_logs"] = "No error_logs.txt found"
+        
+    try:
+        cache_dir = os.path.join(BASE_DIR, "backgrounds_cache")
+        res["cache_exists"] = os.path.exists(cache_dir)
+        if res["cache_exists"]:
+            res["cache_files"] = os.listdir(cache_dir)
+    except Exception as e:
+        res["cache_error"] = str(e)
+        
+    # Enhanced debug info: Disk Usage
+    try:
+        total, used, free = shutil.disk_usage("/")
+        res["disk_total_gb"] = total / (1024**3)
+        res["disk_used_gb"] = used / (1024**3)
+        res["disk_free_gb"] = free / (1024**3)
+    except Exception as e:
+        res["disk_usage_error"] = str(e)
+        
+    # List files in output directory
+    try:
+        if os.path.exists(OUTPUT_DIR):
+            res["output_files"] = []
+            for item in os.listdir(OUTPUT_DIR):
+                item_path = os.path.join(OUTPUT_DIR, item)
+                if os.path.isdir(item_path):
+                    res["output_files"].append({"name": item, "is_dir": True, "files_count": len(os.listdir(item_path))})
+                else:
+                    res["output_files"].append({"name": item, "is_dir": False, "size_mb": os.path.getsize(item_path) / (1024**2)})
+    except Exception as e:
+        res["output_files_error"] = str(e)
+
+    # List files in temp directory
+    try:
+        if os.path.exists(TEMP_FOLDER):
+            res["temp_files"] = []
+            for item in os.listdir(TEMP_FOLDER):
+                item_path = os.path.join(TEMP_FOLDER, item)
+                if os.path.isdir(item_path):
+                    res["temp_files"].append({"name": item, "is_dir": True, "files_count": len(os.listdir(item_path))})
+                else:
+                    res["temp_files"].append({"name": item, "is_dir": False, "size_mb": os.path.getsize(item_path) / (1024**2)})
+    except Exception as e:
+        res["temp_files_error"] = str(e)
+
+    return res
+
+from video_generator import create_video_from_row
+
+def process_video_batch(
+    session_id: str, 
+    questions: List[dict], 
+    category: str, 
+    logo_path: str = None, 
+    user_email: str = None,
+    box_color: str = None,
+    custom_bg_paths: List[str] = None
+):
+    session_output_dir = os.path.join(OUTPUT_DIR, session_id)
+    os.makedirs(session_output_dir, exist_ok=True)
+    
+    import random
+    PREMIUM_COLORS = [
+        "#E74C3C", "#3498DB", "#2C3E50", "#8E44AD", "#16A085", 
+        "#27AE60", "#D35400", "#C0392B", "#2980B9", "#130f40", 
+        "#6F1E51", "#1B1464", "#0652DD", "#833471", "#6D213C", "#1E3799"
+    ]
+    
+    config_path = os.path.join(BASE_DIR, "backgrounds_config.json")
+    bg_urls = []
+    info_msg = f"INFO: Started process_video_batch. session_id={session_id}, category={category}, config_path_exists={os.path.exists(config_path)}"
+    try:
+        with open("error_logs.txt", "a") as f:
+            f.write(info_msg + "\n")
+    except Exception:
+        pass
+
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                config_data = json.load(f)
+            bg_urls = config_data.get(category, [])
+            keys_msg = f"INFO: config loaded. Keys available: {list(config_data.keys())}. Number of URLs for {category}: {len(bg_urls)}"
+            with open("error_logs.txt", "a") as f:
+                f.write(keys_msg + "\n")
+        except Exception as e:
+            err_load_msg = f"ERROR: loading background config: {e}"
+            print(err_load_msg, flush=True)
+            with open("error_logs.txt", "a") as f:
+                f.write(err_load_msg + "\n")
+            
+    try:
+        for idx, row in enumerate(questions):
+            if session_id in active_sessions and active_sessions[session_id] == "stop":
+                update_job_progress(session_id, status="Interrupted")
+                break
+                
+            row_bg_paths = None
+            category_local_path = os.path.join(BASE_DIR, "backgrounds", category)
+            local_bg_files = []
+            if category == "Mix":
+                for root_dir, _, files in os.walk(os.path.join(BASE_DIR, "backgrounds")):
+                    for file in files:
+                        if file.lower().endswith((".mp4", ".mov", ".mkv", ".webm")):
+                            local_bg_files.append(os.path.join(root_dir, file))
+            elif os.path.exists(category_local_path) and os.path.isdir(category_local_path):
+                local_bg_files = [
+                    os.path.join(category_local_path, f)
+                    for f in os.listdir(category_local_path)
+                    if f.lower().endswith((".mp4", ".mov", ".mkv", ".webm"))
+                ]
+
+            if custom_bg_paths and len(custom_bg_paths) > 0:
+                row_bg_paths = custom_bg_paths
+            elif local_bg_files:
+                row_bg_paths = [random.choice(local_bg_files)]
+            elif bg_urls:
+                random_url = random.choice(bg_urls)
+                dl_start_msg = f"INFO: Selected random url={random_url}. Starting download..."
+                try:
+                    with open("error_logs.txt", "a") as f:
+                        f.write(dl_start_msg + "\n")
+                except Exception:
+                    pass
+                local_bg_file = download_and_cache_video(random_url)
+                dl_end_msg = f"INFO: download_and_cache_video result={local_bg_file}"
+                try:
+                    with open("error_logs.txt", "a") as f:
+                        f.write(dl_end_msg + "\n")
+                except Exception:
+                    pass
+                if local_bg_file:
+                    row_bg_paths = [local_bg_file]
+            else:
+                no_urls_msg = f"INFO: bg_urls is empty. custom_bg_paths={custom_bg_paths}"
+                try:
+                    with open("error_logs.txt", "a") as f:
+                        f.write(no_urls_msg + "\n")
+                except Exception:
+                    pass
+
+            selected_color = random.choice(PREMIUM_COLORS)
+            try:
+                output_file = create_video_from_row(row, category, logo_path, session_output_dir, selected_color, row_bg_paths)
+                if output_file:
+                    update_job_progress(session_id, completed_increment=1)
+            except Exception as e:
+                import traceback
+                error_msg = f"Error processing row {idx}: {e}\n{traceback.format_exc()}"
+                print(error_msg, flush=True)
+                with open("error_logs.txt", "a") as f:
+                    f.write(error_msg + "\n")
+                
+    except Exception as e:
+        update_job_progress(session_id, status="Failed")
+        import traceback
+        error_msg = f"Batch generation failed: {e}\n{traceback.format_exc()}"
+        print(error_msg, flush=True)
+        with open("error_logs.txt", "a") as f:
+            f.write(error_msg + "\n")
+        
+    finally:
+        zip_path = os.path.join(OUTPUT_DIR, f"{session_id}.zip")
+        try:
+            print(f"Creating zip file: {zip_path} from folder: {session_output_dir}", flush=True)
+            shutil.make_archive(zip_path.replace('.zip', ''), 'zip', session_output_dir)
+            update_job_progress(session_id, zip_file_path=zip_path)
+        except Exception as zip_err:
+            import traceback
+            zip_err_msg = f"ZIP creation failed: {zip_err}\n{traceback.format_exc()}"
+            print(zip_err_msg, flush=True)
+            try:
+                with open("error_logs.txt", "a") as f:
+                    f.write(zip_err_msg + "\n")
+            except Exception:
+                pass
+        
+        final_status, completed_so_far = finalize_job_and_user_credits(session_id, user_email)
+        
+        if final_status == "Completed" and user_email:
+            print(f"\n[{user_email}] AUTOMATION: Sending email -> 'Sit back and relax, your bulk videos are ready to download!'", flush=True)
+            try:
+                mailer_url = "https://quizviral-nine.vercel.app/api/mailer"
+                download_link = "https://quizviral-nine.vercel.app"
+                body = f"""Hello Creator,
+
+Your bulk trivia videos have been successfully generated!
+
+You can download them right now by going to your dashboard or using this direct link:
+{download_link}
+
+Keep growing your viral factory!
+- QuizViral AI Team"""
+
+                payload = {
+                    "to": user_email,
+                    "subject": "Your Bulk Quiz Videos are Ready! 🎉",
+                    "text": body
+                }
+
+                data = json.dumps(payload).encode('utf-8')
+                req = urllib.request.Request(mailer_url, data=data, headers={'Content-Type': 'application/json'})
+                
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    if response.status == 200:
+                        print(f"Successfully sent email to {user_email} via Vercel mailer", flush=True)
+                    else:
+                        print(f"Failed to send via Vercel: {response.read()}", flush=True)
+                        
+            except Exception as email_err:
+                print(f"Failed to send email HTTP request: {email_err}", flush=True)
+        
+        if custom_bg_paths:
+            for path in custom_bg_paths:
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                except Exception:
+                    pass
+                    
+        if session_id in active_sessions:
+            del active_sessions[session_id]
+
+@app.post("/api/generate-bulk")
+async def generate_bulk(
+    background_tasks: BackgroundTasks,
+    questions: str = Form(...), 
+    category: str = Form(...),
+    logo: Optional[UploadFile] = File(None),
+    email: Optional[str] = Form(None),
+    box_color: Optional[str] = Form(None),
+    custom_bg_videos: Optional[List[UploadFile]] = File(None)
+):
+    questions_list = json.loads(questions)
+    
+    if len(questions_list) == 0:
+        raise HTTPException(status_code=400, detail="No questions provided")
+        
+    # Run automatic clean-up of expired download jobs (> 24 hours) in backgrounds
+    background_tasks.add_task(cleanup_expired_video_jobs)
+
+    session_id = str(uuid.uuid4())
+    
+    # Save custom background videos locally
+    custom_bg_paths = []
+    if custom_bg_videos:
+        for bg_vid in custom_bg_videos:
+            if bg_vid.filename:
+                bg_path = os.path.join(TEMP_FOLDER, f"custom_bg_{session_id}_{uuid.uuid4().hex}_{bg_vid.filename}")
+                with open(bg_path, "wb") as f:
+                    f.write(await bg_vid.read())
+                custom_bg_paths.append(bg_path)
+    
+    logo_path = None
+    if logo and logo.filename:
+        logo_path = os.path.join(ASSETS_DIR, f"logo_{session_id}_{logo.filename}")
+        with open(logo_path, "wb") as f:
+            f.write(await logo.read())
+            
+    db = SessionLocal()
+    new_job = VideoJob(
+        session_id=session_id,
+        total_expected=len(questions_list),
+        status="Processing",
+        user_email=email,
+        created_at=datetime.datetime.now().isoformat()
+    )
+    db.add(new_job)
+    db.commit()
+    db.close()
+    
+    active_sessions[session_id] = "run"
+    background_tasks.add_task(
+        process_video_batch, 
+        session_id, 
+        questions_list, 
+        category, 
+        logo_path, 
+        email, 
+        box_color, 
+        custom_bg_paths
+    )
+    
+    return {"session_id": session_id, "message": "Generation started"}
+
+@app.post("/api/stop-generation/{session_id}")
+def stop_generation(session_id: str):
+    if session_id in active_sessions:
+        active_sessions[session_id] = "stop"
+        return {"message": "Stop signal sent"}
+    raise HTTPException(status_code=404, detail="Session not found or already stopped")
+
+@app.get("/api/status/{session_id}")
+def get_status(session_id: str):
+    db = SessionLocal()
+    job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
+    db.close()
+    if not job:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {
+        "session_id": job.session_id,
+        "status": job.status,
+        "completed_so_far": job.completed_so_far,
+        "total_expected": job.total_expected
+    }
+
+@app.get("/api/download/{session_id}")
+def download_zip(session_id: str):
+    db = SessionLocal()
+    job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
+    db.close()
+    
+    if not job or not job.zip_file_path or not os.path.exists(job.zip_file_path):
+        raise HTTPException(status_code=404, detail="ZIP file not ready or found")
+        
+    return FileResponse(job.zip_file_path, media_type="application/zip", filename=f"QuizViral_Videos_{session_id}.zip")
+
+@app.get("/api/videos/{session_id}")
+def list_generated_videos(session_id: str):
+    db = SessionLocal()
+    job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
+    db.close()
+    if not job:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session_output_dir = os.path.join(OUTPUT_DIR, session_id)
+    if not os.path.isdir(session_output_dir):
+        raise HTTPException(status_code=404, detail="Generated videos not found")
+
+    videos = sorted(
+        filename for filename in os.listdir(session_output_dir)
+        if filename.lower().endswith(".mp4")
+    )
+    return {"session_id": session_id, "videos": [{"filename": filename} for filename in videos]}
+
+@app.get("/api/videos/{session_id}/{filename}")
+def preview_generated_video(session_id: str, filename: str):
+    db = SessionLocal()
+    job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
+    db.close()
+    if not job:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    safe_filename = os.path.basename(filename)
+    if safe_filename != filename or not safe_filename.lower().endswith(".mp4"):
+        raise HTTPException(status_code=400, detail="Invalid video filename")
+
+    video_path = os.path.join(OUTPUT_DIR, session_id, safe_filename)
+    if not os.path.isfile(video_path):
+        raise HTTPException(status_code=404, detail="Generated video not found")
+
+    return FileResponse(video_path, media_type="video/mp4")
+
+@app.get("/api/jobs")
+def get_user_jobs(email: str, background_tasks: BackgroundTasks):
+    background_tasks.add_task(cleanup_expired_video_jobs)
+    db = SessionLocal()
+    jobs = db.query(VideoJob).filter(VideoJob.user_email == email).order_by(VideoJob.id.desc()).all()
+    job_list = [{
+        "session_id": j.session_id,
+        "status": j.status,
+        "completed_so_far": j.completed_so_far,
+        "total_expected": j.total_expected,
+        "created_at": j.created_at
+    } for j in jobs]
+    db.close()
+    return {"jobs": job_list}
+
+@app.get("/api/logs")
+def get_logs():
+    if os.path.exists("error_logs.txt"):
+        with open("error_logs.txt", "r") as f:
+            return HTMLResponse(f"<pre>{f.read()}</pre>")
+    return {"message": "No errors logged yet."}
+
+@app.post("/api/test-email")
+def test_email(email: str = Form(...)):
+    try:
+        import json
+        import urllib.request
+        
+        mailer_url = "https://quizviral-nine.vercel.app/api/mailer"
+        payload = {
+            "to": email,
+            "subject": "QuizViral AI - Test Email via Vercel",
+            "text": "If you received this, the Vercel Mailer Bridge is working perfectly and bypassing the Hugging Face firewall!"
+        }
+        
+        data = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(mailer_url, data=data, headers={'Content-Type': 'application/json'})
+        
+        with urllib.request.urlopen(req, timeout=15) as response:
+            resp_body = response.read().decode('utf-8')
+            if response.status == 200:
+                return {"status": "success", "message": f"Successfully sent test email to {email}", "vercel_response": resp_body}
+            else:
+                return {"status": "error", "message": f"Vercel rejected the email: {resp_body}"}
+                
+    except urllib.error.HTTPError as e:
+        return {"status": "error", "message": f"HTTP Error from Vercel: {e.code} - {e.read().decode('utf-8')}"}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
+class FeedbackSchema(BaseModel):
+    email: str
+    rating: int
+    comment: str
+
+@app.post("/api/feedback")
+def submit_feedback(fb: FeedbackSchema):
+    db = SessionLocal()
+    new_fb = Feedback(
+        email=fb.email,
+        rating=fb.rating,
+        comment=fb.comment,
+        submitted_at=datetime.date.today().isoformat()
+    )
+    db.add(new_fb)
+    db.commit()
+    db.close()
+    return {"message": "Feedback submitted successfully"}
+
+@app.get("/api/admin/feedbacks")
+def get_feedbacks(email: str):
+    # Only allow the site owner
+    if email not in ["hamzaraeescarpet@gmail.com", "hamzarais2023@gmail.com"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    db = SessionLocal()
+    fbs = db.query(Feedback).order_by(Feedback.id.desc()).all()
+    
+    # Format feedbacks for easy display
+    formatted = []
+    for item in fbs:
+        formatted.append({
+            "id": item.id,
+            "email": item.email,
+            "rating": item.rating,
+            "comment": item.comment,
+            "submitted_at": item.submitted_at
+        })
+    db.close()
+    return {"feedbacks": formatted}
+
+class UserRegisterSchema(BaseModel):
+    email: str
+
+@app.post("/api/register-user")
+def register_user(user: UserRegisterSchema):
+    db = SessionLocal()
+    db_user = db.query(User).filter(User.username == user.email).first()
+    # Owner email is premium by default, others check database flag
+    is_owner = user.email in ["hamzaraeescarpet@gmail.com", "hamzarais2023@gmail.com"]
+    if not db_user:
+        db_user = User(
+            username=user.email,
+            videos_generated_count=0,
+            is_premium=is_owner
+        )
+        db.add(db_user)
+        db.commit()
+    else:
+        # If user exists, guarantee owner status is correct
+        if is_owner and not db_user.is_premium:
+            db_user.is_premium = True
+            db.commit()
+    db.close()
+    return {"message": "User registered successfully"}
+
+# Check if user is premium
+@app.get("/api/check-premium")
+def check_premium(email: str):
+    # Owner email is premium by default
+    if email in ["hamzaraeescarpet@gmail.com", "hamzarais2023@gmail.com"]:
+        return {"is_premium": True}
+    db = SessionLocal()
+    db_user = db.query(User).filter(User.username == email).first()
+    is_prem = db_user.is_premium if db_user else False
+    db.close()
+    return {"is_premium": is_prem}
+
+# Ko-fi Webhook activation flow
+# Helper to send Facebook Conversions API event
+def send_facebook_capi_event(email: str, amount: float, currency: str):
+    import hashlib
+    import time
+    import urllib.request
+    
+    pixel_id = os.environ.get("FB_PIXEL_ID")
+    access_token = os.environ.get("FB_ACCESS_TOKEN")
+    test_code = os.environ.get("FB_TEST_EVENT_CODE")
+    
+    if not pixel_id or not access_token:
+        log_msg = f"FB CAPI Skipped: pixel_id={pixel_id}, access_token={'set' if access_token else 'not set'}\n"
+        print(log_msg, flush=True)
+        with open("error_logs.txt", "a") as f:
+            f.write(log_msg)
+        return
+        
+    try:
+        # Normalize and hash the email address (sha256)
+        cleaned_email = email.strip().lower()
+        hashed_email = hashlib.sha256(cleaned_email.encode('utf-8')).hexdigest()
+        
+        # Build the Facebook CAPI request payload
+        payload = {
+            "data": [
+                {
+                    "event_name": "Purchase",
+                    "event_time": int(time.time()),
+                    "action_source": "website",
+                    "user_data": {
+                        "em": [hashed_email]
+                    },
+                    "custom_data": {
+                        "value": amount,
+                        "currency": currency if currency else "USD"
+                    }
+                }
+            ]
+        }
+        
+        if test_code:
+            payload["test_event_code"] = test_code.strip()
+            with open("error_logs.txt", "a") as f:
+                f.write(f"FB CAPI: Using test event code={test_code.strip()}\n")
+            
+        url = f"https://graph.facebook.com/v17.0/{pixel_id}/events?access_token={access_token}"
+        data = json.dumps(payload).encode('utf-8')
+        
+        req = urllib.request.Request(
+            url, 
+            data=data, 
+            headers={'Content-Type': 'application/json'}
+        )
+        
+        with urllib.request.urlopen(req) as response:
+            res_body = response.read().decode('utf-8')
+            log_msg = f"FB CAPI Success: {res_body}\n"
+            print(log_msg, flush=True)
+            with open("error_logs.txt", "a") as f:
+                f.write(log_msg)
+            
+    except Exception as e:
+        import traceback
+        log_msg = f"FB CAPI Error: {e}\n{traceback.format_exc()}\n"
+        print(log_msg, flush=True)
+        with open("error_logs.txt", "a") as f:
+            f.write(log_msg)
+
+@app.post("/api/kofi-webhook")
+async def kofi_webhook(
+    data: str = Form(...)
+):
+    try:
+        payload = json.loads(data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid JSON data payload")
+    
+    # Optional Verification Token security check
+    # KOFI_VERIFICATION_TOKEN can be retrieved from config/env if wanted.
+    # We will accept any matching token if they configure it, or fallback to activating directly.
+    # Let's match token if provided in payload.
+    verification_token = payload.get("verification_token")
+    
+    # Supporter email to upgrade
+    email = payload.get("email")
+    txn_type = payload.get("type") # "Donation", "Subscription", "Shop Order"
+    
+    if not email:
+        return {"status": "ignored", "message": "No email provided in webhook payload"}
+        
+    print(f"WEBHOOK: Received Ko-fi event ({txn_type}) for email: {email}", flush=True)
+    
+    # Instant activation in SQLite DB
+    db = SessionLocal()
+    user_rec = db.query(User).filter(User.username == email).first()
+    if user_rec:
+        user_rec.is_premium = True
+        print(f"WEBHOOK: Activated existing user to premium: {email}", flush=True)
+    else:
+        # Create a new premium user record
+        user_rec = User(
+            username=email,
+            videos_generated_count=0,
+            is_premium=True
+        )
+        db.add(user_rec)
+        print(f"WEBHOOK: Created and activated new premium user: {email}", flush=True)
+        
+    db.commit()
+    db.close()
+
+    # Try sending Facebook CAPI Event
+    try:
+        amount_val = 0.0
+        try:
+            amount_val = float(payload.get("amount", "0"))
+        except ValueError:
+            pass
+        currency_val = payload.get("currency", "USD")
+        send_facebook_capi_event(email, amount_val, currency_val)
+    except Exception as ex:
+        print(f"Failed to process Facebook CAPI event: {ex}", flush=True)
+
+    return {"status": "success", "message": f"Activated premium status for {email}"}
+
+@app.post("/api/dodo-webhook")
+async def dodo_webhook(
+    request: Request
+):
+    import hmac
+    import hashlib
+    import base64
+    
+    raw_body = await request.body()
+    
+    # Log that webhook was received
+    try:
+        log_msg = f"[WEBHOOK DEBUG] Received raw request. Headers: {dict(request.headers)}, Body len: {len(raw_body)}\n"
+        with open("error_logs.txt", "a", encoding="utf-8") as f:
+            f.write(log_msg)
+    except Exception:
+        pass
+
+    # Optional Signature verification (if DODO_WEBHOOK_SECRET is set in environment)
+    secret = os.environ.get("DODO_WEBHOOK_SECRET")
+    if secret:
+        signature_header = request.headers.get("webhook-signature")
+        msg_id = request.headers.get("webhook-id")
+        msg_timestamp = request.headers.get("webhook-timestamp")
+        
+        if not signature_header or not msg_id or not msg_timestamp:
+            err_msg = f"[WEBHOOK ERROR] Missing required headers. signature={bool(signature_header)}, id={bool(msg_id)}, timestamp={bool(msg_timestamp)}\n"
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write(err_msg)
+            except Exception:
+                pass
+            raise HTTPException(status_code=401, detail="Missing required webhook headers")
+            
+        # Parse signing key
+        if secret.startswith("whsec_"):
+            secret = secret[len("whsec_"):]
+        try:
+            secret_bytes = base64.b64decode(secret)
+        except Exception as e:
+            # Fallback if secret is not base64 encoded
+            secret_bytes = secret.encode("utf-8")
+            
+        # Reconstruct signed payload: msg_id + "." + msg_timestamp + "." + raw_body
+        to_sign = msg_id.encode('utf-8') + b'.' + msg_timestamp.encode('utf-8') + b'.' + raw_body
+        
+        # Verify signature
+        # webhook-signature header format: a space-separated list of "v1,signature"
+        signatures = signature_header.split(" ")
+        signature_valid = False
+        for sig_entry in signatures:
+            if "," not in sig_entry:
+                continue
+            version, signature = sig_entry.split(",", 1)
+            if version != "v1":
+                continue
+                
+            try:
+                expected_sig_bytes = base64.b64decode(signature)
+            except Exception:
+                continue
+                
+            computed_sig_bytes = hmac.new(
+                key=secret_bytes,
+                msg=to_sign,
+                digestmod=hashlib.sha256
+            ).digest()
+            
+            if hmac.compare_digest(computed_sig_bytes, expected_sig_bytes):
+                signature_valid = True
+                break
+                
+        if not signature_valid:
+            err_msg = f"[WEBHOOK ERROR] Signature mismatch for event {msg_id}\n"
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write(err_msg)
+            except Exception:
+                pass
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+        else:
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write("[WEBHOOK DEBUG] Signature verification passed successfully!\n")
+            except Exception:
+                pass
+    else:
+        try:
+            with open("error_logs.txt", "a", encoding="utf-8") as f:
+                f.write("[WEBHOOK DEBUG] DODO_WEBHOOK_SECRET is not set in environment. Signature check skipped.\n")
+        except Exception:
+            pass
+            
+    try:
+        payload = json.loads(raw_body.decode('utf-8'))
+    except Exception as e:
+        err_msg = f"[WEBHOOK ERROR] Failed to parse JSON payload: {e}\n"
+        try:
+            with open("error_logs.txt", "a", encoding="utf-8") as f:
+                f.write(err_msg)
+        except Exception:
+            pass
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+        
+    event_type = payload.get("type")
+    data = payload.get("data", {})
+    
+    # Extract email from data.customer or fallback to data.customer_email/metadata
+    email = None
+    if isinstance(data, dict):
+        customer = data.get("customer", {})
+        if isinstance(customer, dict):
+            email = customer.get("email")
+            
+    if not email:
+        email = data.get("email")
+        
+    if not email:
+        err_msg = f"[WEBHOOK WARNING] No email found in payload data: {payload}\n"
+        try:
+            with open("error_logs.txt", "a", encoding="utf-8") as f:
+                f.write(err_msg)
+        except Exception:
+            pass
+        return {"status": "ignored", "message": "No email found in webhook payload"}
+        
+    # Log event type and email
+    try:
+        with open("error_logs.txt", "a", encoding="utf-8") as f:
+            f.write(f"[WEBHOOK] Event: {event_type}, Email: {email}\n")
+    except Exception:
+        pass
+
+    # If subscription is active or renewed, or a payment succeeded
+    if event_type in ("subscription.active", "payment.succeeded", "subscription.renewed"):
+        db = SessionLocal()
+        user_rec = db.query(User).filter(User.username == email).first()
+        if user_rec:
+            user_rec.is_premium = True
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write(f"[WEBHOOK] Activated existing premium user: {email}\n")
+            except Exception:
+                pass
+        else:
+            user_rec = User(
+                username=email,
+                videos_generated_count=0,
+                is_premium=True
+            )
+            db.add(user_rec)
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write(f"[WEBHOOK] Created and activated new premium user: {email}\n")
+            except Exception:
+                pass
+            
+        db.commit()
+        db.close()
+        
+        # Try sending Facebook CAPI Event
+        try:
+            # Dodo Payments amount is in cents, so convert to dollars
+            amount_cents = float(data.get("total_amount", 0))
+            amount_val = amount_cents / 100.0
+            currency_val = data.get("currency", "USD")
+            send_facebook_capi_event(email, amount_val, currency_val)
+        except Exception as ex:
+            print(f"Failed to process Facebook CAPI event: {ex}", flush=True)
+            
+    elif event_type in ("subscription.cancelled", "subscription.expired", "subscription.failed"):
+        # Deactivate premium status
+        db = SessionLocal()
+        user_rec = db.query(User).filter(User.username == email).first()
+        if user_rec:
+            user_rec.is_premium = False
+            db.commit()
+            try:
+                with open("error_logs.txt", "a", encoding="utf-8") as f:
+                    f.write(f"[WEBHOOK] Deactivated user subscription: {email}\n")
+            except Exception:
+                pass
+        db.close()
+        
+    return {"status": "success", "message": f"Processed event {event_type} for {email}"}
+
+@app.get("/api/admin/users")
+def get_users(email: str):
+    if email not in ["hamzaraeescarpet@gmail.com", "hamzarais2023@gmail.com"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    db = SessionLocal()
+    users = db.query(User).order_by(User.id.desc()).all()
+    formatted = []
+    for u in users:
+        # Extra safety check for premium status
+        is_prem = u.username in ["hamzaraeescarpet@gmail.com", "hamzarais2023@gmail.com"] or u.is_premium
+        if is_prem != u.is_premium:
+            u.is_premium = is_prem
+            db.commit()
+        formatted.append({
+            "id": u.id,
+            "email": u.username,
+            "videos_count": u.videos_generated_count,
+            "is_premium": u.is_premium
+        })
+    db.close()
+    return {"users": formatted}
+
+# Serve React Frontend (For Hugging Face Spaces & Production)
+if os.path.exists(FRONTEND_DIST):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="frontend-assets")
+    
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        index_path = os.path.join(FRONTEND_DIST, "index.html")
+        if os.path.exists(index_path):
+            return HTMLResponse(content=open(index_path, "r", encoding="utf-8").read())
+        return {"message": "Frontend build not found."}

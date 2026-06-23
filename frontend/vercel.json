@@ -1,0 +1,13 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/hf/:path*",
+      "destination": "https://hamzaraeescarpet-quiz-viral-api.hf.space/api/:path*"
+    },
+    {
+      "source": "/((?!api/hf|google0b26fe164adfde6f\\.html|sitemap\\.xml|robots\\.txt|assets|favicon\\.svg|icons\\.svg).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+
