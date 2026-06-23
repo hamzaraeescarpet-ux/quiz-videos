@@ -224,7 +224,8 @@ def format_pinterest_description(title, excerpt, url):
 def find_builder_fields(page):
     """
     Scans the Pin Builder page and detects Title, Description, and Link fields
-    by using highly targeted, unique selectors scoped within the Pin Builder editor.
+    by using highly targeted, unique selectors scoped within the Pin Builder editor,
+    along with language-independent structural fallbacks.
     """
     fields = {"title": None, "desc": None, "link": None}
     
@@ -279,6 +280,47 @@ def find_builder_fields(page):
         if loc.count() > 0 and loc.first.is_visible():
             fields["link"] = loc.first
             break
+            
+    # Structural Fallback for Title
+    if not fields["title"]:
+        all_inputs = page.locator('input[type="text"]:not([readonly])')
+        for i in range(all_inputs.count()):
+            inp = all_inputs.nth(i)
+            if inp.is_visible():
+                # The first visible text input is typically the title
+                fields["title"] = inp
+                break
+
+    # Structural Fallback for Description
+    if not fields["desc"]:
+        editables = page.locator('[contenteditable="true"], textarea')
+        for i in range(editables.count()):
+            el = editables.nth(i)
+            if el.is_visible():
+                if fields["title"] and el.element_handle() == fields["title"].element_handle():
+                    continue
+                fields["desc"] = el
+                break
+
+    # Structural Fallback for Link
+    if not fields["link"]:
+        all_inputs = page.locator('input[type="text"]:not([readonly]), input[type="url"]:not([readonly])')
+        visible_inputs = []
+        for i in range(all_inputs.count()):
+            inp = all_inputs.nth(i)
+            if inp.is_visible():
+                if fields["title"] and inp.element_handle() == fields["title"].element_handle():
+                    continue
+                # Skip search input fields
+                placeholder = inp.get_attribute("placeholder") or ""
+                inp_id = inp.get_attribute("id") or ""
+                inp_class = inp.get_attribute("class") or ""
+                if any(x in placeholder.lower() or x in inp_id.lower() or x in inp_class.lower() for x in ["search", "select", "board", "find"]):
+                    continue
+                visible_inputs.append(inp)
+        if visible_inputs:
+            # Destination link is usually the last text/url input
+            fields["link"] = visible_inputs[-1]
             
     return fields
 
@@ -500,9 +542,12 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                         '[data-testid="board-dropdown"]',
                         'button[aria-haspopup="listbox"]',
                         'button[aria-haspopup="true"]',
+                        '[data-test-id*="board" i]',
+                        '[data-testid*="board" i]',
                         'button[id*="board" i]',
                         'button[class*="board" i]',
-                        '[aria-label*="board" i]'
+                        '[aria-label*="board" i]',
+                        '[aria-label*="बोर्ड" i]'
                     ]
                     target_board_opener = None
                     for sel in board_opener_selectors:
@@ -556,7 +601,10 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                             time.sleep(2)
                         if not board_selected:
                             print(f"Board '{BOARD_NAME}' not found in dropdown. Default board will be used.")
-                            page.keyboard.press("Escape")
+                            try:
+                                page.locator("body").click(position={"x": 10, "y": 10}, force=True)
+                            except Exception:
+                                page.keyboard.press("Escape")
                             time.sleep(2)
                     else:
                         print("Could not open board picker. Default board use kiya jayega.")
@@ -568,12 +616,18 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                     '[data-testid="board-dropdown-save-button"]',
                     '[data-test-id="create-pin-submit"]',
                     '[data-testid="create-pin-submit"]',
+                    'button[type="submit"]',
                     'button:has-text("Publish")',
                     'button:has-text("Save")',
+                    'button:has-text("सहेजें")',
+                    'button:has-text("प्रकाशित करें")',
                     'button[aria-label*="Publish" i]',
                     'button[aria-label*="Save" i]',
+                    'button[aria-label*="सहेजें" i]',
+                    'button[aria-label*="प्रकाशित" i]',
                     'div[role="button"]:has-text("Publish")',
-                    'div[role="button"]:has-text("Save")'
+                    'div[role="button"]:has-text("Save")',
+                    'div[role="button"]:has-text("सहेजें")'
                 ]
                 target_publish = None
                 for sel in publish_selectors:
@@ -590,6 +644,22 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                     if target_publish:
                         break
                         
+                # Fallback: scan all buttons if nothing matched
+                if not target_publish:
+                    all_buttons = page.locator('button')
+                    for i in range(all_buttons.count()):
+                        btn = all_buttons.nth(i)
+                        try:
+                            if btn.is_visible():
+                                btn_id = btn.get_attribute("id") or ""
+                                btn_class = btn.get_attribute("class") or ""
+                                btn_text = btn.inner_text() or ""
+                                if any(x in btn_id.lower() or x in btn_class.lower() or x in btn_text.lower() for x in ["publish", "save", "submit", "create", "सहेजें", "प्रकाशित"]):
+                                    target_publish = btn
+                                    break
+                        except Exception:
+                            continue
+                            
                 if target_publish:
                     target_publish.scroll_into_view_if_needed()
                     time.sleep(1.5)
