@@ -100,6 +100,25 @@ def get_blog_image(keyword):
             with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
                 hits = data.get("hits", [])
+                if target_publish:
+                    target_publish.scroll_into_view_if_needed()
+                    time.sleep(1.5)
+                    # Wait for button to be enabled (image might still be uploading)
+                    for _w in range(10):
+                        try:
+                            is_disabled = target_publish.get_attribute("disabled") is not None
+                            aria_disabled = target_publish.get_attribute("aria-disabled")
+                            if not is_disabled and aria_disabled != "true":
+                                break
+                        except Exception:
+                            break
+                        print(f"Publish button abhi disabled hai, 2 sec wait kar rahe hai... ({_w+1}/10)")
+                        time.sleep(2)
+                    print("Publish/Save button click kar rahe hai...")
+                    target_publish.click()
+                    print("Publish click ho gaya! Completion ke liye wait kar rahe hai (20 seconds)...")
+                    time.sleep(20)  # Wait for Pinterest to process
+                    print("Pin published successfully!")
                 if hits:
                     img = hits[0]
                     img_url = (
@@ -245,6 +264,48 @@ def launch_chrome_if_needed():
         # Start Chrome detached in the background
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         # Wait a few seconds for Chrome to spin up and bind the port
+        if target_board_opener:
+                        target_board_opener.scroll_into_view_if_needed()
+                        time.sleep(1.5)
+                        target_board_opener.click()
+                        time.sleep(4) # Delay for dropdown animation
+                        
+                        search_box = page.locator(
+                             '[role="listbox"] input, '
+                             '[class*="dropdown"] input, '
+                             '[data-testid="board-dropdown"] input, '
+                             '[data-test-id="board-dropdown"] input'
+                         ).first
+                        if search_box.count() > 0 and search_box.is_visible():
+                            search_box.click()
+                            time.sleep(1.5)
+                            search_box.fill(BOARD_NAME)
+                            time.sleep(3)
+                            
+                        # Try board selection up to 3 times (Pinterest dropdown can be flaky)
+                        board_selected = False
+                        for _attempt in range(3):
+                            board_item = page.locator(
+                                f'div[role="listitem"] div:has-text("{BOARD_NAME}"), '
+                                f'div[role="option"]:has-text("{BOARD_NAME}"), '
+                                f'div[role="option"] span:has-text("{BOARD_NAME}"), '
+                                f'[data-test-id*="board"]:has-text("{BOARD_NAME}")'
+                            ).first
+                            if board_item.count() > 0:
+                                try:
+                                    board_item.wait_for(state="visible", timeout=5000)
+                                    board_item.click()
+                                    print(f"Board '{BOARD_NAME}' select ho gaya! (attempt {_attempt+1})")
+                                    board_selected = True
+                                    time.sleep(3)
+                                    break
+                                except Exception:
+                                    pass
+                            time.sleep(2)
+                        if not board_selected:
+                            print(f"Board '{BOARD_NAME}' dropdown mein nahi mila. Default board use hoga.")
+                            page.keyboard.press("Escape")
+                            time.sleep(2)
         for _ in range(8):
             time.sleep(1)
             if check_port_open(9222):
@@ -329,29 +390,64 @@ def generate_blog_content_via_playwright(trend_keyword):
         
     print(f"Connecting to running Chrome on port 9222 for trend: {trend_keyword}...")
     
-    prompt = f"""
-Write a detailed, professional blog post in Markdown format connecting the today's trending topic "{trend_keyword}" with our product "QuizViral AI".
+    # -----------------------------------------------------------------------
+    # SMART ANGLE: Transform trending topic into a searchable SEO keyword
+    # Example: "Taylor Swift" → "Taylor Swift Trivia Questions for YouTube Shorts"
+    # -----------------------------------------------------------------------
+    prompt = f"""You are an expert SEO blog writer for a product called QuizViral AI.
 
-QuizViral AI is a tool that allows creators to create 100+ viral faceless quiz/trivia videos in just 1-click by importing a CSV file. It automates voiceovers, adds ticking clock sounds, and center-crops background videos (like Minecraft or Space) for TikTok, YouTube Shorts, and Reels.
+QuizViral AI lets content creators generate 100+ viral faceless trivia/quiz videos in 1 click by importing a CSV file. It auto-generates voiceovers (text-to-speech), adds ticking clock sounds, shows 4 answer options on screen with a reveal animation, and supports background videos (Minecraft, Space, Animals, Nature, Cars) for TikTok, YouTube Shorts, Instagram Reels, and Facebook Reels.
 
-Explain how creators can capitalize on this trending topic "{trend_keyword}" by making interactive trivia/quiz videos using QuizViral AI and how they can monetize it to get massive views.
+Today's trending topic from Google Trends is: "{trend_keyword}"
 
-You MUST respond ONLY with a JSON object. Do not wrap it in markdown code blocks like ```json.
+YOUR MISSION:
+1. Use "{trend_keyword}" as inspiration to find the BEST long-tail SEO keyword angle that:
+   - People ACTUALLY type into Google (high search intent)
+   - Is related to trivia, quiz, YouTube, TikTok, faceless channels, or content creation
+   - Combines the trending topic with quiz/trivia/faceless content creation
+   - Has medium-to-low competition (long-tail, specific phrases)
+
+2. Write a FULL blog post targeting that long-tail keyword, NOT just the raw trend topic.
+
+EXAMPLE TRANSFORMATION (follow this pattern):
+- Trend: "Taylor Swift" → Target keyword: "Taylor Swift trivia questions for YouTube Shorts"
+- Trend: "World Cup" → Target keyword: "World Cup quiz questions for faceless YouTube channel"
+- Trend: "Elon Musk" → Target keyword: "Elon Musk trivia questions viral TikTok quiz"
+- Trend: "Olympics" → Target keyword: "Olympics trivia questions for content creators"
+- Trend: "AI tools" → Target keyword: "best AI tools to make faceless YouTube quiz videos"
+
+SEO BLOG REQUIREMENTS:
+- Minimum 1,500 words of rich content
+- Use the exact target long-tail keyword in: title, first paragraph, at least 3 H2 headings
+- Include 15-20 actual sample trivia questions about "{trend_keyword}" (numbered list)
+- Add sections: Introduction, Why This Topic Gets Views, [Topic] Trivia Questions List, How to Turn These Into Videos with QuizViral AI, Monetization Tips, Conclusion
+- Add 2 FAQ blocks (Question + Answer format) at the end for Google featured snippets
+- Naturally include these keyword variations throughout:
+  * "{trend_keyword} trivia questions"
+  * "{trend_keyword} quiz for YouTube"
+  * "faceless YouTube channel quiz ideas"
+  * "viral quiz video maker"
+  * "how to make quiz videos automatically"
+  * "QuizViral AI"
+- Include at least 2 links to https://quizviral-nine.vercel.app
 
 CRITICAL JSON FORMATTING RULES:
-1. Inside the JSON string values (especially the 'content', 'excerpt', and 'title' keys), do NOT use double quotes ("). If you want to quote anything (e.g. 'Which President nominated...' or 'QuizViral AI'), you MUST use single quotes (') instead.
-2. Double quotes (") must ONLY be used as JSON property names and to wrap string values.
-3. Ensure the JSON is 100% valid.
+1. Inside JSON string values, do NOT use double quotes ("). Use single quotes (') instead.
+2. Double quotes ONLY for JSON property names and to wrap string values.
+3. Ensure JSON is 100% valid.
+4. The 'title' must contain the long-tail SEO keyword (not just the raw trend).
+5. The 'seoKeywords' array must have 8-10 specific long-tail keywords people actually search.
 
-JSON format:
+Respond ONLY with this JSON object (no markdown code blocks):
 {{
-  "title": "SEO-optimized title connecting {trend_keyword} and QuizViral AI",
-  "excerpt": "A short 1-2 sentence summary of the article",
-  "metaDescription": "A 150-character SEO description",
-  "seoKeywords": ["{trend_keyword} trivia", "QuizViral AI", "faceless channel", "viral quiz"],
-  "content": "Markdown content here starting with '# Title'. Include H2 subheadings, bullet points, and at least two links to https://quizviral-nine.vercel.app."
+  "title": "Long-tail SEO title with {trend_keyword} + trivia/quiz angle (60-70 chars)",
+  "excerpt": "2-3 sentence hook summary that includes the main keyword naturally",
+  "metaDescription": "SEO meta description under 155 characters including main keyword",
+  "seoKeywords": ["{trend_keyword} trivia questions", "{trend_keyword} quiz YouTube", "faceless YouTube quiz channel", "viral trivia video maker", "quiz video automation tool", "how to make quiz videos", "QuizViral AI review", "{trend_keyword} facts for content creators"],
+  "content": "Full 1500+ word Markdown blog post starting with # [Title]. Must include H2 headings, 15 trivia questions, FAQ section, and 2 links to https://quizviral-nine.vercel.app"
 }}
 """
+
 
     with sync_playwright() as p:
         try:

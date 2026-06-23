@@ -360,7 +360,7 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 else:
                     print("Warning: Could not find Title input.")
                     
-                # 3. Fill the Description
+                # 3. Fill the Description (Pinterest contenteditable needs keyboard, not fill)
                 print("Description aur blog link fill kar rahe hai...")
                 target_desc = fields["desc"]
                 if target_desc:
@@ -368,10 +368,16 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                     time.sleep(1.5)
                     target_desc.click()
                     time.sleep(1.5)
-                    target_desc.fill("")
-                    time.sleep(1.5)
-                    target_desc.fill(pin_data["description"])
-                    print("Description filled successfully with full blog post URL.")
+                    # Pinterest rich-text div ignores .fill() — use keyboard in chunks
+                    page.keyboard.press("Control+A")
+                    page.keyboard.press("Delete")
+                    time.sleep(0.5)
+                    desc_text = pin_data["description"]
+                    chunk_size = 200
+                    for i in range(0, len(desc_text), chunk_size):
+                        page.keyboard.type(desc_text[i:i+chunk_size])
+                        time.sleep(0.3)
+                    print("Description filled successfully.")
                     time.sleep(4)
                 else:
                     print("Warning: Could not find Description input.")
@@ -514,7 +520,7 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                         target_board_opener.scroll_into_view_if_needed()
                         time.sleep(1.5)
                         target_board_opener.click()
-                        time.sleep(4) # Delay for dropdown animation
+                        time.sleep(4)
                         
                         search_box = page.locator(
                              '[role="listbox"] input, '
@@ -528,17 +534,28 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                             search_box.fill(BOARD_NAME)
                             time.sleep(3)
                             
-                        board_item = page.locator(
-                            f'div[role="listitem"] div:has-text("{BOARD_NAME}"), '
-                            f'div[role="option"] div:has-text("{BOARD_NAME}"), '
-                            f'div[class*="board"]:has-text("{BOARD_NAME}"), '
-                            f':has-text("{BOARD_NAME}")'
-                        ).first
-                        if board_item.count() > 0 and board_item.is_visible():
-                            board_item.click()
-                            print(f"Board '{BOARD_NAME}' select ho gaya!")
-                            time.sleep(3)
-                        else:
+                        # Retry up to 3 times — Pinterest dropdown is flaky
+                        board_selected = False
+                        for _attempt in range(3):
+                            board_item = page.locator(
+                                f'div[role="listitem"] div:has-text("{BOARD_NAME}"), '
+                                f'div[role="option"]:has-text("{BOARD_NAME}"), '
+                                f'div[role="option"] span:has-text("{BOARD_NAME}"), '
+                                f'[data-test-id*="board"]:has-text("{BOARD_NAME}")'
+                            ).first
+                            if board_item.count() > 0:
+                                try:
+                                    board_item.wait_for(state="visible", timeout=5000)
+                                    board_item.click()
+                                    print(f"Board '{BOARD_NAME}' selected! (attempt {_attempt+1})")
+                                    board_selected = True
+                                    time.sleep(3)
+                                    break
+                                except Exception:
+                                    pass
+                            time.sleep(2)
+                        if not board_selected:
+                            print(f"Board '{BOARD_NAME}' not found in dropdown. Default board will be used.")
                             page.keyboard.press("Escape")
                             time.sleep(2)
                     else:
@@ -576,10 +593,21 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 if target_publish:
                     target_publish.scroll_into_view_if_needed()
                     time.sleep(1.5)
+                    # Wait up to 20s for publish button to become enabled (image upload delay)
+                    for _w in range(10):
+                        try:
+                            is_disabled = target_publish.get_attribute("disabled") is not None
+                            aria_disabled = target_publish.get_attribute("aria-disabled")
+                            if not is_disabled and aria_disabled != "true":
+                                break
+                        except Exception:
+                            break
+                        print(f"Publish button disabled hai, image upload ka wait ({_w+1}/10)...")
+                        time.sleep(2)
                     print("Publish/Save button click kar rahe hai...")
                     target_publish.click()
-                    print("Publish click ho gaya! Completion ke liye wait kar rahe hai (15 seconds)...")
-                    time.sleep(15)  # Wait for Pinterest to process
+                    print("Publish click ho gaya! 20 seconds wait kar rahe hai...")
+                    time.sleep(20)
                     print("Pin published successfully!")
                     page.close()
                     browser.close()
