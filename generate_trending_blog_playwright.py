@@ -296,8 +296,12 @@ def launch_chrome_if_needed():
         chrome_path,
         "--remote-debugging-port=9222",
         f"--user-data-dir={CHROME_PROFILE_PATH}",
-        "--headless=new",
-        "--disable-gpu"
+        # NOTE: NOT headless — Gemini requires an active Google login session
+        # which dies silently in headless mode, causing TargetClosedError
+        "--no-first-run",
+        "--disable-default-apps",
+        "--disable-session-crashed-bubble",
+        "--hide-crash-restore-bubble",
     ]
     
     print(f"Launching Chrome: {' '.join(cmd)}")
@@ -493,28 +497,34 @@ Respond ONLY with this JSON (no markdown code blocks):
         last_text = ""
 
         while time.time() - start_time < max_wait_seconds:
-            # Check if mic button is visible
-            is_mic_visible = False
-            if mic_locator.count() > 0:
-                for i in range(mic_locator.count()):
-                    if mic_locator.nth(i).is_visible():
-                        is_mic_visible = True
-                        break
+            try:
+                # Check if mic button is visible
+                is_mic_visible = False
+                if mic_locator.count() > 0:
+                    for i in range(mic_locator.count()):
+                        if mic_locator.nth(i).is_visible():
+                            is_mic_visible = True
+                            break
 
-            # Check if stop button is visible (Gemini is still generating)
-            is_stop_visible = False
-            if stop_locator.count() > 0:
-                for i in range(stop_locator.count()):
-                    if stop_locator.nth(i).is_visible():
-                        is_stop_visible = True
-                        break
+                # Check if stop button is visible (Gemini is still generating)
+                is_stop_visible = False
+                if stop_locator.count() > 0:
+                    for i in range(stop_locator.count()):
+                        if stop_locator.nth(i).is_visible():
+                            is_stop_visible = True
+                            break
 
-            print(f"Waiting for Gemini... (Mic visible: {is_mic_visible}, Stop visible: {is_stop_visible})")
+                print(f"Waiting for Gemini... (Mic visible: {is_mic_visible}, Stop visible: {is_stop_visible})")
 
-            # If mic button is visible and stop button is NOT visible, we are done
-            if is_mic_visible and not is_stop_visible:
-                print("Gemini response is ready (Mic button is back and Stop button is gone)!")
-                generation_done = True
+                # If mic button is visible and stop button is NOT visible, we are done
+                if is_mic_visible and not is_stop_visible:
+                    print("Gemini response is ready!")
+                    generation_done = True
+                    break
+
+            except Exception as loop_err:
+                err_name = type(loop_err).__name__
+                print(f"Warning: {err_name} during wait loop — page may have navigated. Falling back to text check...")
                 break
 
             time.sleep(2)

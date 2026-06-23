@@ -4,6 +4,7 @@ import json
 import time
 import subprocess
 import threading
+import socket
 from datetime import datetime
 import tkinter as tk
 from tkinter import messagebox
@@ -11,6 +12,18 @@ from tkinter import messagebox
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(SCRIPT_DIR, "blog_scheduler_state.json")
 LOG_FILE   = os.path.join(SCRIPT_DIR, "blog_scheduler.log")
+
+lock_socket = None
+
+def acquire_single_instance_lock():
+    global lock_socket
+    try:
+        lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        lock_socket.bind(("127.0.0.1", 28734))
+        lock_socket.listen(1)
+        return True
+    except socket.error:
+        return False
 
 # ─────────────────────────────────────────────────────────────────────────────
 def log(msg):
@@ -96,15 +109,19 @@ def run_one_blog(trend_index):
         log(f"Error running blog generator for index {trend_index}: {e}")
         return False
 
-def run_all_blogs_with_gaps():
+def run_all_blogs_with_gaps(start_index=0):
     """
-    Generates 3 blogs with a 2-hour gap between each.
+    Generates remaining blogs for today with a 2-hour gap between each.
     Runs in a background thread so the main process stays alive.
     Shows a small status notification after each blog completes.
     """
     def _worker():
         total = 3
-        for i in range(total):
+        if start_index >= total:
+            save_state("completed", blogs_done=total)
+            return
+
+        for i in range(start_index, total):
             ok = run_one_blog(i)
             save_state("in_progress", blogs_done=i + 1)
 
@@ -166,17 +183,22 @@ def show_popup():
 
     # --- State indicator ---
     state      = load_state()
-    blogs_done = state.get("blogs_done", 0)
+    today      = get_today_date()
+    blogs_done = state.get("blogs_done", 0) if state.get("last_date") == today else 0
+    remaining  = max(0, 3 - blogs_done)
     status_txt = f"Today so far: {blogs_done}/3 blog(s) generated." if blogs_done > 0 else ""
 
     tk.Label(root, text="Daily Blog Generation Automation",
              font=("Segoe UI", 15, "bold"), fg="#cdd6f4", bg="#1e1e2e"
              ).pack(pady=(18, 4))
 
+    if blogs_done > 0:
+        desc_text = f"Would you like to resume today's blog automation?\n{remaining} remaining blog(s) will be published (one every 2 hours)."
+    else:
+        desc_text = "Would you like to start today's blog automation?\n3 blogs will be published — one every 2 hours."
+
     tk.Label(root,
-             text="Would you like to start today's blog automation?\n"
-                  "3 blogs will be published — one every 2 hours.\n"
-                  + (f"📊 {status_txt}" if status_txt else ""),
+             text=desc_text + (f"\n📊 {status_txt}" if status_txt else ""),
              font=("Segoe UI", 10), fg="#a6adc8", bg="#1e1e2e", justify="center"
              ).pack(pady=(0, 16))
 
@@ -219,18 +241,25 @@ def main():
     state = load_state()
     today = get_today_date()
 
-    # Already fully done today → exit silently
-    if state["last_date"] == today and state["status"] == "completed":
-        log(f"Blog automation already completed today ({today}). Exiting.")
+    # Already completed or skipped today → exit silently
+    if state["last_date"] == today and state["status"] in ("completed", "skipped"):
+        log(f"Blog automation already completed or skipped today ({today}) [status: {state['status']}]. Exiting.")
         return
+
+    # Determine start_index based on state and date
+    if state["last_date"] == today:
+        start_index = state.get("blogs_done", 0)
+    else:
+        start_index = 0
+        save_state("pending", blogs_done=0)
 
     log("Showing blog automation popup...")
     action = show_popup()
 
     if action == "yes":
-        log("User clicked 'Start Now'. Launching blog automation in background...")
-        save_state("in_progress", blogs_done=state.get("blogs_done", 0))
-        worker_thread = run_all_blogs_with_gaps()
+        log(f"User clicked 'Start Now'. Launching blog automation from index {start_index} in background...")
+        save_state("in_progress", blogs_done=start_index)
+        worker_thread = run_all_blogs_with_gaps(start_index)
         # Keep main thread alive while background blogs are running
         log("Blog generation running in background. Main process keeping alive...")
         worker_thread.join()
@@ -251,4 +280,7 @@ def main():
         main()
 
 if __name__ == "__main__":
+    if not acquire_single_instance_lock():
+        log("Another instance of QuizViral Blog Scheduler is already running. Exiting.")
+        sys.exit(0)
     main()
