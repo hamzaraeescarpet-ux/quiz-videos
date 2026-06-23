@@ -1,5 +1,6 @@
 export const blogPosts = [
   {
+  trendingKeyword: "rocket launch today",
   title: "How to Automate YouTube Shorts and Create 100+ Viral Videos",
   excerpt: "Discover how to automate YouTube Shorts using QuizViral AI to generate hundreds of high-engagement quiz videos in just one click. Capitalize on massive trending traffic, like today's exciting rocket launch today news, to supercharge your channel's growth and monetization instantly.",
   metaDescription: "Learn how to automate YouTube Shorts with QuizViral AI. Create 100+ viral quiz videos in 1 click and scale your faceless channel fast. Grow now!",
@@ -19,6 +20,7 @@ export const blogPosts = [
   image: "https://pixabay.com/get/g15b158d702d4c04a1417dbfc4d42f2e64d438a0d133955849d6b994957c9687e7b015ac897de9c84aa5a742b7f943d28_1280.jpg"
 },
   {
+  trendingKeyword: "rocket launch",
   title: "How to Automate YouTube Shorts and Create 100+ Viral Videos Fast",
   excerpt: "Discover how to automate YouTube Shorts and create hundreds of viral videos in just one click using QuizViral AI. Leverage timely topics like today's exciting rocket launch to skyrocket your channel's traffic and engagement instantly.",
   metaDescription: "Learn how to automate YouTube Shorts with QuizViral AI. Create bulk viral quiz videos using CSV imports, TTS, and animations. Read our guide!",
@@ -37,6 +39,7 @@ export const blogPosts = [
   image: "https://pixabay.com/get/g778db283f6428fae74b41844d4ae083a1d19f55ddfe454cc87a1f729b0bab3094d8507dbf3bd2b3ba9b0ac93221b53f5_1280.jpg"
 },
   {
+  trendingKeyword: "global shipping",
   title: "How to Automate YouTube Shorts and Create 100+ Quiz Videos Fast",
   excerpt: "Discover how to automate YouTube Shorts using QuizViral AI to create bulk quiz content instantly. Capitalize on current trending topics like 'global shipping' and supply chains to boost your views and go viral overnight.",
   metaDescription: "Learn how to automate YouTube Shorts with QuizViral AI. Create 100+ viral quiz videos in one click and dominate the faceless channel niche.",
@@ -55,6 +58,7 @@ export const blogPosts = [
   image: "https://pixabay.com/get/g2d99a65128885a63bf83c3e7232bc023b0b4f7deb6f4b4f4dc2c7556f98cc72513ffd2bb30c135208d0d63c1b67a80beb45be17b85f7901d1794fd8f2f86ce6b_1280.jpg"
 },
   {
+  trendingKeyword: "m&ms trivia",
   title: "Capitalizing on the M&Ms Trend: How to Build a Viral Faceless Quiz Channel in One Click with QuizViral AI",
   excerpt: "Discover how the latest M&Ms viral trend is creating a massive opportunity for content creators. Learn how to use QuizViral AI to generate hundreds of high-quality trivia videos instantly and dominate TikTok, YouTube Shorts, and Instagram Reels.",
   metaDescription: "Learn how to leverage the trending M&Ms topic to build a viral faceless trivia channel using QuizViral AI. Automate your short-form video creation now.",
@@ -75,6 +79,7 @@ export const blogPosts = [
   image: "https://loremflickr.com/cache/resized/4018_4668653406_e177cae682_h_1200_675_nofilter.jpg"
 },
   {
+  trendingKeyword: "dodgers score trivia",
   title: "How to Ride the Dodgers Score Trend: Turn Viral MLB Stats into Faceless Trivia Content with QuizViral AI",
   excerpt: "Discover how the latest Dodgers score is driving millions of searches and how you can capitalize on this wave using QuizViral AI to create automated, viral sports trivia videos in seconds.",
   metaDescription: "Learn how to turn the trending Dodgers score into highly viral, automated sports trivia videos for TikTok, Shorts, and Reels using QuizViral AI.",
@@ -94,6 +99,7 @@ export const blogPosts = [
   image: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/LA_Dodgers.svg/1280px-LA_Dodgers.svg.png"
 },
   {
+  trendingKeyword: "is the strait of hormuz open trivia",
   title: "Geopolitics, Global Trade, and Group Chats: Monetizing the 'Is the Strait of Hormuz Open' Trend via QuizViral AI",
   excerpt: "With the historic U.S.-Iran memorandum of understanding shaking global energy trade, the question 'is the strait of hormuz open' is topping search engines. Learn how to capitalize on this breaking geopolitical news to build a high-traffic automated trivia channel.",
   metaDescription: "Discover how to turn the trending Strait of Hormuz maritime updates into viral faceless trivia videos using automated tools like QuizViral AI.",
@@ -112,6 +118,7 @@ export const blogPosts = [
   image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Strait_of_Hormuz_and_Musandam_Peninsula_%28MODIS_2018-12-10%29.jpg/1280px-Strait_of_Hormuz_and_Musandam_Peninsula_%28MODIS_2018-12-10%29.jpg"
 },
   {
+  trendingKeyword: "keanu reeves trivia",
   title: "Unlocking the Keanu Reeves Viral Wave: How to Create Massive Trivia Engagement with QuizViral AI",
   excerpt: "With Keanu Reeves captivating the internet yet again following his viral Isle of Man TT appearance and upcoming series 'Hooligans', pop culture traffic is surging. Discover how creators can easily turn this global momentum into automated, revenue-generating trivia videos.",
   metaDescription: "Turn the Keanu Reeves trending topic into massive views and revenue using QuizViral AI to generate hundreds of automated trivia videos in one click.",
@@ -130,6 +137,7 @@ export const blogPosts = [
   image: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Keanu_Reeves_at_TIFF_2025_02_%28Cropped%29.jpg/1280px-Keanu_Reeves_at_TIFF_2025_02_%28Cropped%29.jpg"
 },
   {
+  trendingKeyword: "michael b jordan trivia",
   title: "Oscars, Outfits, and Algorithms: How to Turn Michael B. Jordan Trends into Viral Revenue with QuizViral AI",
   excerpt: "With Michael B. Jordan dominating the news cycle following his historic Best Actor Oscar win for 'Sinners', pop culture traffic is hitting record highs. Discover how creators can easily transform this massive viral curiosity into revenue-generating trivia videos using automated tools.",
   metaDescription: "Turn the Michael B. Jordan search trend into massive video views and cash using automated trivia videos generated via QuizViral AI.",
@@ -148,6 +156,7 @@ export const blogPosts = [
   image: "https://upload.wikimedia.org/wikipedia/commons/2/23/Michael_B_Jordan_-_Sinners_%28cropped%29.jpg"
 },
   {
+  trendingKeyword: "seth brown minor league release trivia",
   title: "Hitting a Home Run with Sports Trends: How to Turn the Seth Brown Minor League Release into Viral Views Using QuizViral AI",
   excerpt: "When baseball veterans hit the transaction wire, sports fans rush to social feeds to debate the fallout. Discover how you can instantly convert the buzzing news surrounding the seth brown minor league release into automated, revenue-generating trivia videos.",
   metaDescription: "Learn how to turn the seth brown minor league release trend into massive short-form video views and payouts using the automation of QuizViral AI.",
@@ -166,6 +175,7 @@ export const blogPosts = [
   image: "https://upload.wikimedia.org/wikipedia/commons/6/67/SethBrownAviators.jpg"
 },
   {
+  trendingKeyword: "gas trivia",
   title: "Fueling Your Feed: How to Turn the Trending 'Gas' Market Volatility into Viral Traffic with QuizViral AI",
   excerpt: "With international supply shifts, regional infrastructure adjustments, and changing energy benchmarks keeping 'gas' at the top of search trends, smart content creators have an open window to scale. Discover how to effortlessly deploy high-converting trivia campaigns using QuizViral AI.",
   metaDescription: "Transform global energy market interest and gas trends into automated social media traffic using QuizViral AI to generate hundreds of viral videos.",
@@ -184,6 +194,7 @@ export const blogPosts = [
   image: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Purplesmoke.jpg"
 },
   {
+  trendingKeyword: "what is a data breach trivia",
   title: "Riding the 'What Is a Data Breach' Trend: Launch a Viral Faceless Trivia Channel with QuizViral AI",
   excerpt: "With cybersecurity topics spiking in global searches, creators can leverage public interest around data privacy to gain massive traffic. Discover how QuizViral AI lets you build automated, high-retention trivia videos that tap into this trending theme with 1-click execution.",
   metaDescription: "Turn the 'what is a data breach' search trend into massive video views and cash using automated trivia videos generated via QuizViral AI.",
@@ -202,6 +213,7 @@ export const blogPosts = [
   image: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&q=80"
 },
   {
+  trendingKeyword: "samuel alito trivia",
   title: "Capitalizing on High-Profile Legal News: How to Turn Samuel Alito Trends into Viral Trivia Traffic with QuizViral AI",
   excerpt: "Discover how content creators can leverage surging political and legal search trends surrounding Supreme Court Justice Samuel Alito. Learn how to turn breaking news into highly engaging, automated trivia videos that maximize watch time and channel monetization.",
   metaDescription: "Turn the Samuel Alito trending topic into massive views and revenue using QuizViral AI to generate hundreds of automated trivia videos in one click.",
@@ -221,7 +233,8 @@ export const blogPosts = [
 },
   {
     slug: 'faceless-trivia-tiktok-growth-guide',
-    title: 'How to Build a Faceless Trivia Channel on TikTok (Complete Growth Guide)',
+    trendingKeyword: "faceless TikTok channel",
+  title: 'How to Build a Faceless Trivia Channel on TikTok (Complete Growth Guide)',
     excerpt: 'Discover the secrets to building a high-retention faceless trivia channel on TikTok. Learn niche selection, bulk content creation, and algorithms.',
     date: 'June 12, 2026',
     readTime: '6 min read',
@@ -293,7 +306,8 @@ Start generating your bulk videos today with [QuizViral AI](https://quizviral-ni
   },
   {
     slug: 'chatgpt-prompts-viral-trivia-videos',
-    title: 'The Ultimate ChatGPT Prompt Strategy for Viral Trivia Videos',
+    trendingKeyword: "ChatGPT trivia prompt",
+  title: 'The Ultimate ChatGPT Prompt Strategy for Viral Trivia Videos',
     excerpt: 'Learn the exact ChatGPT prompts and templates to generate bulk trivia questions that are fully formatted for automated video rendering.',
     date: 'June 11, 2026',
     readTime: '5 min read',
@@ -369,7 +383,8 @@ Automate your viral content factory today at [QuizViral AI](https://quizviral-ni
   },
   {
     slug: 'how-google-discover-works-creator-guide',
-    title: 'How Google Discover Works: A Creator\'s Guide to Driving Free Traffic',
+    trendingKeyword: "Google Discover optimization",
+  title: 'How Google Discover Works: A Creator\'s Guide to Driving Free Traffic',
     excerpt: 'Learn how Google Discover serves content and the best strategies to optimize your blogs for search engine Discover feeds.',
     date: 'June 12, 2026',
     readTime: '7 min read',

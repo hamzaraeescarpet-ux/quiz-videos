@@ -9,6 +9,15 @@ import subprocess
 from datetime import datetime
 from playwright.sync_api import sync_playwright
 
+# Set UTF-8 encoding for standard output and error to prevent CP1252 charmap crashes on Windows
+try:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 # ==================== CONFIGURATION ====================
 # आपके Chrome Profile का पाथ (लॉगिन सेशन बनाए रखने के लिए)
 CHROME_PROFILE_PATH = r"C:\Users\hamza\Downloads\python development\browser automation\gemini video points\bulk scheduling fb videos\chrome_profile_2"
@@ -40,6 +49,58 @@ def _is_relevant_topic(topic):
     if len(topic.strip()) < 4:
         return False
     return True
+
+def is_keyword_already_published(keyword):
+    """Checks if a blog post matching this keyword already exists in blogPosts.js"""
+    if not os.path.exists(BLOG_POSTS_FILE):
+        return False
+    try:
+        with open(BLOG_POSTS_FILE, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        # Extract fields using regex
+        titles = re.findall(r"title:\s*['\"`](.*?)['\"`]", content)
+        slugs = re.findall(r"slug:\s*['\"`](.*?)['\"`]", content)
+        trending_keywords = re.findall(r"trendingKeyword:\s*['\"`](.*?)['\"`]", content)
+        
+        keyword_lower = keyword.lower().strip()
+        
+        # 1. Direct check on trendingKeyword field
+        for tk in trending_keywords:
+            tk_lower = tk.lower().strip()
+            if keyword_lower == tk_lower or keyword_lower in tk_lower or tk_lower in keyword_lower:
+                return True
+                
+        # 2. Direct check on title and slug
+        for t in titles:
+            if keyword_lower in t.lower():
+                return True
+        for s in slugs:
+            if keyword_lower.replace(" ", "-") in s.lower() or s.lower().replace("-", " ") in keyword_lower:
+                return True
+                
+        # 3. Check inside seoKeywords arrays
+        seo_blocks = re.findall(r"seoKeywords:\s*\[(.*?)\]", content, re.DOTALL)
+        for block in seo_blocks:
+            keywords_in_block = [k.strip().strip("'\"`").lower() for k in block.split(",") if k.strip()]
+            for kw in keywords_in_block:
+                if keyword_lower == kw or keyword_lower in kw or kw in keyword_lower:
+                    # Avoid false positives on very common words
+                    if len(keyword_lower) > 3 and keyword_lower not in ["quiz", "viral", "shorts", "youtube", "best", "free"]:
+                        return True
+                
+        # 4. Word overlap check to avoid duplicate themes
+        words = [w for w in re.split(r'\W+', keyword_lower) if len(w) > 3]
+        if words:
+            for t in titles:
+                t_lower = t.lower()
+                if all(w in t_lower for w in words):
+                    return True
+    except Exception as e:
+        print(f"Error checking duplicate posts: {e}")
+    return False
+
+
 
 def get_trending_keyword(index=0):
     """
@@ -626,6 +687,7 @@ def update_blog_posts_file(new_post):
     posts_array_content = match.group(1).strip()
     
     new_post_str = json.dumps(new_post, indent=2)
+    new_post_str = new_post_str.replace('"trendingKeyword":', 'trendingKeyword:')
     new_post_str = new_post_str.replace('"slug":', 'slug:')
     new_post_str = new_post_str.replace('"title":', 'title:')
     new_post_str = new_post_str.replace('"excerpt":', 'excerpt:')
@@ -765,8 +827,23 @@ def main():
             except (ValueError, IndexError):
                 pass
 
-        # 1. Google Trends से कीवर्ड लें
-        trend = get_trending_keyword(trend_index)
+        # 1. Google Trends से कीवर्ड लें (Check for duplicate topics to prevent double posting)
+        attempts = 0
+        max_attempts = 15
+        trend = None
+        
+        while attempts < max_attempts:
+            candidate_trend = get_trending_keyword(trend_index + attempts)
+            if not is_keyword_already_published(candidate_trend):
+                trend = candidate_trend
+                break
+            else:
+                print(f"Keyword '{candidate_trend}' has already been published in blogPosts.js. Trying next trend...")
+                attempts += 1
+                
+        if not trend:
+            trend = get_trending_keyword(trend_index)
+            print(f"Warning: All fetched trends are already published. Defaulting to: '{trend}'")
         
         # 2. Unsplash से 1200px इमेज लें
         image_url = get_unsplash_image(trend)
@@ -784,6 +861,7 @@ def main():
         blog_data["readTime"] = "5 min read"
         blog_data["author"] = "QuizViral AI Team"
         blog_data["image"] = image_url
+        blog_data["trendingKeyword"] = trend
         
         # 4. blogPosts.js में सेव करें
         success = update_blog_posts_file(blog_data)
