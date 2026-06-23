@@ -79,6 +79,41 @@ def safe_print(msg):
 import urllib.request
 import urllib.parse
 import json
+import threading
+
+# =============================================================================
+# IMAGE API KEYS — Pixabay & Pexels (3 keys each for rotation + rate-limit bypass)
+# =============================================================================
+_PIXABAY_KEYS = [
+    "54314916-5f365780e5c27849c23bc950f",   # hamzaraeescarpet
+    "56417685-c45a05a6f9a78c8d4170368f9",   # deshkikhabar
+    "56417696-67f37932e14092cf9a67139f9",   # aajkikhabar34
+]
+_PEXELS_KEYS = [
+    "NqX67bkvlFlTSnZmIFSFNIchLP0ARNW0X2OfaTWJvp7IJNXsIzOWQ1bH",  # hamzaraeescarpet
+    "GT9G57i8szub34xyk134pm4BbdVwgKzYsvjCFTer1lyF7u9nhe1vxrBT",  # aajkikhabar34
+    "PKiIguzl3Pox7aMpM7PKb4iX7kKi2JJJC6r2pidstpUAFgHdA6HgM2CL",  # deshkikhabar34
+]
+
+# Thread-safe key rotation counters
+_key_lock = threading.Lock()
+_pixabay_idx = 0
+_pexels_idx  = 0
+
+def _next_pixabay_key():
+    global _pixabay_idx
+    with _key_lock:
+        key = _PIXABAY_KEYS[_pixabay_idx % len(_PIXABAY_KEYS)]
+        _pixabay_idx += 1
+        return key
+
+def _next_pexels_key():
+    global _pexels_idx
+    with _key_lock:
+        key = _PEXELS_KEYS[_pexels_idx % len(_PEXELS_KEYS)]
+        _pexels_idx += 1
+        return key
+# =============================================================================
 
 def extract_subject(row):
     answer = str(row.get('answer', '')).strip()
@@ -108,23 +143,107 @@ def extract_subject(row):
         
     return answer
 
+# ---------------------------------------------------------------------------
+# PRIMARY: Pixabay — HD/4K photos, 3 rotating API keys
+# ---------------------------------------------------------------------------
+def fetch_pixabay_image(subject):
+    """Search Pixabay for an HD photo. Returns direct image URL or None."""
+    import ssl
+    ssl_ctx = ssl._create_unverified_context()
+    query = urllib.parse.quote(subject)
+    # Try all 3 keys in rotation before giving up
+    for _ in range(len(_PIXABAY_KEYS)):
+        api_key = _next_pixabay_key()
+        try:
+            url = (
+                f"https://pixabay.com/api/?key={api_key}"
+                f"&q={query}&image_type=photo&per_page=5"
+                f"&safesearch=true&min_width=800&order=popular"
+            )
+            req = urllib.request.Request(url, headers={'User-Agent': 'QuizViralBot/2.0'})
+            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                hits = data.get("hits", [])
+                if hits:
+                    # Prefer fullHDURL > largeImageURL > webformatURL
+                    img = hits[0]
+                    return (
+                        img.get("fullHDURL") or
+                        img.get("largeImageURL") or
+                        img.get("webformatURL")
+                    )
+        except Exception as e:
+            safe_print(f"Pixabay key attempt failed for '{subject}': {e}")
+    return None
+
+# ---------------------------------------------------------------------------
+# SECONDARY: Pexels — HD/4K photos, 3 rotating API keys
+# ---------------------------------------------------------------------------
+def fetch_pexels_image(subject):
+    """Search Pexels for an HD photo. Returns direct image URL or None."""
+    import ssl
+    ssl_ctx = ssl._create_unverified_context()
+    query = urllib.parse.quote(subject)
+    for _ in range(len(_PEXELS_KEYS)):
+        api_key = _next_pexels_key()
+        try:
+            url = (
+                f"https://api.pexels.com/v1/search"
+                f"?query={query}&per_page=5&size=large"
+            )
+            req = urllib.request.Request(
+                url,
+                headers={
+                    'Authorization': api_key,
+                    'User-Agent': 'QuizViralBot/2.0'
+                }
+            )
+            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                photos = data.get("photos", [])
+                if photos:
+                    src = photos[0].get("src", {})
+                    # Prefer large2x > original > large
+                    return (
+                        src.get("large2x") or
+                        src.get("original") or
+                        src.get("large")
+                    )
+        except Exception as e:
+            safe_print(f"Pexels key attempt failed for '{subject}': {e}")
+    return None
+
+# ---------------------------------------------------------------------------
+# TERTIARY FALLBACK: Wikipedia (original method, kept as last resort)
+# ---------------------------------------------------------------------------
 def fetch_wikipedia_image(subject):
+    """Search Wikipedia for a topic thumbnail. Last-resort fallback."""
     import ssl
     try:
         context = ssl._create_unverified_context()
-        # Step 1: Search Wikipedia for the best matching page title
-        search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(subject)}&utf8=&format=json&srlimit=1"
-        req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
+        search_url = (
+            f"https://en.wikipedia.org/w/api.php?action=query&list=search"
+            f"&srsearch={urllib.parse.quote(subject)}&utf8=&format=json&srlimit=1"
+        )
+        req = urllib.request.Request(
+            search_url,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        )
         with urllib.request.urlopen(req, timeout=10, context=context) as response:
             search_data = json.loads(response.read().decode('utf-8'))
             search_results = search_data.get("query", {}).get("search", [])
             if not search_results:
                 return None
             best_title = search_results[0]["title"]
-            
-        # Step 2: Get the thumbnail image of the best matching page (max width 1280)
-        image_url = f"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=thumbnail&pithumbsize=1280&titles={urllib.parse.quote(best_title)}&redirects=1"
-        req = urllib.request.Request(image_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
+        image_url = (
+            f"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages"
+            f"&format=json&piprop=thumbnail&pithumbsize=1280"
+            f"&titles={urllib.parse.quote(best_title)}&redirects=1"
+        )
+        req = urllib.request.Request(
+            image_url,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        )
         with urllib.request.urlopen(req, timeout=10, context=context) as response:
             img_data = json.loads(response.read().decode('utf-8'))
             pages = img_data.get("query", {}).get("pages", {})
@@ -132,7 +251,40 @@ def fetch_wikipedia_image(subject):
                 if "thumbnail" in page_data:
                     return page_data["thumbnail"]["source"]
     except Exception as e:
-        safe_print(f"Error fetching Wikipedia image for {subject}: {e}")
+        safe_print(f"Wikipedia image fetch failed for '{subject}': {e}")
+    return None
+
+# ---------------------------------------------------------------------------
+# MASTER CASCADE: Pixabay → Pexels → Wikipedia
+# ---------------------------------------------------------------------------
+def fetch_contextual_image(subject):
+    """
+    Tries image sources in order of quality:
+      1. Pixabay  (HD/4K, 3 rotating keys)
+      2. Pexels   (HD/4K, 3 rotating keys)
+      3. Wikipedia (thumbnail, always-free fallback)
+    Returns the first successful image URL, or None if all fail.
+    """
+    safe_print(f"[Image] Fetching HD image for: '{subject}'")
+
+    url = fetch_pixabay_image(subject)
+    if url:
+        safe_print(f"[Image] Pixabay SUCCESS: {url[:80]}...")
+        return url
+    safe_print(f"[Image] Pixabay returned nothing — trying Pexels...")
+
+    url = fetch_pexels_image(subject)
+    if url:
+        safe_print(f"[Image] Pexels SUCCESS: {url[:80]}...")
+        return url
+    safe_print(f"[Image] Pexels returned nothing — falling back to Wikipedia...")
+
+    url = fetch_wikipedia_image(subject)
+    if url:
+        safe_print(f"[Image] Wikipedia SUCCESS: {url[:80]}...")
+        return url
+
+    safe_print(f"[Image] All sources failed for '{subject}'. No image will be used.")
     return None
 
 def create_parallax_background_files(image_path, temp_dir, vid_id):
@@ -376,8 +528,8 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
         wiki_future = None
         if is_image_category:
             subject = extract_subject(row)
-            safe_print(f"Prefetching Wikipedia image in parallel for: '{subject}'")
-            wiki_future = pool.submit(fetch_wikipedia_image_sync, subject)
+            safe_print(f"[Image] Prefetching HD image in parallel (Pixabay→Pexels→Wikipedia) for: '{subject}'")
+            wiki_future = pool.submit(fetch_contextual_image, subject)
 
         # Wait for TTS (mandatory)
         tts_future.result()
@@ -431,12 +583,12 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     
     if is_image_category:
         try:
-            # Use the prefetched URL from the parallel fetch above (no extra network wait!)
+            # Use the cascade-prefetched URL (Pixabay/Pexels/Wikipedia) from parallel fetch above
             image_url = prefetched_image_url
             if image_url:
-                safe_print(f"Using prefetched Wikipedia image URL: {image_url}")
+                safe_print(f"Using prefetched HD image URL: {image_url}")
             else:
-                safe_print("Prefetched Wikipedia image URL was None. Falling back to video background.")
+                safe_print("Prefetched HD image URL was None. Falling back to video background.")
             if image_url:
                 safe_print(f"Found Wikipedia image URL: {image_url}")
                 parsed_url = urllib.parse.urlparse(image_url)
