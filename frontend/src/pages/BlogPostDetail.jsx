@@ -92,7 +92,7 @@ export default function BlogPostDetail() {
       // Header 1: # Header
       if (block.startsWith('# ')) {
         return (
-          <h1 key={idx} className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white mt-10 mb-6 leading-tight border-b border-gray-200 dark:border-dark-700/60 pb-3">
+          <h1 key={idx} className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-brand-600 via-brand-500 to-indigo-600 dark:from-brand-300 dark:via-brand-400 dark:to-indigo-300 mt-12 mb-8 leading-tight tracking-tight border-b border-gray-200 dark:border-dark-700/60 pb-4">
             {block.slice(2)}
           </h1>
         );
@@ -101,7 +101,7 @@ export default function BlogPostDetail() {
       // Header 2: ## Header
       if (block.startsWith('## ')) {
         return (
-          <h2 key={idx} className="text-2xl md:text-3xl font-bold text-brand-600 dark:text-brand-300 mt-8 mb-4 border-l-4 border-brand-500 pl-3">
+          <h2 key={idx} className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-600 dark:from-brand-300 dark:to-indigo-300 mt-10 mb-5 border-l-4 border-brand-500 pl-4 tracking-tight leading-snug">
             {block.slice(3)}
           </h2>
         );
@@ -110,7 +110,7 @@ export default function BlogPostDetail() {
       // Header 3: ### Header
       if (block.startsWith('### ')) {
         return (
-          <h3 key={idx} className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mt-6 mb-3">
+          <h3 key={idx} className="text-xl md:text-2xl font-extrabold italic text-brand-600 dark:text-brand-400 mt-8 mb-4 tracking-tight">
             {block.slice(4)}
           </h3>
         );

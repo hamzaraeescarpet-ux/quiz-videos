@@ -581,7 +581,7 @@ REQUIREMENTS:
 - Product Integration: Write a step-by-step guide on how content creators can make a quiz video about '{trend_keyword}' in 1 click using QuizViral AI.
 - Links: Naturally include exactly 2 links to https://quizviral-nine.vercel.app in the article body (e.g. as '[QuizViral AI](https://quizviral-nine.vercel.app)').
 - FAQs: Include 2 FAQs at the end.
-- Formatting: Do NOT wrap the response in a JSON block or code fence. Respond with pure Markdown text only. Start writing the post immediately.
+- Formatting: Wrap the entire article (starting from the H1 title '# {title}' to the end) inside a single markdown code block (code fence). Do not write anything outside the code block. Start writing the post immediately.
 """
 
         print("Typing content prompt into Gemini (Turn 2)...")
