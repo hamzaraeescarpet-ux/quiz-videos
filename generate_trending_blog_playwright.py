@@ -50,6 +50,17 @@ def _is_relevant_topic(topic):
         return False
     return True
 
+def extract_field_values(field_name, content):
+    """Extracts quoted field values (using double, single, or backtick quotes) from content."""
+    pattern = rf"{field_name}:\s*(?:\"([^\"]*)\"|'([^']*)'|`([^`]*)`)"
+    matches = re.findall(pattern, content)
+    values = []
+    for m in matches:
+        val = m[0] or m[1] or m[2]
+        if val:
+            values.append(val)
+    return values
+
 def is_keyword_already_published(keyword):
     """Checks if a blog post matching this keyword already exists in blogPosts.js"""
     if not os.path.exists(BLOG_POSTS_FILE):
@@ -59,9 +70,9 @@ def is_keyword_already_published(keyword):
             content = f.read()
         
         # Extract fields using regex
-        titles = re.findall(r"title:\s*['\"`](.*?)['\"`]", content)
-        slugs = re.findall(r"slug:\s*['\"`](.*?)['\"`]", content)
-        trending_keywords = re.findall(r"trendingKeyword:\s*['\"`](.*?)['\"`]", content)
+        titles = extract_field_values("title", content)
+        slugs = extract_field_values("slug", content)
+        trending_keywords = extract_field_values("trendingKeyword", content)
         
         keyword_lower = keyword.lower().strip()
         
@@ -722,45 +733,151 @@ def git_push_changes(title):
     except Exception as e:
         print(f"Git push failed: {e}")
 
-def update_sitemap(slug):
-    """Automatically adds the new blog post URL to frontend/public/sitemap.xml for SEO indexing"""
+def generate_sitemap_from_posts():
+    """
+    Regenerates sitemap.xml completely based on the current blogPosts.js
+    and the core site pages. This prevents index drift and ensures Google
+    knows about every post.
+    """
     sitemap_path = os.path.join(SCRIPT_DIR, "frontend", "public", "sitemap.xml")
-    if not os.path.exists(sitemap_path):
-        print(f"Sitemap file not found at {sitemap_path}")
-        return False
-        
-    print(f"Updating sitemap.xml with slug: {slug}...")
+    print(f"Regenerating sitemap.xml at {sitemap_path}...")
+    
+    # Core static URLs
+    core_urls = [
+        {"loc": "https://quizviral-nine.vercel.app/", "priority": "1.0", "changefreq": "daily"},
+        {"loc": "https://quizviral-nine.vercel.app/pricing", "priority": "0.8", "changefreq": "weekly"},
+        {"loc": "https://quizviral-nine.vercel.app/about", "priority": "0.5", "changefreq": "monthly"},
+        {"loc": "https://quizviral-nine.vercel.app/blog", "priority": "0.9", "changefreq": "daily"},
+    ]
+    
+    slugs = []
+    if os.path.exists(BLOG_POSTS_FILE):
+        try:
+            with open(BLOG_POSTS_FILE, "r", encoding="utf-8") as f:
+                content = f.read()
+            slugs = extract_field_values("slug", content)
+            # Filter and unique
+            slugs = list(dict.fromkeys(slugs))
+        except Exception as e:
+            print(f"Error reading slugs for sitemap: {e}")
+            
     today_str = datetime.now().strftime("%Y-%m-%d")
-    new_url = f"https://quizviral-nine.vercel.app/blog/{slug}"
+    
+    xml_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    ]
+    
+    # Add core URLs
+    for url in core_urls:
+        xml_lines.append("  <url>")
+        xml_lines.append(f"    <loc>{url['loc']}</loc>")
+        xml_lines.append(f"    <lastmod>{today_str}</lastmod>")
+        xml_lines.append(f"    <changefreq>{url['changefreq']}</changefreq>")
+        xml_lines.append(f"    <priority>{url['priority']}</priority>")
+        xml_lines.append("  </url>")
+        
+    # Add blog post URLs
+    for slug in slugs:
+        xml_lines.append("  <url>")
+        xml_lines.append(f"    <loc>https://quizviral-nine.vercel.app/blog/{slug}</loc>")
+        xml_lines.append(f"    <lastmod>{today_str}</lastmod>")
+        xml_lines.append("    <changefreq>weekly</changefreq>")
+        xml_lines.append("    <priority>0.8</priority>")
+        xml_lines.append("  </url>")
+        
+    xml_lines.append("</urlset>")
     
     try:
-        with open(sitemap_path, "r", encoding="utf-8") as f:
-            content = f.read()
-            
-        if new_url in content:
-            print("URL already exists in sitemap.xml. Skipping...")
-            return True
-            
-        new_entry = f"""  <url>
-    <loc>{new_url}</loc>
-    <lastmod>{today_str}</lastmod>
-    <priority>0.8</priority>
-  </url>
-"""
-        
-        # Insert right before </urlset>
-        if "</urlset>" in content:
-            updated_content = content.replace("</urlset>", new_entry + "</urlset>")
-            with open(sitemap_path, "w", encoding="utf-8") as f:
-                f.write(updated_content)
-            print("sitemap.xml updated successfully!")
-            return True
-        else:
-            print("Could not find </urlset> tag in sitemap.xml.")
-            return False
+        os.makedirs(os.path.dirname(sitemap_path), exist_ok=True)
+        with open(sitemap_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(xml_lines) + "\n")
+        print(f"Successfully regenerated sitemap.xml with {len(slugs)} blog posts!")
+        return True
     except Exception as e:
-        print(f"Failed to update sitemap.xml: {e}")
+        print(f"Failed to write sitemap.xml: {e}")
         return False
+
+def get_latest_fb_video():
+    """
+    Connects to the active Chrome on port 9222, navigates to the Facebook page,
+    extracts the latest video ID from the page source JSON/scripts, and saves it
+    to latestFbVideo.js.
+    """
+    print("Scraping Facebook page for latest video...")
+    fb_page_url = "https://www.facebook.com/profile.php?id=61585764748589"
+    latest_video_url = "https://www.facebook.com/watch/?v=892872416450589" # Fallback
+    
+    if not check_port_open(9222):
+        print("Chrome remote debugger is not running. Using fallback FB video.")
+    else:
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.connect_over_cdp("http://localhost:9222")
+                context = browser.contexts[0]
+                page = context.new_page()
+                
+                print(f"Navigating to Facebook Page: {fb_page_url}...")
+                page.goto(fb_page_url)
+                time.sleep(5)
+                
+                # Scroll a bit to load posts
+                page.evaluate("window.scrollBy(0, 1000);")
+                time.sleep(4)
+                
+                # Get script tag contents
+                scripts = page.locator("script").evaluate_all("elements => elements.map(el => el.textContent || '')")
+                
+                video_ids = []
+                reel_ids = []
+                
+                # Search for video and reel IDs using regex
+                for script in scripts:
+                    if not script:
+                        continue
+                    for m in re.finditer(r'"video_id"\s*:\s*"(\d+)"', script):
+                        video_ids.append(m.group(1))
+                    for m in re.finditer(r'"video":\{"__typename":"Video","id":"(\d+)"', script):
+                        video_ids.append(m.group(1))
+                    for m in re.finditer(r'"reel":\{"id":"(\d+)"', script):
+                        reel_ids.append(m.group(1))
+                    for m in re.finditer(r'facebook\.com/reel/(\d+)', script):
+                        reel_ids.append(m.group(1))
+                
+                # Unique
+                video_ids = list(dict.fromkeys(video_ids))
+                reel_ids = list(dict.fromkeys(reel_ids))
+                
+                urls = []
+                for r_id in reel_ids:
+                    urls.append(f"https://www.facebook.com/reel/{r_id}")
+                for v_id in video_ids:
+                    urls.append(f"https://www.facebook.com/watch/?v={v_id}")
+                    
+                if urls:
+                    latest_video_url = urls[0]
+                    print(f"Facebook scraper found latest video: {latest_video_url}")
+                else:
+                    print("No video URLs found. Using fallback.")
+                
+                page.close()
+                browser.close()
+        except Exception as e:
+            print(f"Error scraping Facebook page: {e}. Using fallback.")
+            
+    # Write to latestFbVideo.js
+    dest_path = os.path.join(SCRIPT_DIR, "frontend", "src", "data", "latestFbVideo.js")
+    try:
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        with open(dest_path, "w", encoding="utf-8") as f:
+            f.write(f'export const latestFbVideoUrl = "{latest_video_url}";\n')
+        print(f"Updated latestFbVideo.js successfully with: {latest_video_url}")
+    except Exception as e:
+        print(f"Failed to write latestFbVideo.js: {e}")
+
+def update_sitemap(slug):
+    """Automatically regenerates the sitemap.xml file"""
+    return generate_sitemap_from_posts()
 
 def ping_indexnow(slug):
     """Pings IndexNow API to request instant crawling of the new blog URL on Bing/Yahoo/Yandex"""
@@ -818,6 +935,9 @@ def kill_chrome_on_port_9222():
 
 def main():
     try:
+        # 0. Facebook page video scrape to keep it up to date
+        get_latest_fb_video()
+        
         # Parse trend index argument if provided
         trend_index = 0
         if "--trend-index" in sys.argv:

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { blogPosts } from '../data/blogPosts';
+import { latestFbVideoUrl } from '../data/latestFbVideo';
 import { Calendar, Clock, ChevronLeft, ArrowRight } from 'lucide-react';
 
 export default function BlogPostDetail() {
@@ -243,6 +244,23 @@ export default function BlogPostDetail() {
              <span className="border-r border-gray-200 dark:border-dark-700 h-4" />
              <span className="font-semibold text-brand-500 dark:text-brand-400">By {post.author}</span>
            </div>
+
+           {/* Facebook Video Embed */}
+           {latestFbVideoUrl && (
+             <div className="my-6 aspect-video w-full rounded-2xl overflow-hidden border border-gray-200 dark:border-dark-700/40 shadow-md">
+               <iframe
+                 src={`https://www.facebook.com/plugins/video.php?height=314&href=${encodeURIComponent(latestFbVideoUrl)}&show_text=false&width=560`}
+                 width="100%"
+                 height="100%"
+                 style={{ border: 'none', overflow: 'hidden' }}
+                 scrolling="no"
+                 frameBorder="0"
+                 allowFullScreen={true}
+                 allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                 title="Latest Facebook Video"
+               ></iframe>
+             </div>
+           )}
  
            {/* Rendered content */}
            <div className="prose prose-invert max-w-none pt-2">
