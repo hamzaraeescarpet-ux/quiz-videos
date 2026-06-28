@@ -277,12 +277,16 @@ def find_builder_fields(page):
     link_selectors = [
         '#WebsiteField',
         '[data-test-id="WebsiteField"]',
+        'textarea[id^="pin-draft-link"]',
+        'textarea[placeholder*="link" i]',
+        'textarea[placeholder*="destination" i]',
         'input[placeholder*="Add a link" i]',
         '[data-testid="pin-builder-link"]',
         'input[placeholder*="link" i]',
         'input[placeholder*="website" i]',
         'input[placeholder*="url" i]',
-        '[aria-label*="link" i]'
+        '[aria-label*="link" i]',
+        '[aria-label*="destination link" i]'
     ]
     for sel in link_selectors:
         loc = page.locator(sel)
@@ -313,12 +317,14 @@ def find_builder_fields(page):
 
     # Structural Fallback for Link
     if not fields["link"]:
-        all_inputs = page.locator('input[type="text"]:not([readonly]), input[type="url"]:not([readonly])')
+        all_inputs = page.locator('input[type="text"]:not([readonly]), input[type="url"]:not([readonly]), textarea:not([readonly])')
         visible_inputs = []
         for i in range(all_inputs.count()):
             inp = all_inputs.nth(i)
             if inp.is_visible():
                 if fields["title"] and inp.element_handle() == fields["title"].element_handle():
+                    continue
+                if fields["desc"] and inp.element_handle() == fields["desc"].element_handle():
                     continue
                 # Skip search input fields
                 placeholder = inp.get_attribute("placeholder") or ""
@@ -328,7 +334,7 @@ def find_builder_fields(page):
                     continue
                 visible_inputs.append(inp)
         if visible_inputs:
-            # Destination link is usually the last text/url input
+            # Destination link is usually the last input/textarea
             fields["link"] = visible_inputs[-1]
             
     return fields
@@ -538,15 +544,26 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                                 time.sleep(2)
                         else:
                             print("Tag input field nahi mila.")
+                            try:
+                                page.keyboard.press("Escape")
+                                time.sleep(2)
+                            except Exception:
+                                pass
                     else:
                         print("Tag products button page par nahi mila. Skipping optional product tagging...")
                 except Exception as tag_err:
                     print(f"Product tagging process skip ho gaya (Issue): {tag_err}")
+                    try:
+                        page.keyboard.press("Escape")
+                        time.sleep(2)
+                    except Exception:
+                        pass
                     
                 # 6. Handle Board Selection
                 if BOARD_NAME:
                     print(f"Board '{BOARD_NAME}' select karne ki koshish kar rahe hai...")
                     board_opener_selectors = [
+                        '[data-testid="board-dropdown-select-button"]',
                         '[data-test-id="board-dropdown-select-button"]',
                         '[data-testid="board-dropdown"]',
                         'button[aria-haspopup="listbox"]',
@@ -595,6 +612,7 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                                 f'div[role="listitem"] div:has-text("{BOARD_NAME}"), '
                                 f'div[role="option"]:has-text("{BOARD_NAME}"), '
                                 f'div[role="option"] span:has-text("{BOARD_NAME}"), '
+                                f'[data-testid*="board"]:has-text("{BOARD_NAME}"), '
                                 f'[data-test-id*="board"]:has-text("{BOARD_NAME}")'
                             ).first
                             if board_item.count() > 0:
@@ -621,10 +639,13 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 # 7. Click Publish / Save
                 print("Publish button locate kar rahe hai...")
                 publish_selectors = [
-                    '[data-test-id="board-dropdown-save-button"]',
+                    'div[role="button"][data-testid="board-dropdown-save-button"]',
                     '[data-testid="board-dropdown-save-button"]',
-                    '[data-test-id="create-pin-submit"]',
+                    '[data-test-id="board-dropdown-save-button"]',
+                    'div[role="button"]:has-text("Publish")',
+                    'div[role="button"]:has-text("Save")',
                     '[data-testid="create-pin-submit"]',
+                    '[data-test-id="create-pin-submit"]',
                     'button[type="submit"]',
                     'button:has-text("Publish")',
                     'button:has-text("Save")',
@@ -634,8 +655,6 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                     'button[aria-label*="Save" i]',
                     'button[aria-label*="सहेजें" i]',
                     'button[aria-label*="प्रकाशित" i]',
-                    'div[role="button"]:has-text("Publish")',
-                    'div[role="button"]:has-text("Save")',
                     'div[role="button"]:has-text("सहेजें")'
                 ]
                 target_publish = None
