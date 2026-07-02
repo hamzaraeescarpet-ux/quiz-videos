@@ -471,6 +471,12 @@ def download_pollinations_image(prompt, output_path, format_type="landscape"):
         # Force photography styles as a safeguard
         clean_prompt += ", professional photography, photorealistic, highly detailed, sharp focus, 8k resolution"
         
+        # Prepend explicit orientation directives to ensure Flux constructs correct aspect ratio composition
+        if format_type == "vertical":
+            clean_prompt = "A vertical portrait photograph, 9:16 aspect ratio, " + clean_prompt
+        else:
+            clean_prompt = "A landscape photograph, 16:9 aspect ratio, " + clean_prompt
+            
         encoded_prompt = urllib.parse.quote(clean_prompt)
         
         # Dimensions based on format
@@ -774,11 +780,12 @@ def run_blog_generator_playwright():
             # TURN 1: Write Introduction Section
             print("\n--- TURN 1: Generating Introduction ---")
             prompt_turn1 = (
-                f"We are writing a blog post about the trending topic: \"{selected_topic}\" for QuizViral AI (which automates bulk quiz video creation).\n"
+                f"We are writing a blog post about the trending topic: \"{selected_topic}\".\n"
                 f"Target Keyword: \"{selected_topic}\"\n"
                 f"Additional keywords to include: {json.dumps(suggestions)}.\n\n"
                 f"Write a compelling, SEO-optimized Introduction section (minimum 400 words) starting with an <h1> tag containing the target keyword. "
-                "Focus on why this topic is trending and how quiz videos can capture this traffic.\n"
+                f"Focus strictly on \"{selected_topic}\", why it is currently trending, its significance, background, and key facts. "
+                "Do NOT mention quiz videos, video creators, bulk quiz makers, or QuizViral AI here. Focus 100% on the topic itself.\n"
                 "Respond with ONLY raw HTML body content. Do not include <html>, <head>, or <body> wrappers, and do not wrap in markdown code blocks."
             )
             raw_intro = submit_and_wait_for_response(gemini_page, prompt_turn1, max_wait_seconds=150)
@@ -788,8 +795,9 @@ def run_blog_generator_playwright():
             print("\n--- TURN 2: Generating Tutorial & 10 Quiz Questions ---")
             prompt_turn2 = (
                 f"Excellent. Now write the second section (minimum 600 words):\n"
-                f"- A step-by-step tutorial on how content creators can use QuizViral AI to mass-produce 100+ quiz videos about \"{selected_topic}\" in 1 click using CSV spreadsheet imports, choosing background loops (Minecraft, Space, Nature), and generating natural AI voiceovers.\n"
+                f"- Go deeper into details, history, analysis, or current events about \"{selected_topic}\" to provide maximum value to the reader.\n"
                 f"- Include 10 complete quiz questions about \"{selected_topic}\" with 4 options (A, B, C, D) and specify the correct answer clearly. Format these questions as structured HTML lists or tables.\n\n"
+                "Do NOT mention video creation tools, AI generators, or QuizViral AI here. Focus 100% on the topic itself. "
                 "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
             )
             raw_tutorial = submit_and_wait_for_response(gemini_page, prompt_turn2, max_wait_seconds=180)
@@ -799,6 +807,7 @@ def run_blog_generator_playwright():
             print("\n--- TURN 3: Generating Monetization & FAQs ---")
             prompt_turn3 = (
                 f"Excellent. Now write the final section (minimum 500 words):\n"
+                f"- Introduce QuizViral AI: Explain how content creators can leverage the viral interest in \"{selected_topic}\" by using QuizViral AI to mass-produce 100+ quiz videos about \"{selected_topic}\" in 1 click using CSV spreadsheet imports, choosing background loops (Minecraft, Space, Nature), and generating natural AI voiceovers.\n"
                 f"- YouTube Quiz Channel Monetization Strategy: securing YPP status (10M shorts views in 90 days), and alternate revenue streams (affiliates, print-on-demand, digital trivia downloads).\n"
                 f"- 3 Frequently Asked Questions (FAQs) about automated quiz channels.\n\n"
                 "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
@@ -816,14 +825,14 @@ def run_blog_generator_playwright():
                 "Awesome. Based on the complete article we just generated, compile the SEO metadata and photorealistic image prompts.\n"
                 "Respond ONLY with a JSON object in this format. Do not wrap in markdown code blocks:\n"
                 "{\n"
-                "  \"title\": \"SEO Headline containing the keyword\",\n"
-                "  \"slug\": \"url-friendly-slug-with-keyword\",\n"
-                "  \"excerpt\": \"Compelling 2-sentence summary of the post\",\n"
-                "  \"meta_title\": \"SEO Meta Title (exactly 50-60 characters featuring keywords like 'faceless quiz videos' or 'AI video generator')\",\n"
-                "  \"meta_description\": \"SEO Meta Description (exactly 145-150 characters featuring keywords like 'AI video generator' or 'bulk quiz maker')\",\n"
+                "  \"title\": \"SEO Headline containing the keyword (strictly about the topic itself, e.g. secrets/history/stardom of the topic. DO NOT mention quiz, video, or QuizViral in the title)\",\n"
+                "  \"slug\": \"url-friendly-slug-with-keyword (strictly about the topic itself, no quiz/video terms)\",\n"
+                "  \"excerpt\": \"Compelling 2-sentence summary of the post (strictly about the topic itself)\",\n"
+                "  \"meta_title\": \"SEO Meta Title (exactly 50-60 characters featuring the topic and high-intent keywords like 'faceless quiz videos' or 'AI video generator' naturally at the end)\",\n"
+                "  \"meta_description\": \"SEO Meta Description (exactly 145-150 characters featuring the topic and high-intent keywords naturally at the end)\",\n"
                 "  \"markdown\": \"Complete blog post in markdown format (including title, headers, body, 10 quiz questions, and FAQs)\",\n"
-                "  \"landscape_image_prompt\": \"Write a highly detailed, descriptive, photorealistic prompt for generating a landscape (16:9) photo representing the blog post. Describe professional camera settings (e.g. shot with 35mm lens, natural shadows, depth of field), specific textures, and natural lighting. Do not use cartoon, 3D render, illustration, drawing, or anime words. Avoid celebrity names.\",\n"
-                "  \"vertical_image_prompt\": \"Write a highly detailed, descriptive, photorealistic prompt for a vertical (9:16) photo that matches the style, lighting, and elements of the landscape photo. Avoid celebrity names.\"\n"
+                "  \"landscape_image_prompt\": \"Write a highly detailed, descriptive, photorealistic prompt representing the topic itself (e.g., if the topic is a player, describe an action photo of a basketball game; if the topic is a landmark, describe a professional architectural photo at sunset). Describe professional camera settings (e.g. shot with 35mm lens, natural shadows, depth of field), specific textures, and natural lighting. Do NOT include laptops, video editing screens, or quiz icons. Avoid celebrity names.\",\n"
+                "  \"vertical_image_prompt\": \"Write a matching vertical (9:16) version of that photorealistic topic image prompt. Avoid celebrity names.\"\n"
                 "}"
             )
             raw_metadata = submit_and_wait_for_response(gemini_page, prompt_turn4, max_wait_seconds=120)
@@ -1098,6 +1107,13 @@ def main():
         # Fallback image URL
         blog_data["image"] = ghost_image_url or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&h=675&q=80"
         
+        # Prepend the feature image to both the Ghost HTML post body and the local frontend markdown file
+        img_src = blog_data["image"]
+        if img_src:
+            # Ghost card standard format for body images
+            blog_data["html"] = f'<figure class="kg-card kg-image-card"><img src="{img_src}" class="kg-image" alt="{blog_data["title"]}" loading="lazy"></figure>\n' + blog_data["html"]
+            blog_data["markdown"] = f"![{blog_data['title']}]({img_src})\n\n" + blog_data["markdown"]
+            
         # Set Pinterest image path
         blog_data["pinterest_image"] = blog_data.get("local_pinterest_image") or blog_data["image"]
         
