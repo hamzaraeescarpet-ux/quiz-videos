@@ -459,54 +459,48 @@ def get_autocomplete_suggestions(page, topic):
 
 # ==================== STEP 3: GEMINI IMAGE DOWNLOAD ====================
 
-def wait_for_and_download_new_image(page, output_path, max_wait_seconds=450):
+def download_pollinations_image(prompt, output_path, format_type="landscape"):
     """
-    Waits for the image generation turn to complete using the same button-tracking logic,
-    then downloads the generated image or captures a screenshot.
+    Pollinations.ai Free API ke zariye detailed prompt se realistic image download karta hai.
+    Saves it directly to the local output_path.
     """
-    print("Waiting for image generation turn to complete...")
-    # Reuse the stable ChatGPT button-tracking function to wait for the image turn to finish
-    wait_for_chatgpt_response(page, max_wait_seconds=max_wait_seconds)
-    
-    print("Turn complete! Searching for the generated image...")
-    time.sleep(4) # Give a small buffer for the image source to render fully
-    
-    # Locate the image element inside the last ChatGPT response block
-    last_response = page.locator("div[data-message-author-role='assistant'], .markdown").last
-    img_locator = last_response.locator("img")
-    
-    # Fallback to any oaiusercontent or blob image on the page
-    if img_locator.count() == 0:
-        print("Image not found in last response. Trying global image locator fallback...")
-        img_locator = page.locator("img[src*='oaiusercontent.com'], img[src*='blob:']").last
+    print(f"Requesting image from Pollinations.ai for prompt: '{prompt[:100]}...'")
+    try:
+        # Clean prompt: remove extra newlines, quotes, and sanitize for URL encoding
+        clean_prompt = prompt.strip().replace("\n", " ").replace('"', '').replace("'", "")
+        # Force photography styles as a safeguard
+        clean_prompt += ", professional photography, photorealistic, highly detailed, sharp focus, 8k resolution"
         
-    if img_locator.count() > 0:
-        print("Image element resolved! Attempting download...")
+        encoded_prompt = urllib.parse.quote(clean_prompt)
         
-        # Try to locate and click the download button first
-        try:
-            download_btn = last_response.locator("button[aria-label*='Download' i], a[aria-label*='Download' i], [aria-label*='Download' i]").first
-            if download_btn.count() > 0 and download_btn.is_visible():
-                print("Clicking download button...")
-                with page.expect_download(timeout=15000) as download_info:
-                    download_btn.click()
-                download = download_info.value
-                download.save_as(output_path)
-                print(f"Downloaded image successfully via DALL-E download link to: {output_path}")
-                return True
-        except Exception as e:
-            print(f"Download button click failed: {e}. Falling back to screenshot...")
+        # Dimensions based on format
+        width = 1024 if format_type == "landscape" else 576
+        height = 576 if format_type == "landscape" else 1024
+        
+        # Construct Pollinations.ai URL with Flux model
+        url = f"https://image.pollinations.ai/p/{encoded_prompt}?width={width}&height={height}&nologo=true&private=true&model=flux"
+        
+        # Make request and save the image
+        print(f"Downloading {format_type} image from Pollinations.ai...")
+        
+        # Use urllib.request with a user-agent to bypass any robot blocking
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
+        
+        # Disable SSL verification just in case
+        import ssl
+        context = ssl._create_unverified_context()
+        
+        with urllib.request.urlopen(req, timeout=40, context=context) as response:
+            image_data = response.read()
             
-        # Fallback: Element screenshot
-        try:
-            img_locator.first.screenshot(path=output_path)
-            print(f"Successfully captured image element screenshot and saved to: {output_path}")
-            return True
-        except Exception as se:
-            print(f"Screenshot fallback failed: {se}")
+        with open(output_path, "wb") as f:
+            f.write(image_data)
             
-    print("Error: Could not locate the generated image element.")
-    return False
+        print(f"SUCCESS! {format_type.capitalize()} image saved to: {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error downloading image from Pollinations.ai: {e}")
+        return False
 
 # ==================== STEP 4: GHOST CMS INTEGRATION ====================
 
@@ -819,7 +813,7 @@ def run_blog_generator_playwright():
             # TURN 4: Compile Metadata JSON & Markdown version
             print("\n--- TURN 4: Compiling Metadata JSON ---")
             prompt_turn4 = (
-                "Awesome. Based on the complete article we just generated, compile the SEO metadata.\n"
+                "Awesome. Based on the complete article we just generated, compile the SEO metadata and photorealistic image prompts.\n"
                 "Respond ONLY with a JSON object in this format. Do not wrap in markdown code blocks:\n"
                 "{\n"
                 "  \"title\": \"SEO Headline containing the keyword\",\n"
@@ -827,7 +821,9 @@ def run_blog_generator_playwright():
                 "  \"excerpt\": \"Compelling 2-sentence summary of the post\",\n"
                 "  \"meta_title\": \"SEO Meta Title (exactly 50-60 characters featuring keywords like 'faceless quiz videos' or 'AI video generator')\",\n"
                 "  \"meta_description\": \"SEO Meta Description (exactly 145-150 characters featuring keywords like 'AI video generator' or 'bulk quiz maker')\",\n"
-                "  \"markdown\": \"Complete blog post in markdown format (including title, headers, body, 10 quiz questions, and FAQs)\"\n"
+                "  \"markdown\": \"Complete blog post in markdown format (including title, headers, body, 10 quiz questions, and FAQs)\",\n"
+                "  \"landscape_image_prompt\": \"Write a highly detailed, descriptive, photorealistic prompt for generating a landscape (16:9) photo representing the blog post. Describe professional camera settings (e.g. shot with 35mm lens, natural shadows, depth of field), specific textures, and natural lighting. Do not use cartoon, 3D render, illustration, drawing, or anime words. Avoid celebrity names.\",\n"
+                "  \"vertical_image_prompt\": \"Write a highly detailed, descriptive, photorealistic prompt for a vertical (9:16) photo that matches the style, lighting, and elements of the landscape photo. Avoid celebrity names.\"\n"
                 "}"
             )
             raw_metadata = submit_and_wait_for_response(gemini_page, prompt_turn4, max_wait_seconds=120)
@@ -854,7 +850,9 @@ def run_blog_generator_playwright():
                     "excerpt": f"Discover how to create viral quiz videos about {selected_topic} automatically.",
                     "meta_title": f"How to Make Quiz Videos about {selected_topic} Instantly",
                     "meta_description": f"Learn how to create automated faceless quiz videos about {selected_topic} to grow your channel.",
-                    "markdown": f"# The Ultimate Guide to {selected_topic}\n\n" + html_content.replace("<p>", "").replace("</p>", "\n\n").replace("<h2>", "## ").replace("</h2>", "\n\n")
+                    "markdown": f"# The Ultimate Guide to {selected_topic}\n\n" + html_content.replace("<p>", "").replace("</p>", "\n\n").replace("<h2>", "## ").replace("</h2>", "\n\n"),
+                    "landscape_image_prompt": f"A realistic, professional sports/conceptual close-up photograph representing the theme of {selected_topic}, natural lighting, sharp focus",
+                    "vertical_image_prompt": f"A realistic, professional sports/conceptual close-up vertical photograph representing the theme of {selected_topic}, natural lighting, sharp focus"
                 }
             
             # Attach combined HTML
@@ -862,65 +860,34 @@ def run_blog_generator_playwright():
             
             # --- 5. Generate Landscape Image ---
             print("\n--- STEP 5: Generating Landscape Image (16:9) ---")
-            image_prompt = create_safe_image_prompt(blog_data.get("title", selected_topic), format_type="landscape")
-            image_prompt += " Generate only one single image. Do not generate multiple options or variations."
-            print(f"Image Prompt: {image_prompt}")
+            # Retrieve detailed prompt from ChatGPT metadata JSON or build fallback
+            image_prompt = blog_data.get("landscape_image_prompt")
+            if not image_prompt:
+                image_prompt = create_safe_image_prompt(blog_data.get("title", selected_topic), format_type="landscape")
             
             landscape_path = os.path.join(SCRIPT_DIR, "assets", "landscape_image.png")
             os.makedirs(os.path.dirname(landscape_path), exist_ok=True)
             
-            success_landscape = False
-            for attempt in range(3):
-                if attempt > 0:
-                    print(f"Retrying landscape image generation (Attempt {attempt+1}/3)...")
-                    try:
-                        gemini_page.reload()
-                        time.sleep(8)
-                    except Exception:
-                        pass
-                try:
-                    submit_prompt_to_chatgpt(gemini_page, image_prompt)
-                    if wait_for_and_download_new_image(gemini_page, landscape_path):
-                        success_landscape = True
-                        break
-                except Exception as e:
-                    print(f"Image generation submission failed: {e}")
-                    
+            success_landscape = download_pollinations_image(image_prompt, landscape_path, format_type="landscape")
             if success_landscape:
                 blog_data["local_image"] = landscape_path
             else:
-                print("Failed to obtain landscape image. Using hardcoded fallback.")
+                print("Failed to download landscape image from Pollinations.ai.")
                 blog_data["local_image"] = None
                 
             # --- 6. Generate Pinterest Vertical Image ---
             print("\n--- STEP 6: Generating Pinterest Vertical Image (9:16) ---")
-            pinterest_prompt = create_safe_image_prompt(blog_data.get("title", selected_topic), format_type="vertical")
-            pinterest_prompt += " Generate only one single vertical image. Do not generate multiple options or variations."
-            print(f"Pinterest Image Prompt: {pinterest_prompt}")
+            pinterest_prompt = blog_data.get("vertical_image_prompt")
+            if not pinterest_prompt:
+                pinterest_prompt = create_safe_image_prompt(blog_data.get("title", selected_topic), format_type="vertical")
             
             pinterest_path = os.path.join(SCRIPT_DIR, "assets", "pinterest_image.png")
             
-            success_pinterest = False
-            for attempt in range(3):
-                if attempt > 0:
-                    print(f"Retrying Pinterest vertical image generation (Attempt {attempt+1}/3)...")
-                    try:
-                        gemini_page.reload()
-                        time.sleep(8)
-                    except Exception:
-                        pass
-                try:
-                    submit_prompt_to_chatgpt(gemini_page, pinterest_prompt)
-                    if wait_for_and_download_new_image(gemini_page, pinterest_path):
-                        success_pinterest = True
-                        break
-                except Exception as e:
-                    print(f"Pinterest image generation submission failed: {e}")
-                    
+            success_pinterest = download_pollinations_image(pinterest_prompt, pinterest_path, format_type="vertical")
             if success_pinterest:
                 blog_data["local_pinterest_image"] = pinterest_path
             else:
-                print("Failed to obtain Pinterest vertical image.")
+                print("Failed to download Pinterest vertical image from Pollinations.ai.")
                 blog_data["local_pinterest_image"] = None
                 
             # Close browser
