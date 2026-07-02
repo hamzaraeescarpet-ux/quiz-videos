@@ -376,38 +376,41 @@ def create_safe_image_prompt(post_title, format_type="landscape"):
     """
     Creates a conceptual, generic image prompt from a post title.
     Removes real names or celebrity references, and focuses on core concepts
-    (e.g., sports/basketball, technology, space, etc.) to comply with Gemini's safety guidelines.
+    (e.g., sports/basketball, technology, space, etc.) to comply with safety guidelines.
+    Ensures that the output style is photorealistic and resembles a real-life photograph.
     """
     title_lower = post_title.lower()
     
-    # Heuristics for common niches
-    concept = "generic conceptual illustration of growth and success"
+    # Heuristics for common niches targeting photorealistic photography
+    concept = "a realistic, professional close-up photograph of a clean, modern desk showing signs of success and growth, with warm natural lighting and soft background focus"
     if any(x in title_lower for x in ["marvin bagley", "nba", "basketball", "player", "sports"]):
-        concept = "a generic basketball action scene on a professional court, with a player silhouette jumping towards a glowing hoop"
+        concept = "a realistic, professional sports action photograph taken from the court sideline, showing a basketball player silhouette jumping to dunk into a hoop, dramatic arena lighting, motion blur on the player, crisp details on the net and backboard"
     elif any(x in title_lower for x in ["space", "galaxy", "universe", "planet"]):
-        concept = "a futuristic space exploration rocket traveling through a vibrant cosmic nebula"
+        concept = "a high-resolution, detailed space exploration photograph of a rocket launching and ascending, shot with a telephoto lens, surrounded by realistic billowing smoke, bright fiery exhaust engine glow, clear blue sky background"
     elif any(x in title_lower for x in ["money", "monetiz", "income", "cash", "wealth"]):
-        concept = "a modern abstract design showing upward financial growth charts and glowing digital coins"
+        concept = "a professional, realistic corporate-style close-up photograph of a clean glass table with a smartphone showing stock market growth charts, high-end camera bokeh, warm natural window light reflections, professional office setup"
     elif any(x in title_lower for x in ["video", "youtube", "tiktok", "shorts", "creator"]):
-        concept = "a generic digital content creator setup showing a camera, ring light, and floating neon play icons"
+        concept = "a high-quality, realistic photograph of a modern tech setup for content creation, featuring a professional camera on a tripod, a glowing softbox light, and a clean desk background, shot with shallow depth of field"
     elif any(x in title_lower for x in ["discover", "seo", "google", "traffic", "search"]):
-        concept = "a futuristic digital network globe with connecting data lines and expanding nodes"
+        concept = "a high-quality, clean product photo of a glowing digital tablet on a modern workspace desk, displaying elegant server logs and network maps, sharp details, warm background depth"
     else:
         # General backup: extract main terms and build a generic prompt
         words = [w for w in re.split(r'\W+', post_title) if len(w) > 3]
         if words:
-            concept = f"an artistic abstract representation of {', '.join(words[:3])}"
+            concept = f"a realistic professional photograph representing the theme of {', '.join(words[:3])}, captured with high-end camera equipment, natural shadows, realistic textures, highly detailed"
             
     if format_type == "landscape":
         prompt = (
-            f"Generate a high-quality landscape illustration (16:9 aspect ratio) representing: {concept}. "
-            "Make it clean, professional, and visually engaging. Do not depict any real-life individuals by name or face. "
-            "Do not write any text or words on the image."
+            f"Generate a high-quality photorealistic landscape photograph (16:9 aspect ratio) representing: {concept}. "
+            "Ensure it looks like a real-life, professional camera photo with natural lighting, sharp focus, realistic textures, and shadows. "
+            "Do not make it look like an illustration, drawing, 3D render, cartoon, anime, or digital art. "
+            "Do not depict any real-life individuals by name or face. "
+            "Do not write any text, letters, or words on the image."
         )
     else:
         prompt = (
-            f"Generate a vertical version (9:16 aspect ratio) of the exact same image (matching the same style, color scheme, and content) representing: {concept}. "
-            "Ensure it does not include any text or words on the image."
+            f"Generate a vertical version (9:16 aspect ratio) of the exact same image (matching the same style, lighting, realistic photograph format, and content) representing: {concept}. "
+            "Ensure it is a realistic photograph and does not include any text, letters, or words on the image."
         )
         
     return prompt
@@ -456,7 +459,7 @@ def get_autocomplete_suggestions(page, topic):
 
 # ==================== STEP 3: GEMINI IMAGE DOWNLOAD ====================
 
-def wait_for_and_download_new_image(page, output_path, max_wait_seconds=180):
+def wait_for_and_download_new_image(page, output_path, max_wait_seconds=450):
     """
     Waits for the image generation turn to complete using the same button-tracking logic,
     then downloads the generated image or captures a screenshot.
