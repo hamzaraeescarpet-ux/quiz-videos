@@ -340,6 +340,46 @@ def get_trends_from_page_and_rss(page):
 
 # ==================== STEP 2: GOOGLE AUTOCOMPLETE RESEARCH ====================
 
+def create_safe_image_prompt(post_title, format_type="landscape"):
+    """
+    Creates a conceptual, generic image prompt from a post title.
+    Removes real names or celebrity references, and focuses on core concepts
+    (e.g., sports/basketball, technology, space, etc.) to comply with Gemini's safety guidelines.
+    """
+    title_lower = post_title.lower()
+    
+    # Heuristics for common niches
+    concept = "generic conceptual illustration of growth and success"
+    if any(x in title_lower for x in ["marvin bagley", "nba", "basketball", "player", "sports"]):
+        concept = "a generic basketball action scene on a professional court, with a player silhouette jumping towards a glowing hoop"
+    elif any(x in title_lower for x in ["space", "galaxy", "universe", "planet"]):
+        concept = "a futuristic space exploration rocket traveling through a vibrant cosmic nebula"
+    elif any(x in title_lower for x in ["money", "monetiz", "income", "cash", "wealth"]):
+        concept = "a modern abstract design showing upward financial growth charts and glowing digital coins"
+    elif any(x in title_lower for x in ["video", "youtube", "tiktok", "shorts", "creator"]):
+        concept = "a generic digital content creator setup showing a camera, ring light, and floating neon play icons"
+    elif any(x in title_lower for x in ["discover", "seo", "google", "traffic", "search"]):
+        concept = "a futuristic digital network globe with connecting data lines and expanding nodes"
+    else:
+        # General backup: extract main terms and build a generic prompt
+        words = [w for w in re.split(r'\W+', post_title) if len(w) > 3]
+        if words:
+            concept = f"an artistic abstract representation of {', '.join(words[:3])}"
+            
+    if format_type == "landscape":
+        prompt = (
+            f"Generate a high-quality landscape illustration (16:9 aspect ratio) representing: {concept}. "
+            "Make it clean, professional, and visually engaging. Do not depict any real-life individuals by name or face. "
+            "Do not write any text or words on the image."
+        )
+    else:
+        prompt = (
+            f"Generate a vertical version (9:16 aspect ratio) of the exact same image (matching the same style, color scheme, and content) representing: {concept}. "
+            "Ensure it does not include any text or words on the image."
+        )
+        
+    return prompt
+
 def get_autocomplete_suggestions(page, topic):
     """
     Topic ko Google Search box me dalta hai aur space ke baad letters (a, b, y, z)
@@ -356,12 +396,13 @@ def get_autocomplete_suggestions(page, topic):
         search_box.click()
         time.sleep(1)
         
-        letters = ['a', 'b', 'y', 'z']
+        # Loop through the entire alphabet a to z to harvest all related keywords
+        letters = [chr(i) for i in range(ord('a'), ord('z') + 1)]
         for l in letters:
             query = f"{topic} {l}"
             print(f"Typing query suggestion sequence: '{query}'...")
             search_box.fill(query)
-            time.sleep(2) # Dropdown loading wait
+            time.sleep(1.5) # Dropdown loading wait
             
             # Scrape suggestion spans
             elements = page.locator('ul[role="listbox"] li div[role="option"] span').all_inner_texts()
@@ -527,6 +568,48 @@ def publish_to_ghost_cms(api_url, api_key, version, post_data, status="draft"):
 
 # ==================== MAIN AUTOMATION FLOW ====================
 
+def submit_prompt_to_gemini(page, prompt_text):
+    """Types a prompt into Gemini and submits it using button click or Control+Enter fallback."""
+    print("Typing prompt into Gemini...")
+    textbox = page.locator("div[role='textbox']").first
+    textbox.click()
+    textbox.fill(prompt_text)
+    time.sleep(1.5)
+    
+    # Try clicking the send button using various selectors
+    clicked = False
+    send_button_selectors = [
+        "button[aria-label*='Send' i]",
+        "button[aria-label*='Submit' i]",
+        "button[aria-label*='भेजें' i]",
+        "button.send-button",
+        "div[role='button'][aria-label*='Send' i]",
+        "gmat-icon-button[aria-label*='Send' i]"
+    ]
+    
+    for sel in send_button_selectors:
+        loc = page.locator(sel)
+        for i in range(loc.count()):
+            btn = loc.nth(i)
+            if btn.is_visible() and btn.is_enabled():
+                print(f"Clicking submit button with selector: {sel}")
+                try:
+                    btn.click(timeout=3000)
+                    clicked = True
+                    break
+                except Exception:
+                    pass
+        if clicked:
+            break
+            
+    if not clicked:
+        # Fallback: Press Control+Enter inside the textbox to submit
+        print("Submit button click failed or not found. Attempting fallback: Control+Enter to submit...")
+        textbox.press("Control+Enter")
+        clicked = True
+        
+    time.sleep(2)
+
 def run_blog_generator_playwright():
     # Ensure Chrome Debugger is running
     launched = launch_chrome_if_needed()
@@ -562,14 +645,7 @@ def run_blog_generator_playwright():
                 "Choose exactly one. Respond with ONLY the chosen topic name, and absolutely nothing else."
             )
             
-            textbox = page.locator("div[role='textbox']")
-            textbox.click()
-            textbox.fill(filter_prompt)
-            time.sleep(1)
-            
-            submit_btn = page.locator("button[aria-label*='Send' i], button[aria-label*='Submit' i], button[aria-label*='भेj' i], button[class*='send-button']").first
-            submit_btn.click()
-            time.sleep(3)
+            submit_prompt_to_gemini(page, filter_prompt)
             
             mic_locator = page.locator("button[aria-label*='microphone' i], button[aria-label*='mic' i], button[aria-label*='माइक्रो' i]")
             stop_locator = page.locator("button[aria-label*='Stop' i], button[aria-label*='रोकें' i]")
@@ -585,50 +661,75 @@ def run_blog_generator_playwright():
                 
             # --- 3. Google Search Autocomplete Suggestions ---
             suggestions = get_autocomplete_suggestions(page, selected_topic)
+            # Limit to top 15 diverse suggestions to prevent prompt clutter and Google SEO keyword stuffing penalties
+            suggestions = suggestions[:15]
             
-            # --- 4. Content Generation Prompt ---
-            print("\n--- STEP 4: Generating Blog Post Content via Gemini ---")
-            # Navigate back to Gemini
+            # --- 4. Content Generation Prompt (Multi-Turn) ---
+            print("\n--- STEP 4: Generating Blog Post Content via Gemini (Multi-Turn) ---")
             page.goto("https://gemini.google.com/app/5d22a66bd735a3fe")
             time.sleep(4)
             
-            content_prompt = f"""
-            Write a comprehensive, long-form, well-researched blog post (minimum 1500 words) about the topic: "{selected_topic}".
+            # TURN 1: Write Introduction Section
+            print("\n--- TURN 1: Generating Introduction ---")
+            prompt_turn1 = (
+                f"We are writing a blog post about the trending topic: \"{selected_topic}\" for QuizViral AI (which automates bulk quiz video creation).\n"
+                f"Target Keyword: \"{selected_topic}\"\n"
+                f"Additional keywords to include: {json.dumps(suggestions)}.\n\n"
+                f"Write a compelling, SEO-optimized Introduction section (minimum 400 words) starting with an <h1> tag containing the target keyword. "
+                "Focus on why this topic is trending and how quiz videos can capture this traffic.\n"
+                "Respond with ONLY raw HTML body content. Do not include <html>, <head>, or <body> wrappers, and do not wrap in markdown code blocks."
+            )
+            submit_prompt_to_gemini(page, prompt_turn1)
+            raw_intro = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=120)
+            print("Successfully read Turn 1 (Introduction) response.")
             
-            TARGET KEYWORD:
-            "{selected_topic}"
-            Make sure this keyword is integrated naturally and is inside the H1 tag at the very beginning.
+            # TURN 2: Write Tutorial & 10 Quiz Questions
+            print("\n--- TURN 2: Generating Tutorial & 10 Quiz Questions ---")
+            prompt_turn2 = (
+                f"Excellent. Now write the second section (minimum 600 words):\n"
+                f"- A step-by-step tutorial on how content creators can use QuizViral AI to mass-produce 100+ quiz videos about \"{selected_topic}\" in 1 click using CSV spreadsheet imports, choosing background loops (Minecraft, Space, Nature), and generating natural AI voiceovers.\n"
+                f"- Include 10 complete quiz questions about \"{selected_topic}\" with 4 options (A, B, C, D) and specify the correct answer clearly. Format these questions as structured HTML lists or tables.\n\n"
+                "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
+            )
+            submit_prompt_to_gemini(page, prompt_turn2)
+            raw_tutorial = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=150)
+            print("Successfully read Turn 2 (Tutorial & Quiz Questions) response.")
             
-            SEO ADDITIONAL KEYWORDS TO INCLUDE:
-            {json.dumps(suggestions)}
+            # TURN 3: Write Monetization & FAQs
+            print("\n--- TURN 3: Generating Monetization & FAQs ---")
+            prompt_turn3 = (
+                f"Excellent. Now write the final section (minimum 500 words):\n"
+                f"- YouTube Quiz Channel Monetization Strategy: securing YPP status (10M shorts views in 90 days), and alternate revenue streams (affiliates, print-on-demand, digital trivia downloads).\n"
+                f"- 3 Frequently Asked Questions (FAQs) about automated quiz channels.\n\n"
+                "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
+            )
+            submit_prompt_to_gemini(page, prompt_turn3)
+            raw_monetization = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=120)
+            print("Successfully read Turn 3 (Monetization & FAQs) response.")
             
-            CRITICAL OUTPUT REQUIREMENT:
-            Respond ONLY with a JSON object in this format. Do not write any markdown code blocks (like ```json), introduction, or explanations outside the JSON. Just start directly with {{ and end with }}.
-            All double quotes inside property values must be single quotes or escaped.
+            # Combine the HTML components
+            html_content = f"{raw_intro}\n{raw_tutorial}\n{raw_monetization}"
+            html_content = clean_markdown_response(html_content)
             
-            Format:
-            {{
-              "title": "A catchy SEO-friendly title containing the keyword",
-              "slug": "url-slug-with-keyword",
-              "excerpt": "A short, engaging 2-sentence summary of the post.",
-              "meta_title": "Meta title exactly 50-60 characters containing keyword 'faceless quiz videos' or 'AI video generator'",
-              "meta_description": "Meta description exactly 145-150 characters containing keyword 'AI video generator' or 'bulk quiz maker'",
-              "html": "<h1>Target Keyword Title</h1><h2>Introduction</h2><p>Article body content in HTML format...</p>",
-              "markdown": "# Target Keyword Title\\n\\n## Introduction\\n\\nArticle body content in Markdown format for the frontend..."
-            }}
-            """
+            # TURN 4: Compile Metadata JSON & Markdown version
+            print("\n--- TURN 4: Compiling Metadata JSON ---")
+            prompt_turn4 = (
+                "Awesome. Based on the complete article we just generated, compile the SEO metadata.\n"
+                "Respond ONLY with a JSON object in this format. Do not wrap in markdown code blocks:\n"
+                "{\n"
+                "  \"title\": \"SEO Headline containing the keyword\",\n"
+                "  \"slug\": \"url-friendly-slug-with-keyword\",\n"
+                "  \"excerpt\": \"Compelling 2-sentence summary of the post\",\n"
+                "  \"meta_title\": \"SEO Meta Title (exactly 50-60 characters featuring keywords like 'faceless quiz videos' or 'AI video generator')\",\n"
+                "  \"meta_description\": \"SEO Meta Description (exactly 145-150 characters featuring keywords like 'AI video generator' or 'bulk quiz maker')\",\n"
+                "  \"markdown\": \"Complete blog post in markdown format (including title, headers, body, 10 quiz questions, and FAQs)\"\n"
+                "}"
+            )
+            submit_prompt_to_gemini(page, prompt_turn4)
+            raw_metadata = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=90)
+            print("Successfully read Turn 4 (Metadata JSON) response.")
             
-            textbox = page.locator("div[role='textbox']")
-            textbox.click()
-            textbox.fill(content_prompt)
-            time.sleep(1)
-            
-            submit_btn = page.locator("button[aria-label*='Send' i], button[aria-label*='Submit' i], button[aria-label*='भेj' i], button[class*='send-button']").first
-            submit_btn.click()
-            time.sleep(3)
-            
-            raw_response = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=240)
-            cleaned_json = clean_markdown_response(raw_response)
+            cleaned_json = clean_markdown_response(raw_metadata)
             
             # Find and parse JSON
             blog_data = None
@@ -641,14 +742,19 @@ def run_blog_generator_playwright():
             else:
                 blog_data = fallback_json_parser(cleaned_json)
                 
-            if not blog_data or "html" not in blog_data:
-                print("Error: Could not parse blog post content from Gemini.")
-                print(f"Raw response: {raw_response[:800]}...")
-                page.close()
-                browser.close()
-                return None
-                
-            print(f"Successfully generated article: '{blog_data.get('title')}'")
+            if not blog_data:
+                print("Error: Could not parse metadata JSON from Gemini. Trying custom build...")
+                blog_data = {
+                    "title": f"The Ultimate Guide to {selected_topic}",
+                    "slug": selected_topic.lower().replace(" ", "-"),
+                    "excerpt": f"Discover how to create viral quiz videos about {selected_topic} automatically.",
+                    "meta_title": f"How to Make Quiz Videos about {selected_topic} Instantly",
+                    "meta_description": f"Learn how to create automated faceless quiz videos about {selected_topic} to grow your channel.",
+                    "markdown": f"# The Ultimate Guide to {selected_topic}\n\n" + html_content.replace("<p>", "").replace("</p>", "\n\n").replace("<h2>", "## ").replace("</h2>", "\n\n")
+                }
+            
+            # Attach combined HTML
+            blog_data["html"] = html_content
             
             # Count current images in Gemini conversation to set baselines
             initial_images = page.locator(".model-response img[src*='googleusercontent.com'], .model-response img[src*='blob:']").all()
@@ -657,15 +763,11 @@ def run_blog_generator_playwright():
             
             # --- 5. Generate Landscape Image ---
             print("\n--- STEP 5: Generating Landscape Image (16:9) ---")
-            image_prompt = (
-                f"Generate a high-quality landscape illustration (16:9 aspect ratio) representing the theme of the blog post: '{blog_data.get('title')}'. "
-                "Keep it clean, professional, and visually engaging. Do not write any text on the image."
-            )
+            image_prompt = create_safe_image_prompt(blog_data.get("title", selected_topic), format_type="landscape")
+            image_prompt += " Generate only one single image. Do not generate multiple options or variations."
+            print(f"Image Prompt: {image_prompt}")
             
-            textbox.click()
-            textbox.fill(image_prompt)
-            time.sleep(1)
-            submit_btn.click()
+            submit_prompt_to_gemini(page, image_prompt)
             
             landscape_path = os.path.join(SCRIPT_DIR, "assets", "landscape_image.png")
             os.makedirs(os.path.dirname(landscape_path), exist_ok=True)
@@ -684,15 +786,11 @@ def run_blog_generator_playwright():
             
             # --- 6. Generate Pinterest Vertical Image ---
             print("\n--- STEP 6: Generating Pinterest Vertical Image (9:16) ---")
-            pinterest_prompt = (
-                "Now generate a vertical version (9:16 aspect ratio) of the exact same image (same style, theme, color scheme, and subjects) for Pinterest. "
-                "Do not write any text on the image."
-            )
+            pinterest_prompt = create_safe_image_prompt(blog_data.get("title", selected_topic), format_type="vertical")
+            pinterest_prompt += " Generate only one single vertical image. Do not generate multiple options or variations."
+            print(f"Pinterest Image Prompt: {pinterest_prompt}")
             
-            textbox.click()
-            textbox.fill(pinterest_prompt)
-            time.sleep(1)
-            submit_btn.click()
+            submit_prompt_to_gemini(page, pinterest_prompt)
             
             pinterest_path = os.path.join(SCRIPT_DIR, "assets", "pinterest_image.png")
             success_pinterest = wait_for_and_download_new_image(page, image_baseline, pinterest_path)

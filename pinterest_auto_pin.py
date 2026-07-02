@@ -206,10 +206,60 @@ def format_pinterest_title(title):
         return truncated + "..."
     return title
 
+def generate_topic_hashtags(title):
+    """Generates relevant topic-specific hashtags from a blog title."""
+    cleaned = re.sub(r'[^\w\s]', '', title.lower())
+    words = cleaned.split()
+    
+    # Stop words to filter out
+    stop_words = {
+        "how", "to", "the", "and", "a", "of", "in", "on", "for", "with", "is", "are", "it", 
+        "that", "your", "best", "fast", "scale", "about", "works", "guide", "free", "ideas", 
+        "make", "money", "grow", "new", "this", "from", "any", "instant", "instantly", "why"
+    }
+    
+    keywords = []
+    for w in words:
+        if w not in stop_words and len(w) > 2 and not w.isdigit():
+            if w not in keywords:
+                keywords.append(w)
+                
+    # Detect multi-word phrases and merge them
+    special_matches = []
+    title_lower = title.lower()
+    if "marvin bagley" in title_lower:
+        special_matches.append("marvinbagley")
+    if "youtube shorts" in title_lower:
+        special_matches.append("youtubeshorts")
+    if "google discover" in title_lower:
+        special_matches.append("googlediscover")
+    if "true crime" in title_lower:
+        special_matches.append("truecrime")
+    if "faceless channel" in title_lower or "faceless youtube" in title_lower:
+        special_matches.append("facelesschannel")
+        
+    tags = []
+    for m in special_matches:
+        tags.append(f"#{m}")
+        
+    # Pick top 4 keywords as hashtags
+    for kw in keywords[:4]:
+        tag = f"#{kw}"
+        if tag not in tags:
+            tags.append(tag)
+            
+    return " ".join(tags)
+
 def format_pinterest_description(title, excerpt, url):
     """Creates a rich description within Pinterest's 500-char limit including the post link"""
     header = f"💡 {title}\n\n"
-    cta = f"\n\nRead the full blog post and take the interactive quiz here:\n👉 {url}\n\nCreate viral trivia quizzes instantly with QuizViral AI!\n#quiz #trivia #viral #quizviral #contentcreator"
+    
+    # Generate dynamic, topic-relevant hashtags
+    topic_tags = generate_topic_hashtags(title)
+    base_tags = "#quiz #trivia #viral #quizviral #contentcreator"
+    all_tags = f"{topic_tags} {base_tags}".strip()
+    
+    cta = f"\n\nRead the full blog post and take the interactive quiz here:\n👉 {url}\n\nCreate viral trivia quizzes instantly with QuizViral AI!\n{all_tags}"
     
     # Calculate space left for excerpt
     max_excerpt_len = 500 - len(header) - len(cta) - 10 # buffer

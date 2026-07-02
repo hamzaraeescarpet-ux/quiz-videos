@@ -1,5 +1,22 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to jonathan kuminga",
+  slug: "jonathan-kuminga",
+  excerpt: "Discover how to create viral quiz videos about jonathan kuminga automatically.",
+  date: "July 02, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&h=675&q=80",
+  pinterest_image: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&h=675&q=80",
+  metaDescription: "Learn how to create automated faceless quiz videos about jonathan kuminga to grow your channel. Build viral automated quiz channels easily. Import que",
+  seoKeywords: [
+    "jonathan kuminga",
+    "QuizViral AI"
+  ],
+  content: "# The Ultimate Guide to jonathan kuminga\n\n",
+  trendingKeyword: "jonathan kuminga"
+},
+  {
   title: "The Evolution of Marvin Bagley III: College Dominance, NBA Reality, and the Path Ahead",
   slug: "marvin-bagley-nba-career-stats-evolution",
   excerpt: "Explore the complete basketball journey of Marvin Bagley III, from his historic dominance at Duke to his evolving role in the NBA. This detailed profile tracks his stats, team transitions, and newest opportunities.",
