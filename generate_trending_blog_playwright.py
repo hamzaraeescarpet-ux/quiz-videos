@@ -98,6 +98,9 @@ def kill_chrome_on_port_9222():
     return False
 
 def launch_chrome_if_needed():
+    # Force kill any active debug Chrome instances first to ensure a fresh session with our new flags!
+    kill_chrome_on_port_9222()
+    
     if check_port_open(9222):
         print("Chrome remote debugger is already running on port 9222.")
         return True
@@ -133,6 +136,11 @@ def launch_chrome_if_needed():
         "--disable-default-apps",
         "--disable-session-crashed-bubble",
         "--hide-crash-restore-bubble",
+        "--disable-extensions", # Disable extensions to stop permission popups
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--disable-ipc-flooding-protection"
     ]
     
     try:
@@ -197,46 +205,80 @@ def fallback_json_parser(raw_json):
         print(f"Fallback JSON regex parser failed: {e}")
     return None
 
-def wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=180):
+def wait_for_gemini_response(page, max_wait_seconds=600):
+    print("Waiting for Gemini response...")
     start_time = time.time()
-    generation_done = False
+    
+    # Wait for the generation to start (give it a few seconds to toggle buttons)
+    time.sleep(4)
+    
     last_text = ""
-
+    stable_count = 0
+    
     while time.time() - start_time < max_wait_seconds:
-        try:
-            is_mic_visible = False
-            if mic_locator.count() > 0:
-                for i in range(mic_locator.count()):
-                    if mic_locator.nth(i).is_visible():
-                        is_mic_visible = True
-                        break
-
-            is_stop_visible = False
-            if stop_locator.count() > 0:
-                for i in range(stop_locator.count()):
-                    if stop_locator.nth(i).is_visible():
-                        is_stop_visible = True
-                        break
-
-            if is_mic_visible and not is_stop_visible:
-                print("Gemini response is ready!")
-                generation_done = True
-                break
-        except Exception:
-            break
-        time.sleep(2)
-
-    if not generation_done:
-        print("Warning: Timed out waiting for mic button. Checking text stability...")
-        for _ in range(15):
-            time.sleep(2)
-            responses = page.locator(".model-response, .message-content, message-content")
-            if responses.count() > 0:
-                current_text = responses.last.inner_text()
-                if current_text == last_text and len(current_text) > 100:
+        # Check Stop button visibility
+        stop_btns = page.locator("button[aria-label*='Stop' i], button[aria-label*='रोकें' i], button[class*='stop-button'], button[class*='stop']").all()
+        is_stop_visible = False
+        for btn in stop_btns:
+            try:
+                if btn.is_visible():
+                    is_stop_visible = True
                     break
-                last_text = current_text
-
+            except Exception:
+                pass
+                
+        # Check Mic button visibility
+        mic_btns = page.locator("button[aria-label*='mic' i], button[aria-label*='microphone' i], button[aria-label*='माइक' i], button[aria-label*='voice' i], button[aria-label*='Voice' i]").all()
+        is_mic_visible = False
+        for btn in mic_btns:
+            try:
+                if btn.is_visible():
+                    is_mic_visible = True
+                    break
+            except Exception:
+                pass
+                
+        # Check Send/Submit button visibility/enabled state
+        send_btns = page.locator("button[aria-label*='Send' i], button[aria-label*='Submit' i], button[aria-label*='भेजें' i], button.send-button").all()
+        is_send_enabled = False
+        for btn in send_btns:
+            try:
+                if btn.is_visible() and btn.is_enabled():
+                    is_send_enabled = True
+                    break
+            except Exception:
+                pass
+                
+        # Get current response text
+        responses = page.locator(".model-response, .message-content, message-content")
+        current_text = ""
+        if responses.count() > 0:
+            try:
+                current_text = responses.last.inner_text().strip()
+            except Exception:
+                pass
+            
+        # STRICT MODEL RESOLUTION RULE:
+        # 1. Stop button must be completely hidden
+        # 2. Mic button must be visible OR Send button must be active/enabled
+        # 3. We must have some response content (> 2 chars) loaded
+        if not is_stop_visible and (is_mic_visible or is_send_enabled) and len(current_text) > 2:
+            print("Generation complete! (Stop button is hidden, Mic/Send button is visible & active).")
+            return current_text
+            
+        # Backup text stability check in case of unexpected DOM changes
+        if len(current_text) > 2:
+            if current_text == last_text:
+                stable_count += 1
+                if stable_count >= 5: # Stable for 10 seconds
+                    print("Generation complete (Text is stable fallback).")
+                    return current_text
+            else:
+                stable_count = 0
+                
+        last_text = current_text
+        time.sleep(2)
+        
     responses = page.locator(".model-response, .message-content, message-content")
     if responses.count() > 0:
         return responses.last.inner_text()
@@ -282,24 +324,25 @@ def get_trends_from_page_and_rss(page):
     print("\n--- STEP 1: Scraping Google Trends US Page ---")
     try:
         page.goto("https://trends.google.com/trending?geo=US")
-        time.sleep(6)
+        # Allow sufficient time for the grid and content to load
+        time.sleep(8)
         
-        # Scrape grid cell row texts
-        elements = page.locator('div[role="row"] div[role="gridcell"]').all_inner_texts()
-        for el in elements:
-            val = el.strip().split('\n')[0]
-            if val and len(val) > 2 and len(val) < 40 and not val.isdigit():
-                if val not in trends and not any(x in val.lower() for x in ["search", "explore", "trending", "menu", "sign in"]):
-                    trends.append(val)
-                    
-        # Check anchors backup
-        if len(trends) < 5:
-            anchors = page.locator('td.query a, .trend-card a, tr td a').all_inner_texts()
-            for el in anchors:
-                val = el.strip()
-                if val and len(val) > 2 and len(val) < 40:
-                    if val not in trends:
-                        trends.append(val)
+        # Extract all visible text lines from the body
+        body_text = page.locator("body").inner_text()
+        lines = [line.strip() for line in body_text.split("\n") if line.strip()]
+        
+        for i in range(len(lines) - 1):
+            line = lines[i]
+            next_line = lines[i+1]
+            
+            # Check if the next line represents a search volume indicator (e.g. 2M+, 500K+, 10K+)
+            # Starts with a number, ends with '+'
+            if re.match(r'^\d+.*?\+$', next_line):
+                # Clean candidate keyword
+                if len(line) > 2 and len(line) < 50:
+                    if not any(x in line.lower() for x in ["search", "explore", "trending", "active", "arrow", "percent", "hours ago"]):
+                        if line not in trends:
+                            trends.append(line)
     except Exception as e:
         print(f"Error scraping Trends page: {e}")
 
@@ -570,11 +613,23 @@ def publish_to_ghost_cms(api_url, api_key, version, post_data, status="draft"):
 
 def submit_prompt_to_gemini(page, prompt_text):
     """Types a prompt into Gemini and submits it using button click or Control+Enter fallback."""
-    print("Typing prompt into Gemini...")
+    print("Waiting for Gemini input box to be ready...")
     textbox = page.locator("div[role='textbox']").first
+    try:
+        textbox.wait_for(state="visible", timeout=30000)
+    except Exception as e:
+        print(f"Warning: Input box wait timed out: {e}")
+        
+    print("Typing prompt into Gemini...")
     textbox.click()
     textbox.fill(prompt_text)
-    time.sleep(1.5)
+    time.sleep(0.5)
+    
+    # Trigger input change listeners by typing space and backspace
+    textbox.press(" ")
+    time.sleep(0.2)
+    textbox.press("Backspace")
+    time.sleep(1)
     
     # Try clicking the send button using various selectors
     clicked = False
@@ -622,21 +677,34 @@ def run_blog_generator_playwright():
             # Connect over CDP
             browser = p.chromium.connect_over_cdp("http://localhost:9222")
             context = browser.contexts[0]
-            page = context.new_page()
+            
+            # Create main Gemini page
+            gemini_page = context.new_page()
             
             # --- 1. Scrape Trends ---
-            top_trends = get_trends_from_page_and_rss(page)
+            # We use a temporary page for trends scraping so gemini_page doesn't navigate away
+            print("\n--- STEP 1: Scraping Google Trends ---")
+            temp_page = context.new_page()
+            top_trends = get_trends_from_page_and_rss(temp_page)
+            temp_page.close()
+            
             if not top_trends:
                 print("No trending topics found. Aborting.")
-                page.close()
-                browser.close()
+                gemini_page.close()
                 return None
                 
             print(f"Top trends to filter: {top_trends}")
             
             # --- 2. Navigate to Gemini to filter trend ---
             print("\n--- STEP 2: Connecting to Gemini for topic filtering ---")
-            page.goto("https://gemini.google.com/app/5d22a66bd735a3fe")
+            gemini_page.goto("https://gemini.google.com/app/5d22a66bd735a3fe")
+            
+            # Wait for text box to load
+            textbox = gemini_page.locator("div[role='textbox']").first
+            try:
+                textbox.wait_for(state="visible", timeout=30000)
+            except Exception:
+                pass
             time.sleep(5)
             
             filter_prompt = (
@@ -645,12 +713,9 @@ def run_blog_generator_playwright():
                 "Choose exactly one. Respond with ONLY the chosen topic name, and absolutely nothing else."
             )
             
-            submit_prompt_to_gemini(page, filter_prompt)
+            submit_prompt_to_gemini(gemini_page, filter_prompt)
             
-            mic_locator = page.locator("button[aria-label*='microphone' i], button[aria-label*='mic' i], button[aria-label*='माइक्रो' i]")
-            stop_locator = page.locator("button[aria-label*='Stop' i], button[aria-label*='रोकें' i]")
-            
-            selected_topic = wait_for_gemini_response(page, mic_locator, stop_locator).strip()
+            selected_topic = wait_for_gemini_response(gemini_page).strip()
             # Clean possible markdown or quote wrappers by Gemini
             selected_topic = selected_topic.strip('"\'`').replace('\n', '').strip()
             print(f"Gemini selected topic: '{selected_topic}'")
@@ -660,14 +725,18 @@ def run_blog_generator_playwright():
                 selected_topic = top_trends[0]
                 
             # --- 3. Google Search Autocomplete Suggestions ---
-            suggestions = get_autocomplete_suggestions(page, selected_topic)
+            # We use a temporary page for autocomplete so gemini_page doesn't navigate away
+            print("\n--- STEP 3: Scraping Google Autocomplete ---")
+            search_page = context.new_page()
+            suggestions = get_autocomplete_suggestions(search_page, selected_topic)
+            search_page.close()
+            
             # Limit to top 15 diverse suggestions to prevent prompt clutter and Google SEO keyword stuffing penalties
             suggestions = suggestions[:15]
             
             # --- 4. Content Generation Prompt (Multi-Turn) ---
             print("\n--- STEP 4: Generating Blog Post Content via Gemini (Multi-Turn) ---")
-            page.goto("https://gemini.google.com/app/5d22a66bd735a3fe")
-            time.sleep(4)
+            # We do NOT reload the page here. We just send the prompt directly in the active gemini_page thread!
             
             # TURN 1: Write Introduction Section
             print("\n--- TURN 1: Generating Introduction ---")
@@ -679,8 +748,8 @@ def run_blog_generator_playwright():
                 "Focus on why this topic is trending and how quiz videos can capture this traffic.\n"
                 "Respond with ONLY raw HTML body content. Do not include <html>, <head>, or <body> wrappers, and do not wrap in markdown code blocks."
             )
-            submit_prompt_to_gemini(page, prompt_turn1)
-            raw_intro = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=120)
+            submit_prompt_to_gemini(gemini_page, prompt_turn1)
+            raw_intro = wait_for_gemini_response(gemini_page, max_wait_seconds=120)
             print("Successfully read Turn 1 (Introduction) response.")
             
             # TURN 2: Write Tutorial & 10 Quiz Questions
@@ -691,8 +760,8 @@ def run_blog_generator_playwright():
                 f"- Include 10 complete quiz questions about \"{selected_topic}\" with 4 options (A, B, C, D) and specify the correct answer clearly. Format these questions as structured HTML lists or tables.\n\n"
                 "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
             )
-            submit_prompt_to_gemini(page, prompt_turn2)
-            raw_tutorial = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=150)
+            submit_prompt_to_gemini(gemini_page, prompt_turn2)
+            raw_tutorial = wait_for_gemini_response(gemini_page, max_wait_seconds=150)
             print("Successfully read Turn 2 (Tutorial & Quiz Questions) response.")
             
             # TURN 3: Write Monetization & FAQs
@@ -703,8 +772,8 @@ def run_blog_generator_playwright():
                 f"- 3 Frequently Asked Questions (FAQs) about automated quiz channels.\n\n"
                 "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
             )
-            submit_prompt_to_gemini(page, prompt_turn3)
-            raw_monetization = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=120)
+            submit_prompt_to_gemini(gemini_page, prompt_turn3)
+            raw_monetization = wait_for_gemini_response(gemini_page, max_wait_seconds=120)
             print("Successfully read Turn 3 (Monetization & FAQs) response.")
             
             # Combine the HTML components
@@ -725,8 +794,8 @@ def run_blog_generator_playwright():
                 "  \"markdown\": \"Complete blog post in markdown format (including title, headers, body, 10 quiz questions, and FAQs)\"\n"
                 "}"
             )
-            submit_prompt_to_gemini(page, prompt_turn4)
-            raw_metadata = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=90)
+            submit_prompt_to_gemini(gemini_page, prompt_turn4)
+            raw_metadata = wait_for_gemini_response(gemini_page, max_wait_seconds=90)
             print("Successfully read Turn 4 (Metadata JSON) response.")
             
             cleaned_json = clean_markdown_response(raw_metadata)
@@ -757,7 +826,7 @@ def run_blog_generator_playwright():
             blog_data["html"] = html_content
             
             # Count current images in Gemini conversation to set baselines
-            initial_images = page.locator(".model-response img[src*='googleusercontent.com'], .model-response img[src*='blob:']").all()
+            initial_images = gemini_page.locator(".model-response img[src*='googleusercontent.com'], .model-response img[src*='blob:']").all()
             image_baseline = len(initial_images)
             print(f"Initial images count in chat: {image_baseline}")
             
@@ -767,12 +836,12 @@ def run_blog_generator_playwright():
             image_prompt += " Generate only one single image. Do not generate multiple options or variations."
             print(f"Image Prompt: {image_prompt}")
             
-            submit_prompt_to_gemini(page, image_prompt)
+            submit_prompt_to_gemini(gemini_page, image_prompt)
             
             landscape_path = os.path.join(SCRIPT_DIR, "assets", "landscape_image.png")
             os.makedirs(os.path.dirname(landscape_path), exist_ok=True)
             
-            success_landscape = wait_for_and_download_new_image(page, image_baseline, landscape_path)
+            success_landscape = wait_for_and_download_new_image(gemini_page, image_baseline, landscape_path)
             if success_landscape:
                 blog_data["local_image"] = landscape_path
             else:
@@ -781,7 +850,7 @@ def run_blog_generator_playwright():
                 
             # Update image baseline for next prompt
             time.sleep(2)
-            current_images = page.locator(".model-response img[src*='googleusercontent.com'], .model-response img[src*='blob:']").all()
+            current_images = gemini_page.locator(".model-response img[src*='googleusercontent.com'], .model-response img[src*='blob:']").all()
             image_baseline = len(current_images)
             
             # --- 6. Generate Pinterest Vertical Image ---
@@ -790,10 +859,10 @@ def run_blog_generator_playwright():
             pinterest_prompt += " Generate only one single vertical image. Do not generate multiple options or variations."
             print(f"Pinterest Image Prompt: {pinterest_prompt}")
             
-            submit_prompt_to_gemini(page, pinterest_prompt)
+            submit_prompt_to_gemini(gemini_page, pinterest_prompt)
             
             pinterest_path = os.path.join(SCRIPT_DIR, "assets", "pinterest_image.png")
-            success_pinterest = wait_for_and_download_new_image(page, image_baseline, pinterest_path)
+            success_pinterest = wait_for_and_download_new_image(gemini_page, image_baseline, pinterest_path)
             if success_pinterest:
                 blog_data["local_pinterest_image"] = pinterest_path
             else:
@@ -801,7 +870,7 @@ def run_blog_generator_playwright():
                 blog_data["local_pinterest_image"] = None
                 
             # Close browser
-            page.close()
+            gemini_page.close()
             browser.close()
             
             blog_data["trendingKeyword"] = selected_topic
@@ -812,8 +881,6 @@ def run_blog_generator_playwright():
             import traceback
             traceback.print_exc()
             
-    return None
-
 
 def get_latest_fb_video():
     # Facebook page video scraping logic (preserved from original code)
