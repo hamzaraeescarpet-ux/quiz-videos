@@ -772,7 +772,7 @@ def get_latest_blog_post():
             object_str = array_match.group(1)
             
             blog_data = {}
-            for field in ["title", "slug", "excerpt", "image"]:
+            for field in ["title", "slug", "excerpt", "image", "pinterest_image"]:
                 val = extract_js_field(object_str, field)
                 if val:
                     blog_data[field] = val
@@ -787,15 +787,25 @@ def get_latest_blog_post():
 def run_pinterest_syndication(blog_data):
     print("=================== PINTEREST SYNDICATION START ===================")
     
-    # Pre-check for image field
-    image_url = blog_data.get("image")
+    # Pre-check for Pinterest image field, falling back to main image field
+    image_url = blog_data.get("pinterest_image") or blog_data.get("image")
     if not image_url:
-        print("Aborting Pinterest syndication: 'image' field not found in blog post data.")
+        print("Aborting Pinterest syndication: 'image' or 'pinterest_image' field not found in blog post data.")
         return
         
-    local_image = download_temp_image(image_url)
+    # If the image is a URL, download it. If it is already a local path, use it directly!
+    if image_url.startswith("http://") or image_url.startswith("https://"):
+        local_image = download_temp_image(image_url)
+    else:
+        if os.path.exists(image_url):
+            print(f"Using local Pinterest image: {image_url}")
+            local_image = image_url
+        else:
+            print(f"Aborting Pinterest syndication: Local image path not found: {image_url}")
+            return
+            
     if not local_image:
-        print("Aborting Pinterest syndication: Could not download image.")
+        print("Aborting Pinterest syndication: Could not resolve image.")
         return
         
     full_url = f"https://quizviral-nine.vercel.app/blog/{blog_data['slug']}"

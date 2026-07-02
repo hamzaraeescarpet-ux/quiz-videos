@@ -1,11 +1,31 @@
+#!/usr/bin/env python3
+"""
+QuizViral AI - Trending Blog Post Generator (Playwright & Gemini)
+================================================================
+This script automates the full SEO blog generation pipeline using Playwright
+to control Chrome (port 9222):
+1. Navigates to Google Trends (US) to scrape the top 5 trending topics.
+2. Prompts Gemini to select the easiest/most interesting topic for a quiz video.
+3. Performs Google Autocomplete Suggestion research by typing the topic + ' a', ' b', ' y', ' z'.
+4. Generates a 1500+ words SEO-optimized blog post in both HTML (for Ghost) and Markdown (for Vercel frontend).
+5. Generates a landscape header image (16:9) and a vertical Pinterest image (9:16) using Gemini, downloading both.
+6. Uploads the landscape header to Ghost CMS and publishes the post to Ghost CMS Admin API v2.
+7. Updates the frontend data file `blogPosts.js`, updates sitemap.xml, and triggers Vercel/GitHub deployments.
+8. Automatically triggers Pinterest syndication using the vertical image.
+"""
+
 import os
 import sys
 import re
 import json
 import time
-import xml.etree.ElementTree as ET
+import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 import subprocess
+import hmac
+import hashlib
+import base64
 from datetime import datetime
 from playwright.sync_api import sync_playwright
 
@@ -19,312 +39,38 @@ except Exception:
     pass
 
 # ==================== CONFIGURATION ====================
-# आपके Chrome Profile का पाथ (लॉगिन सेशन बनाए रखने के लिए)
 CHROME_PROFILE_PATH = r"C:\Users\hamza\Downloads\python development\browser automation\gemini video points\bulk scheduling fb videos\chrome_profile_2"
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BLOG_POSTS_FILE = os.path.join(SCRIPT_DIR, "frontend", "src", "data", "blogPosts.js")
-# ========================================================
 
+# Ghost CMS Credentials (loaded from environment variables, falls back to local values)
+GHOST_API_URL = os.environ.get("GHOST_API_URL", "")
+GHOST_ADMIN_API_KEY = os.environ.get("GHOST_ADMIN_API_KEY", "")
+GHOST_API_VERSION = os.environ.get("GHOST_API_VERSION", "v2")
+CTA_URL = os.environ.get("CTA_URL", "https://quizviral-nine.vercel.app")
+BLOG_BASE_URL = os.environ.get("BLOG_BASE_URL", "https://quizviral-nine.vercel.app/blog")
+PUBLISH_STATUS = os.environ.get("PUBLISH_STATUS", "draft") # Use "draft" to review first
 
-# Topics to SKIP — US legal/medical ad-spend keywords that pollute trends
-_SKIP_KEYWORDS = [
-    "lawyer", "attorney", "lawsuit", "accident", "injury", "mesothelioma",
-    "rehab", "treatment center", "drug rehab", "insurance", "settlement",
-    "compensation", "mortgage", "loan", "credit", "debt", "bankruptcy",
-    "addiction", "detox", "clinic", "hospital", "cancer", "disease",
-    "symptoms", "diagnosis", "medicare", "medicaid", "tax relief",
-    "car crash", "truck accident", "slip and fall", "personal injury",
-    "class action", "malpractice", "dui", "divorce", "custody",
-]
+# Imports from helper script for interlinking and alt-tags
+try:
+    from ghost_blog_automation import (
+        validate_meta_title,
+        validate_meta_description,
+        apply_smart_interlinking,
+        set_image_alt_tags,
+        load_existing_blogs
+    )
+except ImportError:
+    # Inline fallbacks if ghost_blog_automation is not available
+    def validate_meta_title(t): return t[:60]
+    def validate_meta_description(d): return d[:150]
+    def apply_smart_interlinking(h, b, c, u): return h
+    def set_image_alt_tags(h, k, t): return h
+    def load_existing_blogs(s): return {}
 
-def _is_relevant_topic(topic):
-    """Returns True if topic is relevant (pop culture, sports, tech, entertainment)."""
-    topic_lower = topic.lower()
-    # Skip if any spam keyword is in the topic
-    for skip in _SKIP_KEYWORDS:
-        if skip in topic_lower:
-            return False
-    # Skip very short or generic topics
-    if len(topic.strip()) < 4:
-        return False
-    return True
-
-def extract_field_values(field_name, content):
-    """Extracts quoted field values (using double, single, or backtick quotes) from content."""
-    pattern = rf"{field_name}:\s*(?:\"([^\"]*)\"|'([^']*)'|`([^`]*)`)"
-    matches = re.findall(pattern, content)
-    values = []
-    for m in matches:
-        val = m[0] or m[1] or m[2]
-        if val:
-            values.append(val)
-    return values
-
-def is_keyword_already_published(keyword):
-    """Checks if a blog post matching this keyword already exists in blogPosts.js"""
-    if not os.path.exists(BLOG_POSTS_FILE):
-        return False
-    try:
-        with open(BLOG_POSTS_FILE, "r", encoding="utf-8") as f:
-            content = f.read()
-        
-        # Extract fields using regex
-        titles = extract_field_values("title", content)
-        slugs = extract_field_values("slug", content)
-        trending_keywords = extract_field_values("trendingKeyword", content)
-        
-        keyword_lower = keyword.lower().strip()
-        
-        # 1. Direct check on trendingKeyword field
-        for tk in trending_keywords:
-            tk_lower = tk.lower().strip()
-            if keyword_lower == tk_lower or keyword_lower in tk_lower or tk_lower in keyword_lower:
-                return True
-                
-        # 2. Direct check on title and slug
-        for t in titles:
-            if keyword_lower in t.lower():
-                return True
-        for s in slugs:
-            if keyword_lower.replace(" ", "-") in s.lower() or s.lower().replace("-", " ") in keyword_lower:
-                return True
-                
-        # 3. Check inside seoKeywords arrays
-        seo_blocks = re.findall(r"seoKeywords:\s*\[(.*?)\]", content, re.DOTALL)
-        for block in seo_blocks:
-            keywords_in_block = [k.strip().strip("'\"`").lower() for k in block.split(",") if k.strip()]
-            for kw in keywords_in_block:
-                if keyword_lower == kw or keyword_lower in kw or kw in keyword_lower:
-                    # Avoid false positives on very common words
-                    if len(keyword_lower) > 3 and keyword_lower not in ["quiz", "viral", "shorts", "youtube", "best", "free"]:
-                        return True
-                
-        # 4. Word overlap check to avoid duplicate themes
-        words = [w for w in re.split(r'\W+', keyword_lower) if len(w) > 3]
-        if words:
-            for t in titles:
-                t_lower = t.lower()
-                if all(w in t_lower for w in words):
-                    return True
-    except Exception as e:
-        print(f"Error checking duplicate posts: {e}")
-    return False
-
-
-
-def get_trending_keyword(index=0):
-    """
-    Google Trends RSS Feed se trending keyword nikalta hai.
-    Spam/irrelevant topics (lawyers, rehab etc) ko skip karta hai.
-    Agar koi relevant topic nahi milta, creator-friendly fallback use karta hai.
-    """
-    print(f"Fetching trending keywords from Google Trends (want index ~{index})...")
-
-    # Curated fallbacks if Google Trends gives only garbage
-    CREATOR_FALLBACKS = [
-        "viral YouTube Shorts ideas",
-        "faceless YouTube channel tips",
-        "how to grow on TikTok 2025",
-        "best AI tools for content creators",
-        "YouTube automation income",
-        "trending quiz topics for YouTube",
-        "viral trivia video ideas",
-        "how to go viral on Instagram Reels",
-    ]
-
-    # Try both US and IN trends to get variety
-    geo_list = ["US"]
-    all_topics = []
-
-    for geo in geo_list:
-        url = f"https://trends.google.com/trending/rss?geo={geo}"
-        try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=10) as response:
-                xml_data = response.read()
-            root = ET.fromstring(xml_data)
-            items = root.findall(".//item")
-            for item in items:
-                title_el = item.find("title")
-                if title_el is not None and title_el.text:
-                    all_topics.append(title_el.text.strip())
-        except Exception as e:
-            print(f"Google Trends ({geo}) fetch failed: {e}")
-
-    # Filter relevant topics
-    relevant = [t for t in all_topics if _is_relevant_topic(t)]
-    print(f"Total trends fetched: {len(all_topics)}, Relevant after filtering: {len(relevant)}")
-
-    if relevant:
-        # Pick by index (mod to stay in bounds)
-        picked = relevant[index % len(relevant)]
-        print(f"Selected trending topic: '{picked}'")
-        return picked
-
-    # Nothing relevant — use creator-friendly fallback
-    fallback = CREATOR_FALLBACKS[index % len(CREATOR_FALLBACKS)]
-    print(f"No relevant trends found. Using creator fallback: '{fallback}'")
-    return fallback
-
-
-
-# =============================================================================
-# IMAGE CASCADE: Pixabay → Pexels → Unsplash → Wikipedia
-# All free, all HD, 3 API keys each for rotation & rate-limit bypass
-# =============================================================================
-_PIXABAY_KEYS = [
-    "54314916-5f365780e5c27849c23bc950f",   # hamzaraeescarpet
-    "56417685-c45a05a6f9a78c8d4170368f9",   # deshkikhabar
-    "56417696-67f37932e14092cf9a67139f9",   # aajkikhabar34
-]
-_PEXELS_KEYS = [
-    "NqX67bkvlFlTSnZmIFSFNIchLP0ARNW0X2OfaTWJvp7IJNXsIzOWQ1bH",  # hamzaraeescarpet
-    "GT9G57i8szub34xyk134pm4BbdVwgKzYsvjCFTer1lyF7u9nhe1vxrBT",  # aajkikhabar34
-    "PKiIguzl3Pox7aMpM7PKb4iX7kKi2JJJC6r2pidstpUAFgHdA6HgM2CL",  # deshkikhabar34
-]
-_pix_idx = 0
-_pex_idx = 0
-
-def _get_pixabay_key():
-    global _pix_idx
-    k = _PIXABAY_KEYS[_pix_idx % len(_PIXABAY_KEYS)]
-    _pix_idx += 1
-    return k
-
-def _get_pexels_key():
-    global _pex_idx
-    k = _PEXELS_KEYS[_pex_idx % len(_PEXELS_KEYS)]
-    _pex_idx += 1
-    return k
-
-def get_blog_image(keyword):
-    """
-    Fetches an HD blog featured image using a 4-tier cascade:
-      1. Pixabay  (HD/4K, 3 rotating keys) — PRIMARY
-      2. Pexels   (HD/4K, 3 rotating keys) — SECONDARY
-      3. Unsplash (napi search, unofficial but widely used) — TERTIARY
-      4. Wikipedia thumbnail — LAST RESORT
-    Returns a landscape image URL (1200x675 / 16:9) suitable for blog headers.
-    """
-    import ssl
-    import urllib.parse
-    ssl_ctx = ssl._create_unverified_context()
-
-    # Use a richer query for blog-style imagery
-    query = f"{keyword} technology creator" if "quiz" in keyword.lower() else keyword
-    encoded = urllib.parse.quote(query)
-
-    # ------------------------------------------------------------------
-    # TIER 1: Pixabay (HD photos, 3 rotating API keys)
-    # ------------------------------------------------------------------
-    print(f"[BlogImage] Trying Pixabay for: '{query}'...")
-    for _ in range(len(_PIXABAY_KEYS)):
-        api_key = _get_pixabay_key()
-        try:
-            url = (
-                f"https://pixabay.com/api/?key={api_key}"
-                f"&q={encoded}&image_type=photo&per_page=5"
-                f"&safesearch=true&min_width=1200&order=popular"
-                f"&orientation=horizontal"
-            )
-            req = urllib.request.Request(url, headers={'User-Agent': 'QuizViralBot/2.0'})
-            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                hits = data.get("hits", [])
-                if hits:
-                    img = hits[0]
-                    img_url = (
-                        img.get("fullHDURL") or
-                        img.get("largeImageURL") or
-                        img.get("webformatURL")
-                    )
-                    if img_url:
-                        print(f"[BlogImage] Pixabay SUCCESS: {img_url[:80]}...")
-                        return img_url
-        except Exception as e:
-            print(f"[BlogImage] Pixabay attempt failed: {e}")
-
-    # ------------------------------------------------------------------
-    # TIER 2: Pexels (HD photos, 3 rotating API keys)
-    # ------------------------------------------------------------------
-    print(f"[BlogImage] Pixabay failed — trying Pexels...")
-    for _ in range(len(_PEXELS_KEYS)):
-        api_key = _get_pexels_key()
-        try:
-            url = f"https://api.pexels.com/v1/search?query={encoded}&per_page=5&size=large&orientation=landscape"
-            req = urllib.request.Request(
-                url,
-                headers={'Authorization': api_key, 'User-Agent': 'QuizViralBot/2.0'}
-            )
-            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                photos = data.get("photos", [])
-                if photos:
-                    src = photos[0].get("src", {})
-                    img_url = src.get("large2x") or src.get("original") or src.get("large")
-                    if img_url:
-                        print(f"[BlogImage] Pexels SUCCESS: {img_url[:80]}...")
-                        return img_url
-        except Exception as e:
-            print(f"[BlogImage] Pexels attempt failed: {e}")
-
-    # ------------------------------------------------------------------
-    # TIER 3: Unsplash (unofficial napi, reliable enough as tertiary)
-    # ------------------------------------------------------------------
-    print(f"[BlogImage] Pexels failed — trying Unsplash napi...")
-    try:
-        search_url = f"https://unsplash.com/napi/search/photos?query={encoded}&per_page=5"
-        req = urllib.request.Request(
-            search_url,
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        )
-        with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            results = data.get("results", [])
-            if results:
-                base_url = results[0]["urls"]["regular"].split("?")[0]
-                img_url = f"{base_url}?auto=format&fit=crop&w=1200&h=675&q=80"
-                print(f"[BlogImage] Unsplash SUCCESS: {img_url[:80]}...")
-                return img_url
-    except Exception as e:
-        print(f"[BlogImage] Unsplash napi failed: {e}")
-
-    # ------------------------------------------------------------------
-    # TIER 4: Wikipedia thumbnail (last resort)
-    # ------------------------------------------------------------------
-    print(f"[BlogImage] Unsplash failed — trying Wikipedia fallback...")
-    try:
-        search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(keyword)}&utf8=&format=json&srlimit=1"
-        req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as response:
-            search_data = json.loads(response.read().decode('utf-8'))
-            search_results = search_data.get("query", {}).get("search", [])
-            if search_results:
-                best_title = search_results[0]["title"]
-                image_url_api = f"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=thumbnail&pithumbsize=1280&titles={urllib.parse.quote(best_title)}&redirects=1"
-                req2 = urllib.request.Request(image_url_api, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req2, timeout=10, context=ssl_ctx) as response2:
-                    img_data = json.loads(response2.read().decode('utf-8'))
-                    pages = img_data.get("query", {}).get("pages", {})
-                    for page_id, page_data in pages.items():
-                        if "thumbnail" in page_data:
-                            wiki_img = page_data["thumbnail"]["source"]
-                            print(f"[BlogImage] Wikipedia SUCCESS: {wiki_img}")
-                            return wiki_img
-    except Exception as e:
-        print(f"[BlogImage] Wikipedia fallback failed: {e}")
-
-    # Hardcoded safe fallback
-    print("[BlogImage] All sources failed. Using hardcoded fallback image.")
-    return "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&h=675&q=80"
-
-# Keep old name as alias for backward compatibility
-def get_unsplash_image(keyword):
-    return get_blog_image(keyword)
+# ==================== HELPERS ====================
 
 def check_port_open(port):
-
     import socket
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -334,15 +80,29 @@ def check_port_open(port):
     except Exception:
         return False
 
+def kill_chrome_on_port_9222():
+    print("Checking if port 9222 is busy...")
+    try:
+        output = subprocess.check_output("netstat -aon", shell=True).decode('utf-8', errors='ignore')
+        for line in output.splitlines():
+            if ":9222" in line and "LISTENING" in line:
+                parts = line.strip().split()
+                if len(parts) >= 5:
+                    pid = parts[-1]
+                    print(f"Terminating Chrome process (PID: {pid}) listening on port 9222...")
+                    subprocess.run(f"taskkill /F /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    time.sleep(2)
+                    return True
+    except Exception as e:
+        print(f"Error terminating Chrome process: {e}")
+    return False
+
 def launch_chrome_if_needed():
     if check_port_open(9222):
-        print("Chrome remote debugger is already running. Closing it to launch fresh in headless mode...")
-        kill_chrome_on_port_9222()
-        time.sleep(2)
+        print("Chrome remote debugger is already running on port 9222.")
+        return True
         
-    print("Launching Chrome in headless mode...")
-    
-    # Common Chrome executable paths on Windows
+    print("Launching Chrome in headful mode for Playwright remote connection...")
     paths = [
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
@@ -356,19 +116,18 @@ def launch_chrome_if_needed():
             break
             
     if not chrome_path:
-        # Check if it's on PATH
         import shutil
         chrome_path = shutil.which("chrome") or shutil.which("chrome.exe")
         
     if not chrome_path:
-        print("Error: Could not locate chrome.exe on this system automatically.")
+        print("Error: Could not locate chrome.exe automatically.")
         return False
         
     cmd = [
         chrome_path,
         "--remote-debugging-port=9222",
         f"--user-data-dir={CHROME_PROFILE_PATH}",
-        "--headless=new",
+        # "--headless=new", # Removed to enable visual (headful) mode
         "--disable-gpu",
         "--no-first-run",
         "--disable-default-apps",
@@ -376,30 +135,30 @@ def launch_chrome_if_needed():
         "--hide-crash-restore-bubble",
     ]
     
-    print(f"Launching Chrome: {' '.join(cmd)}")
     try:
-        # Start Chrome detached in the background
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        # Wait for Chrome to spin up and bind the port
         for _ in range(8):
             time.sleep(1)
             if check_port_open(9222):
                 print("Chrome started and listening on port 9222 successfully!")
                 return True
-        print("Warning: Chrome launched but port 9222 is still not responsive.")
-        print("Hint: If normal Google Chrome is already running, close all its windows completely (or end it from Task Manager) and run the script again so it can open in debugging mode.")
         return False
     except Exception as e:
-        print(f"Failed to launch Chrome subprocess: {e}")
+        print(f"Failed to launch Chrome: {e}")
         return False
 
+def clean_markdown_response(text):
+    text = text.strip()
+    text = re.sub(r"^```json\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"^```markdown\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"^```\s*", "", text)
+    if text.endswith("```"):
+        text = text[:-3].strip()
+    return text
+
 def fallback_json_parser(raw_json):
-    """
-    Standard json.loads fails if Gemini generates unescaped double quotes inside strings.
-    This fallback uses regex and substring slicing to extract the fields.
-    """
     try:
-        keys = ["title", "excerpt", "metaDescription", "seoKeywords", "content", "outline"]
+        keys = ["title", "slug", "excerpt", "meta_title", "meta_description", "html", "markdown"]
         key_positions = []
         for k in keys:
             pattern = rf'"{k}"\s*:'
@@ -411,7 +170,6 @@ def fallback_json_parser(raw_json):
             return None
             
         key_positions.sort(key=lambda x: x[0])
-        
         data = {}
         for i, (start, end, key) in enumerate(key_positions):
             if i + 1 < len(key_positions):
@@ -420,60 +178,32 @@ def fallback_json_parser(raw_json):
                 next_start = len(raw_json)
                 
             val_str = raw_json[end:next_start].strip()
-            
             if val_str.endswith(","):
                 val_str = val_str[:-1].strip()
-                
             if i == len(key_positions) - 1:
                 if val_str.endswith("}"):
                     val_str = val_str[:-1].strip()
-                    
-            if key == "seoKeywords":
-                if val_str.startswith("["):
-                    val_str = val_str[1:]
-                if val_str.endswith("]"):
-                    val_str = val_str[:-1]
-                items = []
-                for item in re.split(r',', val_str):
-                    item = item.strip().strip('"\'')
-                    if item:
-                        items.append(item)
-                data[key] = items
-            else:
-                if val_str.startswith('"'):
-                    val_str = val_str[1:]
-                if val_str.endswith('"'):
-                    val_str = val_str[:-1]
-                    
-                val_str = val_str.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"')
-                data[key] = val_str
+            
+            if val_str.startswith('"'):
+                val_str = val_str[1:]
+            if val_str.endswith('"'):
+                val_str = val_str[:-1]
                 
-        if "title" in data:
-            return data
+            val_str = val_str.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"')
+            data[key] = val_str
+            
+        return data
     except Exception as e:
-        print(f"Fallback regex parser failed: {e}")
+        print(f"Fallback JSON regex parser failed: {e}")
     return None
 
-def clean_markdown_response(text):
-    """Clean up markdown response by removing leading/trailing code blocks or fluff."""
-    text = text.strip()
-    # Remove leading ```markdown or ```
-    text = re.sub(r"^```markdown\s*", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"^```\s*", "", text)
-    # Remove trailing ```
-    if text.endswith("```"):
-        text = text[:-3].strip()
-    return text
-
 def wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=180):
-    """Wait for Gemini response to finish generating and return the response text."""
     start_time = time.time()
     generation_done = False
     last_text = ""
 
     while time.time() - start_time < max_wait_seconds:
         try:
-            # Check if mic button is visible
             is_mic_visible = False
             if mic_locator.count() > 0:
                 for i in range(mic_locator.count()):
@@ -481,7 +211,6 @@ def wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=1
                         is_mic_visible = True
                         break
 
-            # Check if stop button is visible (Gemini is still generating)
             is_stop_visible = False
             if stop_locator.count() > 0:
                 for i in range(stop_locator.count()):
@@ -489,24 +218,16 @@ def wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=1
                         is_stop_visible = True
                         break
 
-            print(f"Waiting for Gemini... (Mic visible: {is_mic_visible}, Stop visible: {is_stop_visible})")
-
-            # If mic button is visible and stop button is NOT visible, we are done
             if is_mic_visible and not is_stop_visible:
                 print("Gemini response is ready!")
                 generation_done = True
                 break
-
-        except Exception as loop_err:
-            err_name = type(loop_err).__name__
-            print(f"Warning: {err_name} during wait loop — page may have navigated. Falling back to text check...")
+        except Exception:
             break
-
         time.sleep(2)
 
-    # Fallback text stability check if mic detection timed out
     if not generation_done:
-        print("Warning: Timed out waiting for mic button state. Using stable text fallback...")
+        print("Warning: Timed out waiting for mic button. Checking text stability...")
         for _ in range(15):
             time.sleep(2)
             responses = page.locator(".model-response, .message-content, message-content")
@@ -516,199 +237,558 @@ def wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=1
                     break
                 last_text = current_text
 
-    # Fetch the final response text
     responses = page.locator(".model-response, .message-content, message-content")
     if responses.count() > 0:
-        final_response = responses.last.inner_text()
-    else:
-        final_response = last_text
+        return responses.last.inner_text()
+    return last_text
 
-    return final_response
+def is_keyword_already_published(keyword):
+    if not os.path.exists(BLOG_POSTS_FILE):
+        return False
+    try:
+        with open(BLOG_POSTS_FILE, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        # Exact extraction helper
+        def extract_quotes(field):
+            return re.findall(rf"{field}:\s*['\"`]([^'\"`]+?)['\"`]", content)
+            
+        titles = extract_quotes("title")
+        slugs = extract_quotes("slug")
+        trending_keywords = extract_quotes("trendingKeyword")
+        
+        kw_lower = keyword.lower().strip()
+        for tk in trending_keywords:
+            if kw_lower == tk.lower().strip() or kw_lower in tk.lower().strip():
+                return True
+        for t in titles:
+            if kw_lower in t.lower():
+                return True
+        for s in slugs:
+            if kw_lower.replace(" ", "-") in s.lower():
+                return True
+    except Exception as e:
+        print(f"Error checking duplicate posts: {e}")
+    return False
 
-def generate_blog_content_via_playwright(trend_keyword):
-    """Playwright का उपयोग करके localhost:9222 पर चल रहे Chrome के ज़रie 2-Turn dialogue से फ़्री ब्लॉग पोस्ट लिखवाता है"""
+# ==================== STEP 1: GOOGLE TRENDS US SCRAPING ====================
+
+def get_trends_from_page_and_rss(page):
+    """
+    Playwright se Google Trends site ko scrape karta hai.
+    Sath hi, RSS feed ko backup backup backup ke roop me use karta hai agar block ho jaye.
+    """
+    trends = []
+    print("\n--- STEP 1: Scraping Google Trends US Page ---")
+    try:
+        page.goto("https://trends.google.com/trending?geo=US")
+        time.sleep(6)
+        
+        # Scrape grid cell row texts
+        elements = page.locator('div[role="row"] div[role="gridcell"]').all_inner_texts()
+        for el in elements:
+            val = el.strip().split('\n')[0]
+            if val and len(val) > 2 and len(val) < 40 and not val.isdigit():
+                if val not in trends and not any(x in val.lower() for x in ["search", "explore", "trending", "menu", "sign in"]):
+                    trends.append(val)
+                    
+        # Check anchors backup
+        if len(trends) < 5:
+            anchors = page.locator('td.query a, .trend-card a, tr td a').all_inner_texts()
+            for el in anchors:
+                val = el.strip()
+                if val and len(val) > 2 and len(val) < 40:
+                    if val not in trends:
+                        trends.append(val)
+    except Exception as e:
+        print(f"Error scraping Trends page: {e}")
+
+    # Fallback to RSS feed if we got less than 5 items
+    if len(trends) < 5:
+        print("Scraping page returned less than 5 trends. Launching Google Trends RSS Feed Fallback...")
+        try:
+            url = "https://trends.google.com/trending/rss?geo=US"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            import ssl
+            context = ssl._create_unverified_context()
+            with urllib.request.urlopen(req, timeout=10, context=context) as response:
+                xml_data = response.read()
+            root = ET.fromstring(xml_data)
+            items = root.findall(".//item")
+            for item in items:
+                title_el = item.find("title")
+                if title_el is not None and title_el.text:
+                    val = title_el.text.strip()
+                    if val not in trends:
+                        trends.append(val)
+        except Exception as ex:
+            print(f"Trends RSS Fallback failed: {ex}")
+            
+    # Filters out already published topics
+    filtered_trends = []
+    for t in trends:
+        if not is_keyword_already_published(t):
+            filtered_trends.append(t)
+            
+    print(f"Discovered {len(trends)} topics. Non-published trends: {len(filtered_trends)}")
     
-    # Ensure Chrome is running on port 9222
-    launched = launch_chrome_if_needed()
-    if not launched:
-        print("Error: Could not connect to Chrome because it could not be started.")
+    # If all published, use original trends
+    if not filtered_trends:
+        filtered_trends = trends
+        
+    return filtered_trends[:5]
+
+# ==================== STEP 2: GOOGLE AUTOCOMPLETE RESEARCH ====================
+
+def get_autocomplete_suggestions(page, topic):
+    """
+    Topic ko Google Search box me dalta hai aur space ke baad letters (a, b, y, z)
+    daal kar autocomplete suggestions ko scrape karta hai. (No CAPTCHA block issues).
+    """
+    print(f"\n--- STEP 2: Performing Google Autocomplete suggestion scraping for: '{topic}' ---")
+    suggestions = set()
+    
+    try:
+        page.goto("https://www.google.com")
+        time.sleep(3)
+        
+        search_box = page.locator('textarea[name="q"], input[name="q"], [title="Search"]').first
+        search_box.click()
+        time.sleep(1)
+        
+        letters = ['a', 'b', 'y', 'z']
+        for l in letters:
+            query = f"{topic} {l}"
+            print(f"Typing query suggestion sequence: '{query}'...")
+            search_box.fill(query)
+            time.sleep(2) # Dropdown loading wait
+            
+            # Scrape suggestion spans
+            elements = page.locator('ul[role="listbox"] li div[role="option"] span').all_inner_texts()
+            if not elements:
+                elements = page.locator('ul[role="listbox"] li span').all_inner_texts()
+                
+            for el in elements:
+                val = el.strip()
+                if val and val.lower() != query.lower():
+                    # If Google returns only the highlighted suffix, rebuild it
+                    if not val.lower().startswith(topic.lower()):
+                        val = f"{topic} {val}"
+                    suggestions.add(val)
+    except Exception as e:
+        print(f"Autocomplete suggestions scraping failed: {e}")
+        
+    print(f"Found {len(suggestions)} suggestions.")
+    return list(suggestions)
+
+# ==================== STEP 3: GEMINI IMAGE DOWNLOAD ====================
+
+def wait_for_and_download_new_image(page, previous_image_count, output_path):
+    """
+    Gemini conversation me new image generate hone ka wait karta hai,
+    aur usse ya toh download button se ya toh element screenshot se local path par save karta hai.
+    """
+    print(f"Waiting for new image to generate (expecting image count > {previous_image_count})...")
+    
+    for attempt in range(40):
+        time.sleep(2)
+        # Identify image elements
+        images = page.locator(".model-response img[src*='googleusercontent.com'], .model-response img[src*='blob:']").all()
+        if len(images) > previous_image_count:
+            print(f"New image element found (Attempt {attempt+1})! Wait 4s for render...")
+            time.sleep(4)
+            
+            # Tier 1: Download button click
+            try:
+                download_btns = page.locator("button[aria-label*='Download' i], a[aria-label*='Download' i]").all()
+                if len(download_btns) > previous_image_count:
+                    print("Found download button. Clicking...")
+                    with page.expect_download(timeout=15000) as download_info:
+                        download_btns[-1].click()
+                    download = download_info.value
+                    download.save_as(output_path)
+                    print(f"High-res image successfully downloaded via button to: {output_path}")
+                    return True
+            except Exception as e:
+                print(f"Download button failed: {e}. Trying element screenshot as fallback...")
+                
+            # Tier 2: Screenshot fallback
+            try:
+                images[-1].screenshot(path=output_path)
+                print(f"Successfully captured image element screenshot and saved to: {output_path}")
+                return True
+            except Exception as se:
+                print(f"Screenshot fallback failed: {se}")
+                
+    print("Error: Image generation timed out or elements could not be resolved.")
+    return False
+
+# ==================== STEP 4: GHOST CMS INTEGRATION ====================
+
+def base64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
+
+def create_jwt(api_key: str, version: str = "v2") -> str:
+    key_id, secret_hex = api_key.split(':')
+    header = {"alg": "HS256", "typ": "JWT", "kid": key_id}
+    audience = f"/{version}/admin/" if version.lower() in ["v2", "v3"] else "/admin/"
+    now = int(time.time())
+    payload = {"iat": now, "exp": now + 300, "aud": audience}
+    
+    header_json = json.dumps(header, separators=(',', ':')).encode('utf-8')
+    payload_json = json.dumps(payload, separators=(',', ':')).encode('utf-8')
+    unsigned = base64url_encode(header_json) + "." + base64url_encode(payload_json)
+    secret_bytes = bytes.fromhex(secret_hex)
+    signature = hmac.new(secret_bytes, unsigned.encode('utf-8'), hashlib.sha256).digest()
+    return unsigned + "." + base64url_encode(signature)
+
+def upload_image_to_ghost(api_url, api_key, version, file_path):
+    """Local image file ko Ghost CMS image upload API ke zariye upload karta hai."""
+    import requests
+    
+    api_url = api_url.rstrip('/')
+    try:
+        jwt_token = create_jwt(api_key, version=version)
+    except Exception as e:
+        print(f"JWT generation error for image upload: {e}")
         return None
         
-    print(f"Connecting to running Chrome on port 9222 for trend: {trend_keyword}...")
+    url = f"{api_url}/ghost/api/{version}/admin/images/upload/" if version.lower() in ["v2", "v3"] else f"{api_url}/ghost/api/admin/images/upload/"
+    headers = {"Authorization": f"Ghost {jwt_token}"}
     
-    # TURN 1 PROMPT: Metadata & Outline creation
-    prompt_metadata = f"""You are an expert SEO content writer. Your goal is to plan a highly optimized blog post for "QuizViral AI".
-Product details: QuizViral AI lets creators make 100+ viral faceless quiz/trivia videos in 1 click via CSV import. Features include TTS voiceovers, ticking clocks, answer reveal animations, and Minecraft/Space/Nature background videos.
+    filename = os.path.basename(file_path)
+    mime_type = "image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png"
+    
+    print(f"Uploading image to Ghost CMS ({filename})...")
+    try:
+        with open(file_path, "rb") as img_file:
+            files = {"file": (filename, img_file, mime_type)}
+            response = requests.post(url, files=files, headers=headers)
+            
+        if response.status_code in [200, 201]:
+            resp_data = response.json()
+            uploaded_url = resp_data.get("images", [{}])[0].get("url")
+            print(f"Ghost CMS image upload SUCCESS: {uploaded_url}")
+            return uploaded_url
+        else:
+            print(f"Ghost CMS image upload FAILED (HTTP {response.status_code}): {response.text}")
+    except Exception as e:
+        print(f"Ghost CMS image upload Exception: {e}")
+    return None
 
-Today's trending news topic: "{trend_keyword}"
+def publish_to_ghost_cms(api_url, api_key, version, post_data, status="draft"):
+    """Optimized article content ko Ghost CMS Admin API me create karta hai."""
+    import requests
+    
+    api_url = api_url.rstrip('/')
+    try:
+        jwt_token = create_jwt(api_key, version=version)
+    except Exception as e:
+        print(f"JWT generation error for post publish: {e}")
+        return False, str(e)
+        
+    url = f"{api_url}/ghost/api/{version}/admin/posts/?source=html" if version.lower() in ["v2", "v3"] else f"{api_url}/ghost/api/admin/posts/?source=html"
+    headers = {
+        "Authorization": f"Ghost {jwt_token}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "posts": [
+            {
+                "title": post_data["title"],
+                "slug": post_data["slug"],
+                "html": post_data["html"],
+                "custom_excerpt": post_data["excerpt"],
+                "meta_title": post_data["meta_title"],
+                "meta_description": post_data["meta_description"],
+                "feature_image": post_data.get("image"),
+                "status": status
+            }
+        ]
+    }
+    
+    print(f"Publishing blog post to Ghost CMS Admin API: '{post_data['title']}'...")
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code in [200, 201]:
+            resp_json = response.json()
+            post_id = resp_json.get("posts", [{}])[0].get("id", "Unknown")
+            print(f"SUCCESS! Published to Ghost CMS. Post ID: {post_id}")
+            return True, resp_json
+        else:
+            err_msg = f"HTTP {response.status_code}: {response.text}"
+            print(f"ERROR: Ghost CMS rejected post creation: {err_msg}")
+            return False, err_msg
+    except Exception as e:
+        err_msg = str(e)
+        print(f"ERROR: Ghost CMS publishing exception: {err_msg}")
+        return False, err_msg
 
-YOUR TASK:
-Step 1: Choose the single best SEO high-volume keyword from this keyword pool:
-- "how to make quiz videos for youtube"
-- "how to start a faceless youtube channel in 2025"
-- "best quiz video maker free"
-- "viral youtube shorts ideas 2025"
-- "how to make money with a faceless youtube channel"
-- "how to make 100 youtube shorts fast"
-- "faceless youtube channel ideas that make money"
-- "how to automate youtube shorts"
-- "best ai video generator for youtube"
-- "tiktok quiz ideas that go viral"
-- "how to grow youtube channel fast 2025"
-- "youtube quiz channel monetization strategy"
+# ==================== MAIN AUTOMATION FLOW ====================
 
-Step 2: Create a metadata block and a detailed article outline for this post.
-The outline should use H2 headings, targeting the chosen SEO keyword. It should include sections covering the chosen keyword, a step-by-step tutorial of QuizViral AI, 10 quiz questions about "{trend_keyword}", a monetization strategies section, and FAQ ideas.
-
-CRITICAL JSON FORMATTING RULES:
-1. Inside JSON values, do NOT use double quotes ("). Use single quotes (') instead.
-2. Double quotes ONLY for JSON property names and to wrap top-level values.
-3. Respond ONLY with the JSON format (no markdown code blocks, no text before or after).
-
-Format:
-{{
-  "title": "SEO Title containing the chosen high-volume keyword (60-70 chars)",
-  "excerpt": "2-3 sentence summary using the main keyword naturally + mention of {trend_keyword} as a timely hook",
-  "metaDescription": "Under 155 chars, includes main keyword, compelling CTA",
-  "seoKeywords": ["keyword 1", "keyword 2", "keyword 3", "QuizViral AI"],
-  "outline": "Detailed outline of the blog post structure with H2 and H3 headings"
-}}
-"""
-
+def run_blog_generator_playwright():
+    # Ensure Chrome Debugger is running
+    launched = launch_chrome_if_needed()
+    if not launched:
+        print("Error: Could not launch Chrome on port 9222.")
+        return None
+        
     with sync_playwright() as p:
         try:
-            # Port 9222 पर चल रहे Chrome से कनेक्ट करें
+            # Connect over CDP
             browser = p.chromium.connect_over_cdp("http://localhost:9222")
-        except Exception as e:
-            print(f"Failed to connect to Chrome on port 9222: {e}")
-            return None
-
-        # डिफ़ॉल्ट कांटेक्स्ट का उपयोग करें
-        context = browser.contexts[0]
-        # विशिष्ट Gemini Chat URL पर जाएं
-        page = context.new_page()
-        page.goto("https://gemini.google.com/app/5d22a66bd735a3fe")
-        time.sleep(5)
-
-        # -------------------------------------------------------------
-        # TURN 1: Send Metadata Prompt & Receive JSON
-        # -------------------------------------------------------------
-        print("Typing metadata prompt into Gemini (Turn 1)...")
-        textbox = page.locator("div[role='textbox']")
-        textbox.click()
-        textbox.fill(prompt_metadata)
-        time.sleep(1)
-
-        print("Submitting metadata prompt...")
-        submit_btn = page.locator("button[aria-label*='Send' i], button[aria-label*='Submit' i], button[aria-label*='भेजें' i], button[class*='send-button']").first
-        submit_btn.click()
-
-        print("Waiting for Gemini to finish Turn 1...")
-        time.sleep(3)
-        mic_locator = page.locator("button[aria-label*='microphone' i], button[aria-label*='mic' i], button[aria-label*='माइक्रो' i]")
-        stop_locator = page.locator("button[aria-label*='Stop' i], button[aria-label*='रोकें' i]")
-        
-        turn1_response = wait_for_gemini_response(page, mic_locator, stop_locator)
-        print("Successfully read Turn 1 response.")
-
-        # JSON ढूँढें
-        meta_data = None
-        json_match = re.search(r"\{.*\}", turn1_response, re.DOTALL)
-        if json_match:
-            raw_json = json_match.group(0).strip()
-            raw_json = raw_json.replace("{trend_keyword}", trend_keyword)
-            try:
-                meta_data = json.loads(raw_json)
-            except Exception as e:
-                print(f"Standard JSON parser failed for Turn 1: {e}. Trying custom regex fallback...")
-                meta_data = fallback_json_parser(raw_json)
-        else:
-            print("No JSON block found in Turn 1 response. Trying custom regex fallback...")
-            meta_data = fallback_json_parser(turn1_response)
-
-        if not meta_data or "title" not in meta_data:
-            print("Error: Could not parse metadata or outline from Gemini Turn 1.")
-            print(f"Raw response was: {turn1_response}")
+            context = browser.contexts[0]
+            page = context.new_page()
+            
+            # --- 1. Scrape Trends ---
+            top_trends = get_trends_from_page_and_rss(page)
+            if not top_trends:
+                print("No trending topics found. Aborting.")
+                page.close()
+                browser.close()
+                return None
+                
+            print(f"Top trends to filter: {top_trends}")
+            
+            # --- 2. Navigate to Gemini to filter trend ---
+            print("\n--- STEP 2: Connecting to Gemini for topic filtering ---")
+            page.goto("https://gemini.google.com/app/5d22a66bd735a3fe")
+            time.sleep(5)
+            
+            filter_prompt = (
+                f"Out of these 5 trending topics: {json.dumps(top_trends)}. "
+                "Which one is the easiest and most interesting to write a trivia/quiz blog post about? "
+                "Choose exactly one. Respond with ONLY the chosen topic name, and absolutely nothing else."
+            )
+            
+            textbox = page.locator("div[role='textbox']")
+            textbox.click()
+            textbox.fill(filter_prompt)
+            time.sleep(1)
+            
+            submit_btn = page.locator("button[aria-label*='Send' i], button[aria-label*='Submit' i], button[aria-label*='भेj' i], button[class*='send-button']").first
+            submit_btn.click()
+            time.sleep(3)
+            
+            mic_locator = page.locator("button[aria-label*='microphone' i], button[aria-label*='mic' i], button[aria-label*='माइक्रो' i]")
+            stop_locator = page.locator("button[aria-label*='Stop' i], button[aria-label*='रोकें' i]")
+            
+            selected_topic = wait_for_gemini_response(page, mic_locator, stop_locator).strip()
+            # Clean possible markdown or quote wrappers by Gemini
+            selected_topic = selected_topic.strip('"\'`').replace('\n', '').strip()
+            print(f"Gemini selected topic: '{selected_topic}'")
+            
+            if not selected_topic or len(selected_topic) > 80:
+                print("Invalid topic selected by Gemini. Defaulting to first trend.")
+                selected_topic = top_trends[0]
+                
+            # --- 3. Google Search Autocomplete Suggestions ---
+            suggestions = get_autocomplete_suggestions(page, selected_topic)
+            
+            # --- 4. Content Generation Prompt ---
+            print("\n--- STEP 4: Generating Blog Post Content via Gemini ---")
+            # Navigate back to Gemini
+            page.goto("https://gemini.google.com/app/5d22a66bd735a3fe")
+            time.sleep(4)
+            
+            content_prompt = f"""
+            Write a comprehensive, long-form, well-researched blog post (minimum 1500 words) about the topic: "{selected_topic}".
+            
+            TARGET KEYWORD:
+            "{selected_topic}"
+            Make sure this keyword is integrated naturally and is inside the H1 tag at the very beginning.
+            
+            SEO ADDITIONAL KEYWORDS TO INCLUDE:
+            {json.dumps(suggestions)}
+            
+            CRITICAL OUTPUT REQUIREMENT:
+            Respond ONLY with a JSON object in this format. Do not write any markdown code blocks (like ```json), introduction, or explanations outside the JSON. Just start directly with {{ and end with }}.
+            All double quotes inside property values must be single quotes or escaped.
+            
+            Format:
+            {{
+              "title": "A catchy SEO-friendly title containing the keyword",
+              "slug": "url-slug-with-keyword",
+              "excerpt": "A short, engaging 2-sentence summary of the post.",
+              "meta_title": "Meta title exactly 50-60 characters containing keyword 'faceless quiz videos' or 'AI video generator'",
+              "meta_description": "Meta description exactly 145-150 characters containing keyword 'AI video generator' or 'bulk quiz maker'",
+              "html": "<h1>Target Keyword Title</h1><h2>Introduction</h2><p>Article body content in HTML format...</p>",
+              "markdown": "# Target Keyword Title\\n\\n## Introduction\\n\\nArticle body content in Markdown format for the frontend..."
+            }}
+            """
+            
+            textbox = page.locator("div[role='textbox']")
+            textbox.click()
+            textbox.fill(content_prompt)
+            time.sleep(1)
+            
+            submit_btn = page.locator("button[aria-label*='Send' i], button[aria-label*='Submit' i], button[aria-label*='भेj' i], button[class*='send-button']").first
+            submit_btn.click()
+            time.sleep(3)
+            
+            raw_response = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=240)
+            cleaned_json = clean_markdown_response(raw_response)
+            
+            # Find and parse JSON
+            blog_data = None
+            json_match = re.search(r"\{.*\}", cleaned_json, re.DOTALL)
+            if json_match:
+                try:
+                    blog_data = json.loads(json_match.group(0))
+                except Exception:
+                    blog_data = fallback_json_parser(json_match.group(0))
+            else:
+                blog_data = fallback_json_parser(cleaned_json)
+                
+            if not blog_data or "html" not in blog_data:
+                print("Error: Could not parse blog post content from Gemini.")
+                print(f"Raw response: {raw_response[:800]}...")
+                page.close()
+                browser.close()
+                return None
+                
+            print(f"Successfully generated article: '{blog_data.get('title')}'")
+            
+            # Count current images in Gemini conversation to set baselines
+            initial_images = page.locator(".model-response img[src*='googleusercontent.com'], .model-response img[src*='blob:']").all()
+            image_baseline = len(initial_images)
+            print(f"Initial images count in chat: {image_baseline}")
+            
+            # --- 5. Generate Landscape Image ---
+            print("\n--- STEP 5: Generating Landscape Image (16:9) ---")
+            image_prompt = (
+                f"Generate a high-quality landscape illustration (16:9 aspect ratio) representing the theme of the blog post: '{blog_data.get('title')}'. "
+                "Keep it clean, professional, and visually engaging. Do not write any text on the image."
+            )
+            
+            textbox.click()
+            textbox.fill(image_prompt)
+            time.sleep(1)
+            submit_btn.click()
+            
+            landscape_path = os.path.join(SCRIPT_DIR, "assets", "landscape_image.png")
+            os.makedirs(os.path.dirname(landscape_path), exist_ok=True)
+            
+            success_landscape = wait_for_and_download_new_image(page, image_baseline, landscape_path)
+            if success_landscape:
+                blog_data["local_image"] = landscape_path
+            else:
+                print("Failed to obtain landscape image. Using hardcoded fallback.")
+                blog_data["local_image"] = None
+                
+            # Update image baseline for next prompt
+            time.sleep(2)
+            current_images = page.locator(".model-response img[src*='googleusercontent.com'], .model-response img[src*='blob:']").all()
+            image_baseline = len(current_images)
+            
+            # --- 6. Generate Pinterest Vertical Image ---
+            print("\n--- STEP 6: Generating Pinterest Vertical Image (9:16) ---")
+            pinterest_prompt = (
+                "Now generate a vertical version (9:16 aspect ratio) of the exact same image (same style, theme, color scheme, and subjects) for Pinterest. "
+                "Do not write any text on the image."
+            )
+            
+            textbox.click()
+            textbox.fill(pinterest_prompt)
+            time.sleep(1)
+            submit_btn.click()
+            
+            pinterest_path = os.path.join(SCRIPT_DIR, "assets", "pinterest_image.png")
+            success_pinterest = wait_for_and_download_new_image(page, image_baseline, pinterest_path)
+            if success_pinterest:
+                blog_data["local_pinterest_image"] = pinterest_path
+            else:
+                print("Failed to obtain Pinterest vertical image.")
+                blog_data["local_pinterest_image"] = None
+                
+            # Close browser
             page.close()
             browser.close()
-            kill_chrome_on_port_9222()
-            return None
+            
+            blog_data["trendingKeyword"] = selected_topic
+            return blog_data
+            
+        except Exception as e:
+            print(f"Exception during Playwright execution: {e}")
+            import traceback
+            traceback.print_exc()
+            
+    return None
 
-        # -------------------------------------------------------------
-        # TURN 2: Send Content Prompt & Receive Pure Markdown
-        # -------------------------------------------------------------
-        outline = meta_data.get("outline", "Detailed blog sections")
-        title = meta_data.get("title", "SEO Blog Post")
-        
-        prompt_content = f"""Excellent outline. Now, write the complete, extremely in-depth and high-quality blog post in Markdown format following that outline.
 
-Outline to follow:
-{outline}
-
-REQUIREMENTS:
-- Word Count: Minimum 1,500 words. Make the paragraphs highly informative, engaging, and detailed. No short fluffy paragraphs.
-- Title: Start directly with '# {title}' at the very beginning of the article.
-- Headings: Use proper H2 and H3 markdown tags.
-- Example Section: Include 10 complete quiz questions about '{trend_keyword}' (with 4 multiple-choice options each and the correct answer indicated).
-- Product Integration: Write a step-by-step guide on how content creators can make a quiz video about '{trend_keyword}' in 1 click using QuizViral AI.
-- Links: Naturally include exactly 2 links to https://quizviral-nine.vercel.app in the article body (e.g. as '[QuizViral AI](https://quizviral-nine.vercel.app)').
-- FAQs: Include 2 FAQs at the end.
-- Formatting: Wrap the entire article (starting from the H1 title '# {title}' to the end) inside a single markdown code block (code fence). Do not write anything outside the code block. Start writing the post immediately.
-"""
-
-        print("Typing content prompt into Gemini (Turn 2)...")
-        textbox.click()
-        textbox.fill(prompt_content)
-        time.sleep(1)
-
-        print("Submitting content prompt...")
-        submit_btn.click()
-
-        print("Waiting for Gemini to finish Turn 2 (Writing full blog post)...")
-        time.sleep(3)
-        
-        turn2_response = wait_for_gemini_response(page, mic_locator, stop_locator, max_wait_seconds=240)
-        print("Successfully read Turn 2 response.")
-
-        page.close()
-        browser.close()
-        kill_chrome_on_port_9222()
-
-        # Clean markdown and attach to meta_data
-        markdown_content = clean_markdown_response(turn2_response)
-        
-        # Replace template placeholders
-        markdown_content = markdown_content.replace("{trend_keyword}", trend_keyword)
-        markdown_content = markdown_content.replace("{title}", title)
-
-        meta_data["content"] = markdown_content
-        return meta_data
+def get_latest_fb_video():
+    # Facebook page video scraping logic (preserved from original code)
+    print("Scraping Facebook page for latest video...")
+    fb_page_url = "https://www.facebook.com/profile.php?id=61585764748589"
+    latest_video_url = "https://www.facebook.com/watch/?v=892872416450589"
+    
+    if check_port_open(9222):
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.connect_over_cdp("http://localhost:9222")
+                context = browser.contexts[0]
+                page = context.new_page()
+                page.goto(fb_page_url)
+                time.sleep(5)
+                page.evaluate("window.scrollBy(0, 1000);")
+                time.sleep(4)
+                
+                scripts = page.locator("script").evaluate_all("elements => elements.map(el => el.textContent || '')")
+                video_ids = []
+                for script in scripts:
+                    if not script: continue
+                    for m in re.finditer(r'"video_id"\s*:\s*"(\d+)"', script):
+                        video_ids.append(m.group(1))
+                
+                if video_ids:
+                    latest_video_url = f"https://www.facebook.com/watch/?v={video_ids[0]}"
+                page.close()
+                browser.close()
+        except Exception as e:
+            print(f"Facebook scrape failed: {e}")
+            
+    dest_path = os.path.join(SCRIPT_DIR, "frontend", "src", "data", "latestFbVideo.js")
+    try:
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        with open(dest_path, "w", encoding="utf-8") as f:
+            f.write(f'export const latestFbVideoUrl = "{latest_video_url}";\n')
+    except Exception:
+        pass
 
 def update_blog_posts_file(new_post):
-    """Generated ब्लॉग को frontend/src/data/blogPosts.js में ऑटोमैटिक जोड़ता है"""
     print(f"Adding new blog post to {BLOG_POSTS_FILE}...")
+    if not os.path.exists(BLOG_POSTS_FILE):
+        return False
     with open(BLOG_POSTS_FILE, "r", encoding="utf-8") as f:
         file_content = f.read()
     
     match = re.search(r"export const blogPosts = \[(.*)\];\s*$", file_content, re.DOTALL)
     if not match:
-        print("Could not parse blogPosts.js file structure.")
         return False
         
     posts_array_content = match.group(1).strip()
     
-    new_post_str = json.dumps(new_post, indent=2)
-    new_post_str = new_post_str.replace('"trendingKeyword":', 'trendingKeyword:')
-    new_post_str = new_post_str.replace('"slug":', 'slug:')
-    new_post_str = new_post_str.replace('"title":', 'title:')
-    new_post_str = new_post_str.replace('"excerpt":', 'excerpt:')
-    new_post_str = new_post_str.replace('"date":', 'date:')
-    new_post_str = new_post_str.replace('"readTime":', 'readTime:')
-    new_post_str = new_post_str.replace('"author":', 'author:')
-    new_post_str = new_post_str.replace('"image":', 'image:')
-    new_post_str = new_post_str.replace('"metaDescription":', 'metaDescription:')
-    new_post_str = new_post_str.replace('"seoKeywords":', 'seoKeywords:')
-    new_post_str = new_post_str.replace('"content":', 'content:')
+    # We store the markdown block inside "content" field
+    post_item = {
+        "title": new_post["title"],
+        "slug": new_post["slug"],
+        "excerpt": new_post["excerpt"],
+        "date": new_post["date"],
+        "readTime": new_post["readTime"],
+        "author": new_post["author"],
+        "image": new_post["image"],
+        "pinterest_image": new_post.get("pinterest_image", ""),
+        "metaDescription": new_post["meta_description"],
+        "seoKeywords": [new_post["trendingKeyword"], "QuizViral AI"],
+        "content": new_post["markdown"],
+        "trendingKeyword": new_post["trendingKeyword"]
+    }
+    
+    new_post_str = json.dumps(post_item, indent=2)
+    # Re-align JSON properties names for compatibility with JS parser
+    for prop in ["title", "slug", "excerpt", "date", "readTime", "author", "image", "pinterest_image", "metaDescription", "seoKeywords", "content", "trendingKeyword"]:
+        new_post_str = new_post_str.replace(f'"{prop}":', f'{prop}:')
 
     if posts_array_content:
         updated_array = new_post_str + ",\n  " + posts_array_content
@@ -722,291 +802,155 @@ def update_blog_posts_file(new_post):
     print("blogPosts.js updated successfully!")
     return True
 
-def git_push_changes(title):
-    """Git commit & push automatic runs to trigger Vercel deployment"""
-    print("Staging and pushing changes to GitHub...")
-    try:
-        subprocess.run(["git", "add", "."], cwd=SCRIPT_DIR, check=True)
-        subprocess.run(["git", "commit", "-m", f"chore(blog): auto-publish post about {title}"], cwd=SCRIPT_DIR, check=True)
-        subprocess.run(["git", "push", "github", "main"], cwd=SCRIPT_DIR, check=True)
-        print("Git Push Completed! Vercel build triggered.")
-    except Exception as e:
-        print(f"Git push failed: {e}")
-
 def generate_sitemap_from_posts():
-    """
-    Regenerates sitemap.xml completely based on the current blogPosts.js
-    and the core site pages. This prevents index drift and ensures Google
-    knows about every post.
-    """
     sitemap_path = os.path.join(SCRIPT_DIR, "frontend", "public", "sitemap.xml")
-    print(f"Regenerating sitemap.xml at {sitemap_path}...")
-    
-    # Core static URLs
-    core_urls = [
-        {"loc": "https://quizviral-nine.vercel.app/", "priority": "1.0", "changefreq": "daily"},
-        {"loc": "https://quizviral-nine.vercel.app/pricing", "priority": "0.8", "changefreq": "weekly"},
-        {"loc": "https://quizviral-nine.vercel.app/about", "priority": "0.5", "changefreq": "monthly"},
-        {"loc": "https://quizviral-nine.vercel.app/blog", "priority": "0.9", "changefreq": "daily"},
-    ]
+    today_str = datetime.now().strftime("%Y-%m-%d")
     
     slugs = []
     if os.path.exists(BLOG_POSTS_FILE):
         try:
             with open(BLOG_POSTS_FILE, "r", encoding="utf-8") as f:
                 content = f.read()
-            slugs = extract_field_values("slug", content)
-            # Filter and unique
+            slugs = re.findall(r"\bslug:\s*['\"`]([^'\"`]+?)['\"`]", content)
             slugs = list(dict.fromkeys(slugs))
-        except Exception as e:
-            print(f"Error reading slugs for sitemap: {e}")
+        except Exception:
+            pass
             
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    
     xml_lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        f'  <url><loc>https://quizviral-nine.vercel.app/</loc><lastmod>{today_str}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>',
+        f'  <url><loc>https://quizviral-nine.vercel.app/pricing</loc><lastmod>{today_str}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>https://quizviral-nine.vercel.app/blog</loc><lastmod>{today_str}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>'
     ]
-    
-    # Add core URLs
-    for url in core_urls:
-        xml_lines.append("  <url>")
-        xml_lines.append(f"    <loc>{url['loc']}</loc>")
-        xml_lines.append(f"    <lastmod>{today_str}</lastmod>")
-        xml_lines.append(f"    <changefreq>{url['changefreq']}</changefreq>")
-        xml_lines.append(f"    <priority>{url['priority']}</priority>")
-        xml_lines.append("  </url>")
-        
-    # Add blog post URLs
-    for slug in slugs:
-        xml_lines.append("  <url>")
-        xml_lines.append(f"    <loc>https://quizviral-nine.vercel.app/blog/{slug}</loc>")
-        xml_lines.append(f"    <lastmod>{today_str}</lastmod>")
-        xml_lines.append("    <changefreq>weekly</changefreq>")
-        xml_lines.append("    <priority>0.8</priority>")
-        xml_lines.append("  </url>")
-        
-    xml_lines.append("</urlset>")
+    for s in slugs:
+        xml_lines.append(f'  <url><loc>https://quizviral-nine.vercel.app/blog/{s}</loc><lastmod>{today_str}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>')
+    xml_lines.append('</urlset>')
     
     try:
         os.makedirs(os.path.dirname(sitemap_path), exist_ok=True)
         with open(sitemap_path, "w", encoding="utf-8") as f:
             f.write("\n".join(xml_lines) + "\n")
-        print(f"Successfully regenerated sitemap.xml with {len(slugs)} blog posts!")
         return True
-    except Exception as e:
-        print(f"Failed to write sitemap.xml: {e}")
+    except Exception:
         return False
 
-def get_latest_fb_video():
-    """
-    Connects to the active Chrome on port 9222, navigates to the Facebook page,
-    extracts the latest video ID from the page source JSON/scripts, and saves it
-    to latestFbVideo.js.
-    """
-    print("Scraping Facebook page for latest video...")
-    fb_page_url = "https://www.facebook.com/profile.php?id=61585764748589"
-    latest_video_url = "https://www.facebook.com/watch/?v=892872416450589" # Fallback
-    
-    if not check_port_open(9222):
-        print("Chrome remote debugger is not running. Using fallback FB video.")
-    else:
-        try:
-            with sync_playwright() as p:
-                browser = p.chromium.connect_over_cdp("http://localhost:9222")
-                context = browser.contexts[0]
-                page = context.new_page()
-                
-                print(f"Navigating to Facebook Page: {fb_page_url}...")
-                page.goto(fb_page_url)
-                time.sleep(5)
-                
-                # Scroll a bit to load posts
-                page.evaluate("window.scrollBy(0, 1000);")
-                time.sleep(4)
-                
-                # Get script tag contents
-                scripts = page.locator("script").evaluate_all("elements => elements.map(el => el.textContent || '')")
-                
-                video_ids = []
-                reel_ids = []
-                
-                # Search for video and reel IDs using regex
-                for script in scripts:
-                    if not script:
-                        continue
-                    for m in re.finditer(r'"video_id"\s*:\s*"(\d+)"', script):
-                        video_ids.append(m.group(1))
-                    for m in re.finditer(r'"video":\{"__typename":"Video","id":"(\d+)"', script):
-                        video_ids.append(m.group(1))
-                    for m in re.finditer(r'"reel":\{"id":"(\d+)"', script):
-                        reel_ids.append(m.group(1))
-                    for m in re.finditer(r'facebook\.com/reel/(\d+)', script):
-                        reel_ids.append(m.group(1))
-                
-                # Unique
-                video_ids = list(dict.fromkeys(video_ids))
-                reel_ids = list(dict.fromkeys(reel_ids))
-                
-                urls = []
-                for r_id in reel_ids:
-                    urls.append(f"https://www.facebook.com/reel/{r_id}")
-                for v_id in video_ids:
-                    urls.append(f"https://www.facebook.com/watch/?v={v_id}")
-                    
-                if urls:
-                    latest_video_url = urls[0]
-                    print(f"Facebook scraper found latest video: {latest_video_url}")
-                else:
-                    print("No video URLs found. Using fallback.")
-                
-                page.close()
-                browser.close()
-        except Exception as e:
-            print(f"Error scraping Facebook page: {e}. Using fallback.")
-            
-    # Write to latestFbVideo.js
-    dest_path = os.path.join(SCRIPT_DIR, "frontend", "src", "data", "latestFbVideo.js")
-    try:
-        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-        with open(dest_path, "w", encoding="utf-8") as f:
-            f.write(f'export const latestFbVideoUrl = "{latest_video_url}";\n')
-        print(f"Updated latestFbVideo.js successfully with: {latest_video_url}")
-    except Exception as e:
-        print(f"Failed to write latestFbVideo.js: {e}")
-
-def update_sitemap(slug):
-    """Automatically regenerates the sitemap.xml file"""
-    return generate_sitemap_from_posts()
-
 def ping_indexnow(slug):
-    """Pings IndexNow API to request instant crawling of the new blog URL on Bing/Yahoo/Yandex"""
-    import urllib.request
-    import urllib.parse
-    import ssl
-    
     url_to_index = f"https://quizviral-nine.vercel.app/blog/{slug}"
     key = "86b7a1114fbd4f80a501b0dbc2731be3"
     key_location = f"https://quizviral-nine.vercel.app/{key}.txt"
-    
-    # Build request parameters
-    params = {
-        "url": url_to_index,
-        "key": key,
-        "keyLocation": key_location
-    }
-    encoded_params = urllib.parse.urlencode(params)
-    ping_url = f"https://api.indexnow.org/indexnow?{encoded_params}"
-    
-    print(f"Pinging IndexNow for instant indexing of: {url_to_index}...")
+    ping_url = f"https://api.indexnow.org/indexnow?url={url_to_index}&key={key}&keyLocation={key_location}"
     try:
+        import ssl
         context = ssl._create_unverified_context()
         req = urllib.request.Request(ping_url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10, context=context) as response:
-            status = response.getcode()
-            if status == 200:
-                print("IndexNow ping successful! Search engines notified.")
-                return True
-            else:
-                print(f"IndexNow ping returned status: {status}")
-    except Exception as e:
-        print(f"Failed to ping IndexNow: {e}")
-    return False
+            if response.getcode() == 200:
+                print("IndexNow ping successful.")
+    except Exception:
+        pass
 
-def kill_chrome_on_port_9222():
-    """Finds and terminates the Chrome process listening on remote debugging port 9222 on Windows"""
-    import subprocess
-    print("Attempting to close Chrome remote debugging browser on port 9222...")
+def git_push_changes(title):
+    print("Staging and pushing changes to GitHub...")
     try:
-        # Run netstat to find the process ID listening on port 9222
-        output = subprocess.check_output("netstat -aon", shell=True).decode('utf-8', errors='ignore')
-        for line in output.splitlines():
-            if ":9222" in line and "LISTENING" in line:
-                # Extract the PID (last token in the line)
-                parts = line.strip().split()
-                if len(parts) >= 5:
-                    pid = parts[-1]
-                    print(f"Found Chrome debugger process with PID {pid} listening on port 9222. Terminating...")
-                    subprocess.run(f"taskkill /F /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    return True
+        subprocess.run(["git", "add", "."], cwd=SCRIPT_DIR, check=True)
+        subprocess.run(["git", "commit", "-m", f"chore(blog): auto-publish post '{title}'"], cwd=SCRIPT_DIR, check=True)
+        subprocess.run(["git", "push", "github", "main"], cwd=SCRIPT_DIR, check=True)
+        subprocess.run(["git", "push", "origin", "main"], cwd=SCRIPT_DIR, check=True) # Hugging Face
+        print("Git Push Completed!")
     except Exception as e:
-        print(f"Error terminating Chrome process on port 9222: {e}")
-    return False
+        print(f"Git push failed: {e}")
+
+# ==================== ORCHESTRATOR ====================
 
 def main():
     try:
-        # 0. Facebook page video scrape to keep it up to date
+        # 0. Facebook Video scraper update
         get_latest_fb_video()
         
-        # Parse trend index argument if provided
-        trend_index = 0
-        if "--trend-index" in sys.argv:
-            try:
-                idx = sys.argv.index("--trend-index")
-                trend_index = int(sys.argv[idx + 1])
-            except (ValueError, IndexError):
-                pass
-
-        # 1. Google Trends से कीवर्ड लें (Check for duplicate topics to prevent double posting)
-        attempts = 0
-        max_attempts = 15
-        trend = None
-        
-        while attempts < max_attempts:
-            candidate_trend = get_trending_keyword(trend_index + attempts)
-            if not is_keyword_already_published(candidate_trend):
-                trend = candidate_trend
-                break
-            else:
-                print(f"Keyword '{candidate_trend}' has already been published in blogPosts.js. Trying next trend...")
-                attempts += 1
-                
-        if not trend:
-            trend = get_trending_keyword(trend_index)
-            print(f"Warning: All fetched trends are already published. Defaulting to: '{trend}'")
-        
-        # 2. Unsplash से 1200px इमेज लें
-        image_url = get_unsplash_image(trend)
-        
-        # 3. Playwright से ब्लॉग लिखवाएं
-        blog_data = generate_blog_content_via_playwright(trend)
+        # 1. Run Playwright-Gemini flow (Scrapes Trends, Suggestions, Content, and Images)
+        blog_data = run_blog_generator_playwright()
         
         if not blog_data:
-            print("Blog generation failed.")
+            print("Blog automation generation failed.")
             return
             
-        # Metadata जोड़ें
-        blog_data["slug"] = blog_data.get("title", trend).lower().replace(" ", "-").replace(":", "").replace("?", "").replace("&", "")
+        # 2. SEO Title & Description Validation and Sanitization
+        meta_title = validate_meta_title(blog_data.get("meta_title", ""))
+        meta_description = validate_meta_description(blog_data.get("meta_description", ""))
+        
+        blog_data["meta_title"] = meta_title
+        blog_data["meta_description"] = meta_description
+        
+        # Lowercase friendly slug
+        blog_data["slug"] = blog_data.get("slug", "").lower().replace(" ", "-").replace(":", "").replace("?", "").replace("&", "")
         blog_data["date"] = datetime.now().strftime("%B %d, %Y")
         blog_data["readTime"] = "5 min read"
         blog_data["author"] = "QuizViral AI Team"
-        blog_data["image"] = image_url
-        blog_data["trendingKeyword"] = trend
         
-        # 4. blogPosts.js में सेव करें
-        success = update_blog_posts_file(blog_data)
+        # 3. Smart Interlinking
+        existing_blogs = load_existing_blogs(SCRIPT_DIR)
+        interlinked_html = apply_smart_interlinking(blog_data["html"], existing_blogs, CTA_URL, BLOG_BASE_URL)
         
-        # 5. sitemap.xml me save karein aur IndexNow ping karein
-        if success:
-            update_sitemap(blog_data["slug"])
+        # 4. Alt-Tags validation
+        optimized_html = set_image_alt_tags(interlinked_html, blog_data["trendingKeyword"], blog_data["title"])
+        
+        # Ensure H1 tag is present at the beginning of HTML body
+        if not optimized_html.strip().startswith("<h1"):
+            optimized_html = f"<h1>{blog_data['title']}</h1>\n" + optimized_html.strip()
+            
+        blog_data["html"] = optimized_html
+        
+        # 5. Upload Image to Ghost CMS
+        ghost_image_url = None
+        if blog_data.get("local_image") and os.path.exists(blog_data["local_image"]):
+            if GHOST_API_URL and GHOST_ADMIN_API_KEY:
+                ghost_image_url = upload_image_to_ghost(
+                    GHOST_API_URL, GHOST_ADMIN_API_KEY, GHOST_API_VERSION, blog_data["local_image"]
+                )
+        
+        # Fallback image URL
+        blog_data["image"] = ghost_image_url or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&h=675&q=80"
+        
+        # Set Pinterest image path
+        blog_data["pinterest_image"] = blog_data.get("local_pinterest_image") or blog_data["image"]
+        
+        # 6. Publish to Ghost CMS
+        if GHOST_API_URL and GHOST_ADMIN_API_KEY:
+            success, result = publish_to_ghost_cms(
+                GHOST_API_URL, GHOST_ADMIN_API_KEY, GHOST_API_VERSION, blog_data, status=PUBLISH_STATUS
+            )
+            if not success:
+                print(f"Ghost CMS publish failed: {result}")
+        else:
+            print("Ghost CMS credentials not set. Skipping publishing to Ghost.")
+            
+        # 7. Update blogPosts.js for the Vercel React Frontend
+        success_js = update_blog_posts_file(blog_data)
+        
+        if success_js:
+            # 8. Sitemap and IndexNow
+            generate_sitemap_from_posts()
             ping_indexnow(blog_data["slug"])
-        
-        # 6. Build and Push
-        if success:
+            
+            # 9. Build and push changes to trigger deployment
             print("Running build verification...")
             build_res = subprocess.run(["npm", "run", "build"], cwd=os.path.join(SCRIPT_DIR, "frontend"), shell=True)
             if build_res.returncode == 0:
                 git_push_changes(blog_data["title"])
-                # 7. Pinterest Auto-Pin Syndication
+                
+                # 10. Trigger Pinterest Auto-Pin syndication using the vertical image!
                 try:
                     from pinterest_auto_pin import run_pinterest_syndication
+                    print("Initiating Pinterest syndication...")
                     run_pinterest_syndication(blog_data)
                 except Exception as e:
                     print(f"Pinterest syndication failed: {e}")
             else:
-                print("Local build check failed! Aborting Git Push & Pinterest Pinning to avoid breaking production.")
+                print("Local build check failed! Aborting Git Push & Pinterest pinning to avoid breaking production.")
+                
     finally:
-        # Always make sure the browser process is killed before exiting
+        # Always terminate Chrome debug instance
         kill_chrome_on_port_9222()
 
 if __name__ == "__main__":
