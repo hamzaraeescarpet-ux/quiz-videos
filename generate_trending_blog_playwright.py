@@ -205,8 +205,8 @@ def fallback_json_parser(raw_json):
         print(f"Fallback JSON regex parser failed: {e}")
     return None
 
-def wait_for_gemini_response(page, max_wait_seconds=600):
-    print("Waiting for Gemini response...")
+def wait_for_chatgpt_response(page, max_wait_seconds=600):
+    print("Waiting for ChatGPT response...")
     start_time = time.time()
     
     # Wait for the generation to start (give it a few seconds to toggle buttons)
@@ -216,8 +216,8 @@ def wait_for_gemini_response(page, max_wait_seconds=600):
     stable_count = 0
     
     while time.time() - start_time < max_wait_seconds:
-        # Check Stop button visibility
-        stop_btns = page.locator("button[aria-label*='Stop' i], button[aria-label*='रोकें' i], button[class*='stop-button'], button[class*='stop']").all()
+        # Check Stop button visibility in ChatGPT
+        stop_btns = page.locator("button[data-testid='stop-button'], button[aria-label='Stop generating'], button[aria-label*='Stop' i]").all()
         is_stop_visible = False
         for btn in stop_btns:
             try:
@@ -227,19 +227,8 @@ def wait_for_gemini_response(page, max_wait_seconds=600):
             except Exception:
                 pass
                 
-        # Check Mic button visibility
-        mic_btns = page.locator("button[aria-label*='mic' i], button[aria-label*='microphone' i], button[aria-label*='माइक' i], button[aria-label*='voice' i], button[aria-label*='Voice' i]").all()
-        is_mic_visible = False
-        for btn in mic_btns:
-            try:
-                if btn.is_visible():
-                    is_mic_visible = True
-                    break
-            except Exception:
-                pass
-                
-        # Check Send/Submit button visibility/enabled state
-        send_btns = page.locator("button[aria-label*='Send' i], button[aria-label*='Submit' i], button[aria-label*='भेजें' i], button.send-button").all()
+        # Check Send button visibility/enabled state (when done, the send button is enabled)
+        send_btns = page.locator("button[data-testid='send-button'], button[aria-label*='Send' i], button.send-button").all()
         is_send_enabled = False
         for btn in send_btns:
             try:
@@ -249,8 +238,8 @@ def wait_for_gemini_response(page, max_wait_seconds=600):
             except Exception:
                 pass
                 
-        # Get current response text
-        responses = page.locator(".model-response, .message-content, message-content")
+        # Get current response text from ChatGPT assistant message block
+        responses = page.locator("div[data-message-author-role='assistant'] .markdown, .markdown, .message-content")
         current_text = ""
         if responses.count() > 0:
             try:
@@ -260,10 +249,10 @@ def wait_for_gemini_response(page, max_wait_seconds=600):
             
         # STRICT MODEL RESOLUTION RULE:
         # 1. Stop button must be completely hidden
-        # 2. Mic button must be visible OR Send button must be active/enabled
+        # 2. Send button must be visible & active/enabled
         # 3. We must have some response content (> 2 chars) loaded
-        if not is_stop_visible and (is_mic_visible or is_send_enabled) and len(current_text) > 2:
-            print("Generation complete! (Stop button is hidden, Mic/Send button is visible & active).")
+        if not is_stop_visible and is_send_enabled and len(current_text) > 2:
+            print("Generation complete! (Stop button is hidden, Send button is visible & active).")
             return current_text
             
         # Backup text stability check in case of unexpected DOM changes
@@ -279,7 +268,7 @@ def wait_for_gemini_response(page, max_wait_seconds=600):
         last_text = current_text
         time.sleep(2)
         
-    responses = page.locator(".model-response, .message-content, message-content")
+    responses = page.locator("div[data-message-author-role='assistant'] .markdown, .markdown, .message-content")
     if responses.count() > 0:
         return responses.last.inner_text()
     return last_text
@@ -467,44 +456,53 @@ def get_autocomplete_suggestions(page, topic):
 
 # ==================== STEP 3: GEMINI IMAGE DOWNLOAD ====================
 
-def wait_for_and_download_new_image(page, previous_image_count, output_path):
+def wait_for_and_download_new_image(page, output_path, max_wait_seconds=180):
     """
-    Gemini conversation me new image generate hone ka wait karta hai,
-    aur usse ya toh download button se ya toh element screenshot se local path par save karta hai.
+    Waits for the image generation turn to complete using the same button-tracking logic,
+    then downloads the generated image or captures a screenshot.
     """
-    print(f"Waiting for new image to generate (expecting image count > {previous_image_count})...")
+    print("Waiting for image generation turn to complete...")
+    # Reuse the stable ChatGPT button-tracking function to wait for the image turn to finish
+    wait_for_chatgpt_response(page, max_wait_seconds=max_wait_seconds)
     
-    for attempt in range(40):
-        time.sleep(2)
-        # Identify image elements
-        images = page.locator(".model-response img[src*='googleusercontent.com'], .model-response img[src*='blob:']").all()
-        if len(images) > previous_image_count:
-            print(f"New image element found (Attempt {attempt+1})! Wait 4s for render...")
-            time.sleep(4)
-            
-            # Tier 1: Download button click
-            try:
-                download_btns = page.locator("button[aria-label*='Download' i], a[aria-label*='Download' i]").all()
-                if len(download_btns) > previous_image_count:
-                    print("Found download button. Clicking...")
-                    with page.expect_download(timeout=15000) as download_info:
-                        download_btns[-1].click()
-                    download = download_info.value
-                    download.save_as(output_path)
-                    print(f"High-res image successfully downloaded via button to: {output_path}")
-                    return True
-            except Exception as e:
-                print(f"Download button failed: {e}. Trying element screenshot as fallback...")
-                
-            # Tier 2: Screenshot fallback
-            try:
-                images[-1].screenshot(path=output_path)
-                print(f"Successfully captured image element screenshot and saved to: {output_path}")
+    print("Turn complete! Searching for the generated image...")
+    time.sleep(4) # Give a small buffer for the image source to render fully
+    
+    # Locate the image element inside the last ChatGPT response block
+    last_response = page.locator("div[data-message-author-role='assistant'], .markdown").last
+    img_locator = last_response.locator("img")
+    
+    # Fallback to any oaiusercontent or blob image on the page
+    if img_locator.count() == 0:
+        print("Image not found in last response. Trying global image locator fallback...")
+        img_locator = page.locator("img[src*='oaiusercontent.com'], img[src*='blob:']").last
+        
+    if img_locator.count() > 0:
+        print("Image element resolved! Attempting download...")
+        
+        # Try to locate and click the download button first
+        try:
+            download_btn = last_response.locator("button[aria-label*='Download' i], a[aria-label*='Download' i], [aria-label*='Download' i]").first
+            if download_btn.count() > 0 and download_btn.is_visible():
+                print("Clicking download button...")
+                with page.expect_download(timeout=15000) as download_info:
+                    download_btn.click()
+                download = download_info.value
+                download.save_as(output_path)
+                print(f"Downloaded image successfully via DALL-E download link to: {output_path}")
                 return True
-            except Exception as se:
-                print(f"Screenshot fallback failed: {se}")
-                
-    print("Error: Image generation timed out or elements could not be resolved.")
+        except Exception as e:
+            print(f"Download button click failed: {e}. Falling back to screenshot...")
+            
+        # Fallback: Element screenshot
+        try:
+            img_locator.first.screenshot(path=output_path)
+            print(f"Successfully captured image element screenshot and saved to: {output_path}")
+            return True
+        except Exception as se:
+            print(f"Screenshot fallback failed: {se}")
+            
+    print("Error: Could not locate the generated image element.")
     return False
 
 # ==================== STEP 4: GHOST CMS INTEGRATION ====================
@@ -611,16 +609,16 @@ def publish_to_ghost_cms(api_url, api_key, version, post_data, status="draft"):
 
 # ==================== MAIN AUTOMATION FLOW ====================
 
-def submit_prompt_to_gemini(page, prompt_text):
-    """Types a prompt into Gemini and submits it using button click or Control+Enter fallback."""
-    print("Waiting for Gemini input box to be ready...")
-    textbox = page.locator("div[role='textbox']").first
+def submit_prompt_to_chatgpt(page, prompt_text):
+    """Types a prompt into ChatGPT and submits it using button click or Enter fallback."""
+    print("Waiting for ChatGPT input box to be ready...")
+    textbox = page.locator("#prompt-textarea, textarea[id='prompt-textarea']").first
     try:
         textbox.wait_for(state="visible", timeout=30000)
     except Exception as e:
         print(f"Warning: Input box wait timed out: {e}")
         
-    print("Typing prompt into Gemini...")
+    print("Typing prompt into ChatGPT...")
     textbox.click()
     textbox.fill(prompt_text)
     time.sleep(0.5)
@@ -634,12 +632,9 @@ def submit_prompt_to_gemini(page, prompt_text):
     # Try clicking the send button using various selectors
     clicked = False
     send_button_selectors = [
+        "button[data-testid='send-button']",
         "button[aria-label*='Send' i]",
-        "button[aria-label*='Submit' i]",
-        "button[aria-label*='भेजें' i]",
-        "button.send-button",
-        "div[role='button'][aria-label*='Send' i]",
-        "gmat-icon-button[aria-label*='Send' i]"
+        "button.send-button"
     ]
     
     for sel in send_button_selectors:
@@ -658,12 +653,56 @@ def submit_prompt_to_gemini(page, prompt_text):
             break
             
     if not clicked:
-        # Fallback: Press Control+Enter inside the textbox to submit
-        print("Submit button click failed or not found. Attempting fallback: Control+Enter to submit...")
-        textbox.press("Control+Enter")
+        # Fallback: Press Enter inside the textbox to submit in ChatGPT
+        print("Submit button click failed or not found. Attempting fallback: Enter to submit...")
+        textbox.press("Enter")
         clicked = True
         
     time.sleep(2)
+
+def submit_and_wait_for_response(page, prompt_text, max_wait_seconds=180, max_retries=2):
+    """
+    Submits a prompt to ChatGPT and waits for the response.
+    If the response fails, times out, or returns empty, reloads the page (retaining thread history) and retries.
+    """
+    active_url = page.url
+    for attempt in range(max_retries + 1):
+        if attempt > 0:
+            print(f"\n--- Retrying Prompt Submission (Attempt {attempt + 1}/{max_retries + 1}) ---")
+            print("Reloading the page...")
+            try:
+                page.reload()
+                time.sleep(8) # Wait for page reload to stabilize
+            except Exception as re:
+                print(f"Page reload failed: {re}. Navigating back to active thread URL...")
+                try:
+                    page.goto(active_url)
+                    time.sleep(8)
+                except Exception:
+                    pass
+                
+        # Submit the prompt
+        try:
+            submit_prompt_to_chatgpt(page, prompt_text)
+        except Exception as se:
+            print(f"Submission failed: {se}. Retrying reload...")
+            continue
+            
+        # Wait for the response
+        response_text = wait_for_chatgpt_response(page, max_wait_seconds=max_wait_seconds)
+        
+        # If response is valid, return it!
+        if response_text and len(response_text.strip()) > 5:
+            # Update the active thread URL in case it changed
+            try:
+                active_url = page.url
+            except Exception:
+                pass
+            return response_text.strip()
+            
+        print("Warning: Received empty or invalid response. Reloading and retrying...")
+        
+    return ""
 
 def run_blog_generator_playwright():
     # Ensure Chrome Debugger is running
@@ -695,12 +734,12 @@ def run_blog_generator_playwright():
                 
             print(f"Top trends to filter: {top_trends}")
             
-            # --- 2. Navigate to Gemini to filter trend ---
-            print("\n--- STEP 2: Connecting to Gemini for topic filtering ---")
-            gemini_page.goto("https://gemini.google.com/app/5d22a66bd735a3fe")
+            # --- 2. Navigate to ChatGPT to filter trend ---
+            print("\n--- STEP 2: Connecting to ChatGPT for topic filtering ---")
+            gemini_page.goto("https://chatgpt.com")
             
-            # Wait for text box to load
-            textbox = gemini_page.locator("div[role='textbox']").first
+            # Wait for text box to load in ChatGPT
+            textbox = gemini_page.locator("#prompt-textarea, textarea[id='prompt-textarea']").first
             try:
                 textbox.wait_for(state="visible", timeout=30000)
             except Exception:
@@ -713,15 +752,13 @@ def run_blog_generator_playwright():
                 "Choose exactly one. Respond with ONLY the chosen topic name, and absolutely nothing else."
             )
             
-            submit_prompt_to_gemini(gemini_page, filter_prompt)
-            
-            selected_topic = wait_for_gemini_response(gemini_page).strip()
-            # Clean possible markdown or quote wrappers by Gemini
+            selected_topic = submit_and_wait_for_response(gemini_page, filter_prompt, max_wait_seconds=120)
+            # Clean possible markdown or quote wrappers by ChatGPT
             selected_topic = selected_topic.strip('"\'`').replace('\n', '').strip()
-            print(f"Gemini selected topic: '{selected_topic}'")
+            print(f"ChatGPT selected topic: '{selected_topic}'")
             
             if not selected_topic or len(selected_topic) > 80:
-                print("Invalid topic selected by Gemini. Defaulting to first trend.")
+                print("Invalid topic selected by ChatGPT. Defaulting to first trend.")
                 selected_topic = top_trends[0]
                 
             # --- 3. Google Search Autocomplete Suggestions ---
@@ -735,8 +772,7 @@ def run_blog_generator_playwright():
             suggestions = suggestions[:15]
             
             # --- 4. Content Generation Prompt (Multi-Turn) ---
-            print("\n--- STEP 4: Generating Blog Post Content via Gemini (Multi-Turn) ---")
-            # We do NOT reload the page here. We just send the prompt directly in the active gemini_page thread!
+            print("\n--- STEP 4: Generating Blog Post Content via ChatGPT (Multi-Turn) ---")
             
             # TURN 1: Write Introduction Section
             print("\n--- TURN 1: Generating Introduction ---")
@@ -748,8 +784,7 @@ def run_blog_generator_playwright():
                 "Focus on why this topic is trending and how quiz videos can capture this traffic.\n"
                 "Respond with ONLY raw HTML body content. Do not include <html>, <head>, or <body> wrappers, and do not wrap in markdown code blocks."
             )
-            submit_prompt_to_gemini(gemini_page, prompt_turn1)
-            raw_intro = wait_for_gemini_response(gemini_page, max_wait_seconds=120)
+            raw_intro = submit_and_wait_for_response(gemini_page, prompt_turn1, max_wait_seconds=150)
             print("Successfully read Turn 1 (Introduction) response.")
             
             # TURN 2: Write Tutorial & 10 Quiz Questions
@@ -760,8 +795,7 @@ def run_blog_generator_playwright():
                 f"- Include 10 complete quiz questions about \"{selected_topic}\" with 4 options (A, B, C, D) and specify the correct answer clearly. Format these questions as structured HTML lists or tables.\n\n"
                 "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
             )
-            submit_prompt_to_gemini(gemini_page, prompt_turn2)
-            raw_tutorial = wait_for_gemini_response(gemini_page, max_wait_seconds=150)
+            raw_tutorial = submit_and_wait_for_response(gemini_page, prompt_turn2, max_wait_seconds=180)
             print("Successfully read Turn 2 (Tutorial & Quiz Questions) response.")
             
             # TURN 3: Write Monetization & FAQs
@@ -772,8 +806,7 @@ def run_blog_generator_playwright():
                 f"- 3 Frequently Asked Questions (FAQs) about automated quiz channels.\n\n"
                 "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
             )
-            submit_prompt_to_gemini(gemini_page, prompt_turn3)
-            raw_monetization = wait_for_gemini_response(gemini_page, max_wait_seconds=120)
+            raw_monetization = submit_and_wait_for_response(gemini_page, prompt_turn3, max_wait_seconds=150)
             print("Successfully read Turn 3 (Monetization & FAQs) response.")
             
             # Combine the HTML components
@@ -794,8 +827,7 @@ def run_blog_generator_playwright():
                 "  \"markdown\": \"Complete blog post in markdown format (including title, headers, body, 10 quiz questions, and FAQs)\"\n"
                 "}"
             )
-            submit_prompt_to_gemini(gemini_page, prompt_turn4)
-            raw_metadata = wait_for_gemini_response(gemini_page, max_wait_seconds=90)
+            raw_metadata = submit_and_wait_for_response(gemini_page, prompt_turn4, max_wait_seconds=120)
             print("Successfully read Turn 4 (Metadata JSON) response.")
             
             cleaned_json = clean_markdown_response(raw_metadata)
@@ -812,7 +844,7 @@ def run_blog_generator_playwright():
                 blog_data = fallback_json_parser(cleaned_json)
                 
             if not blog_data:
-                print("Error: Could not parse metadata JSON from Gemini. Trying custom build...")
+                print("Error: Could not parse metadata JSON from ChatGPT. Trying custom build...")
                 blog_data = {
                     "title": f"The Ultimate Guide to {selected_topic}",
                     "slug": selected_topic.lower().replace(" ", "-"),
@@ -825,44 +857,63 @@ def run_blog_generator_playwright():
             # Attach combined HTML
             blog_data["html"] = html_content
             
-            # Count current images in Gemini conversation to set baselines
-            initial_images = gemini_page.locator(".model-response img[src*='googleusercontent.com'], .model-response img[src*='blob:']").all()
-            image_baseline = len(initial_images)
-            print(f"Initial images count in chat: {image_baseline}")
-            
             # --- 5. Generate Landscape Image ---
             print("\n--- STEP 5: Generating Landscape Image (16:9) ---")
             image_prompt = create_safe_image_prompt(blog_data.get("title", selected_topic), format_type="landscape")
             image_prompt += " Generate only one single image. Do not generate multiple options or variations."
             print(f"Image Prompt: {image_prompt}")
             
-            submit_prompt_to_gemini(gemini_page, image_prompt)
-            
             landscape_path = os.path.join(SCRIPT_DIR, "assets", "landscape_image.png")
             os.makedirs(os.path.dirname(landscape_path), exist_ok=True)
             
-            success_landscape = wait_for_and_download_new_image(gemini_page, image_baseline, landscape_path)
+            success_landscape = False
+            for attempt in range(3):
+                if attempt > 0:
+                    print(f"Retrying landscape image generation (Attempt {attempt+1}/3)...")
+                    try:
+                        gemini_page.reload()
+                        time.sleep(8)
+                    except Exception:
+                        pass
+                try:
+                    submit_prompt_to_chatgpt(gemini_page, image_prompt)
+                    if wait_for_and_download_new_image(gemini_page, landscape_path):
+                        success_landscape = True
+                        break
+                except Exception as e:
+                    print(f"Image generation submission failed: {e}")
+                    
             if success_landscape:
                 blog_data["local_image"] = landscape_path
             else:
                 print("Failed to obtain landscape image. Using hardcoded fallback.")
                 blog_data["local_image"] = None
                 
-            # Update image baseline for next prompt
-            time.sleep(2)
-            current_images = gemini_page.locator(".model-response img[src*='googleusercontent.com'], .model-response img[src*='blob:']").all()
-            image_baseline = len(current_images)
-            
             # --- 6. Generate Pinterest Vertical Image ---
             print("\n--- STEP 6: Generating Pinterest Vertical Image (9:16) ---")
             pinterest_prompt = create_safe_image_prompt(blog_data.get("title", selected_topic), format_type="vertical")
             pinterest_prompt += " Generate only one single vertical image. Do not generate multiple options or variations."
             print(f"Pinterest Image Prompt: {pinterest_prompt}")
             
-            submit_prompt_to_gemini(gemini_page, pinterest_prompt)
-            
             pinterest_path = os.path.join(SCRIPT_DIR, "assets", "pinterest_image.png")
-            success_pinterest = wait_for_and_download_new_image(gemini_page, image_baseline, pinterest_path)
+            
+            success_pinterest = False
+            for attempt in range(3):
+                if attempt > 0:
+                    print(f"Retrying Pinterest vertical image generation (Attempt {attempt+1}/3)...")
+                    try:
+                        gemini_page.reload()
+                        time.sleep(8)
+                    except Exception:
+                        pass
+                try:
+                    submit_prompt_to_chatgpt(gemini_page, pinterest_prompt)
+                    if wait_for_and_download_new_image(gemini_page, pinterest_path):
+                        success_pinterest = True
+                        break
+                except Exception as e:
+                    print(f"Pinterest image generation submission failed: {e}")
+                    
             if success_pinterest:
                 blog_data["local_pinterest_image"] = pinterest_path
             else:
