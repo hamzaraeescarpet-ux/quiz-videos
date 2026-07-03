@@ -19,6 +19,7 @@ import sys
 import re
 import json
 import time
+import random
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -459,53 +460,151 @@ def get_autocomplete_suggestions(page, topic):
 
 # ==================== STEP 3: GEMINI IMAGE DOWNLOAD ====================
 
-def download_pollinations_image(prompt, output_path, format_type="landscape"):
+def download_meta_ai_image(context, prompt, output_path, chat_url):
     """
-    Pollinations.ai Free API ke zariye detailed prompt se realistic image download karta hai.
-    Saves it directly to the local output_path.
+    Meta AI web interface ke zariye image generate aur download karta hai.
     """
-    print(f"Requesting image from Pollinations.ai for prompt: '{prompt[:100]}...'")
+    print(f"Generating image on Meta AI via URL: {chat_url}")
+    print(f"Prompt: '{prompt[:100]}...'")
     try:
-        # Clean prompt: remove extra newlines, quotes, and sanitize for URL encoding
-        clean_prompt = prompt.strip().replace("\n", " ").replace('"', '').replace("'", "")
-        # Force photography styles as a safeguard
-        clean_prompt += ", professional photography, photorealistic, highly detailed, sharp focus, 8k resolution"
+        page = context.new_page()
+        page.goto(chat_url)
+        time.sleep(8) # Stabilize load
         
-        # Prepend explicit orientation directives to ensure Flux constructs correct aspect ratio composition
-        if format_type == "vertical":
-            clean_prompt = "A vertical portrait photograph, 9:16 aspect ratio, " + clean_prompt
+        # Locate the contenteditable input field
+        input_element = page.locator('div[contenteditable="true"]').first
+        if input_element.count() == 0:
+            input_element = page.get_by_role("textbox").first
+            
+        if input_element.count() == 0:
+            print("Error: Could not locate input box on Meta AI page.")
+            page.close()
+            return False
+            
+        # Fill the prompt
+        input_element.click()
+        input_element.fill(prompt)
+        time.sleep(1)
+        
+        # Click the Send button
+        send_btn = page.locator("button[aria-label='Send']").first
+        if send_btn.count() > 0:
+            print("Clicking Send button...")
+            send_btn.click()
         else:
-            clean_prompt = "A landscape photograph, 16:9 aspect ratio, " + clean_prompt
+            print("Pressing Enter to send...")
+            input_element.press("Enter")
             
-        encoded_prompt = urllib.parse.quote(clean_prompt)
+        time.sleep(3)
         
-        # Dimensions based on format
-        width = 1024 if format_type == "landscape" else 576
-        height = 576 if format_type == "landscape" else 1024
+        # Dismiss potential login modal by pressing Escape
+        page.keyboard.press("Escape")
+        time.sleep(1)
         
-        # Construct Pollinations.ai URL with Flux model
-        url = f"https://image.pollinations.ai/p/{encoded_prompt}?width={width}&height={height}&nologo=true&private=true&model=flux"
+        print("Waiting 30 seconds for images to generate on Meta AI...")
+        time.sleep(30)
         
-        # Make request and save the image
-        print(f"Downloading {format_type} image from Pollinations.ai...")
-        
-        # Use urllib.request with a user-agent to bypass any robot blocking
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
-        
-        # Disable SSL verification just in case
-        import ssl
-        context = ssl._create_unverified_context()
-        
-        with urllib.request.urlopen(req, timeout=40, context=context) as response:
-            image_data = response.read()
+        # Locate generated images, filtering out UI/logo images
+        all_imgs = page.locator("img").all()
+        candidate_imgs = []
+        for img in all_imgs:
+            try:
+                src = img.get_attribute("src") or ""
+                if (src.startswith("http") or src.startswith("blob:")) and ("fbcdn.net" in src or "scontent" in src or "blob:" in src or "cot_logo" not in src):
+                    if img.is_visible():
+                        candidate_imgs.append(img)
+            except Exception:
+                pass
+                
+        if not candidate_imgs:
+            print("No generated images found on Meta AI page.")
+            # Save screenshot for debugging
+            try:
+                page.screenshot(path=os.path.join(os.path.dirname(output_path), "meta_ai_generation_failed.png"))
+            except Exception:
+                pass
+            page.close()
+            return False
             
-        with open(output_path, "wb") as f:
-            f.write(image_data)
+        print(f"Found {len(candidate_imgs)} candidate images on Meta AI.")
+        selected_img = random.choice(candidate_imgs)
+        
+        # Hover over the selected image to show the download button
+        print("Hovering over selected image to reveal download button...")
+        selected_img.hover()
+        time.sleep(2)
+        
+        # Search for download button in the image parent container
+        download_btn = None
+        container = selected_img
+        for _ in range(3):
+            try:
+                container = container.locator("xpath=..")
+            except Exception:
+                break
+                
+        buttons = container.locator("button, div[role='button']").all()
+        for btn in buttons:
+            try:
+                html = btn.evaluate("el => el.outerHTML").lower()
+                aria_label = btn.get_attribute("aria-label") or ""
+                if "download" in html or "download" in aria_label.lower() or "save" in html:
+                    download_btn = btn
+                    break
+            except Exception:
+                pass
+                
+        # If not found locally, search all visible buttons
+        if not download_btn:
+            print("Download button not found in container, searching page globally...")
+            all_buttons = page.locator("button, div[role='button']").all()
+            for btn in all_buttons:
+                try:
+                    if btn.is_visible():
+                        html = btn.evaluate("el => el.outerHTML").lower()
+                        aria_label = btn.get_attribute("aria-label") or ""
+                        if "download" in html or "download" in aria_label.lower() or "save" in html:
+                            download_btn = btn
+                            break
+                except Exception:
+                    pass
+                    
+        if not download_btn:
+            print("Error: Could not locate the download button after hover.")
+            try:
+                page.screenshot(path=os.path.join(os.path.dirname(output_path), "meta_ai_download_button_missing.png"))
+            except Exception:
+                pass
+            page.close()
+            return False
             
-        print(f"SUCCESS! {format_type.capitalize()} image saved to: {output_path}")
-        return True
+        # Download the file
+        print("Clicking download button and saving...")
+        try:
+            with page.expect_download(timeout=15000) as download_info:
+                download_btn.click()
+            download = download_info.value
+            download.save_as(output_path)
+            print(f"SUCCESS: Image saved to {output_path}")
+            page.close()
+            return True
+        except Exception as de:
+            print(f"Click download failed: {de}. Retrying with force click...")
+            try:
+                with page.expect_download(timeout=10000) as download_info:
+                    download_btn.click(force=True)
+                download = download_info.value
+                download.save_as(output_path)
+                print(f"SUCCESS (force click): Image saved to {output_path}")
+                page.close()
+                return True
+            except Exception as de2:
+                print(f"Force click download failed: {de2}")
+                
+        page.close()
+        return False
     except Exception as e:
-        print(f"Error downloading image from Pollinations.ai: {e}")
+        print(f"Exception in download_meta_ai_image: {e}")
         return False
 
 # ==================== STEP 4: GHOST CMS INTEGRATION ====================
@@ -877,11 +976,14 @@ def run_blog_generator_playwright():
             landscape_path = os.path.join(SCRIPT_DIR, "assets", "landscape_image.png")
             os.makedirs(os.path.dirname(landscape_path), exist_ok=True)
             
-            success_landscape = download_pollinations_image(image_prompt, landscape_path, format_type="landscape")
+            success_landscape = download_meta_ai_image(
+                context, image_prompt, landscape_path,
+                "https://www.meta.ai/prompt/bd8847d8-82a7-4538-a589-beab3dce559b"
+            )
             if success_landscape:
                 blog_data["local_image"] = landscape_path
             else:
-                print("Failed to download landscape image from Pollinations.ai.")
+                print("Failed to download landscape image from Meta AI.")
                 blog_data["local_image"] = None
                 
             # --- 6. Generate Pinterest Vertical Image ---
@@ -892,11 +994,14 @@ def run_blog_generator_playwright():
             
             pinterest_path = os.path.join(SCRIPT_DIR, "assets", "pinterest_image.png")
             
-            success_pinterest = download_pollinations_image(pinterest_prompt, pinterest_path, format_type="vertical")
+            success_pinterest = download_meta_ai_image(
+                context, pinterest_prompt, pinterest_path,
+                "https://www.meta.ai/prompt/bfc3bc3c-85ab-47a0-9ab7-f619f0cc751d"
+            )
             if success_pinterest:
                 blog_data["local_pinterest_image"] = pinterest_path
             else:
-                print("Failed to download Pinterest vertical image from Pollinations.ai.")
+                print("Failed to download Pinterest vertical image from Meta AI.")
                 blog_data["local_pinterest_image"] = None
                 
             # Close browser
@@ -1104,8 +1209,34 @@ def main():
                     GHOST_API_URL, GHOST_ADMIN_API_KEY, GHOST_API_VERSION, blog_data["local_image"]
                 )
         
-        # Fallback image URL
-        blog_data["image"] = ghost_image_url or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&h=675&q=80"
+        # Copy generated images to the frontend public assets folder so they can be loaded locally and deployed to Vercel
+        public_blog_dir = os.path.join(SCRIPT_DIR, "frontend", "public", "assets", "blog")
+        os.makedirs(public_blog_dir, exist_ok=True)
+        
+        local_landscape_public = None
+        if blog_data.get("local_image") and os.path.exists(blog_data["local_image"]):
+            dest_landscape = os.path.join(public_blog_dir, f"{blog_data['slug']}-landscape.png")
+            try:
+                import shutil
+                shutil.copy2(blog_data["local_image"], dest_landscape)
+                local_landscape_public = f"/assets/blog/{blog_data['slug']}-landscape.png"
+                print(f"Copied landscape image to frontend public directory: {local_landscape_public}")
+            except Exception as e:
+                print(f"Error copying landscape image to frontend: {e}")
+                
+        local_pinterest_public = None
+        if blog_data.get("local_pinterest_image") and os.path.exists(blog_data["local_pinterest_image"]):
+            dest_pinterest = os.path.join(public_blog_dir, f"{blog_data['slug']}-pinterest.png")
+            try:
+                import shutil
+                shutil.copy2(blog_data["local_pinterest_image"], dest_pinterest)
+                local_pinterest_public = f"/assets/blog/{blog_data['slug']}-pinterest.png"
+                print(f"Copied vertical image to frontend public directory: {local_pinterest_public}")
+            except Exception as e:
+                print(f"Error copying Pinterest image to frontend: {e}")
+                
+        # Set the image to the uploaded Ghost URL or the local public path
+        blog_data["image"] = ghost_image_url or local_landscape_public or "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&h=675&q=80"
         
         # Prepend the feature image to both the Ghost HTML post body and the local frontend markdown file
         img_src = blog_data["image"]
@@ -1115,7 +1246,7 @@ def main():
             blog_data["markdown"] = f"![{blog_data['title']}]({img_src})\n\n" + blog_data["markdown"]
             
         # Set Pinterest image path
-        blog_data["pinterest_image"] = blog_data.get("local_pinterest_image") or blog_data["image"]
+        blog_data["pinterest_image"] = local_pinterest_public or blog_data["image"]
         
         # 6. Publish to Ghost CMS
         if GHOST_API_URL and GHOST_ADMIN_API_KEY:
