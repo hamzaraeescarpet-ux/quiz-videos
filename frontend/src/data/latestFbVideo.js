@@ -1,1 +1,1 @@
-export const latestFbVideoUrl = "https://www.facebook.com/watch/?v=1155718204292233";
+export const latestFbVideoUrl = "https://www.facebook.com/watch/?v=892872416450589";

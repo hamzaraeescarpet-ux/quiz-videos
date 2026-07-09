@@ -137,11 +137,10 @@ def launch_chrome_if_needed():
         "--disable-default-apps",
         "--disable-session-crashed-bubble",
         "--hide-crash-restore-bubble",
-        "--disable-extensions", # Disable extensions to stop permission popups
-        "--disable-background-timer-throttling",
-        "--disable-backgrounding-occluded-windows",
-        "--disable-renderer-backgrounding",
-        "--disable-ipc-flooding-protection"
+        "--disable-blink-features=AutomationControlled",
+        "--window-position=0,0",
+        "--window-size=1280,720",
+        "--start-maximized"
     ]
     
     try:
@@ -167,7 +166,11 @@ def clean_markdown_response(text):
 
 def fallback_json_parser(raw_json):
     try:
-        keys = ["title", "slug", "excerpt", "meta_title", "meta_description", "html", "markdown"]
+        keys = [
+            "title", "slug", "excerpt", "meta_title", "meta_description", "html", "markdown",
+            "landscape_image_prompt", "landscape_prompt", "image_prompt",
+            "vertical_image_prompt", "vertical_prompt", "pinterest_prompt", "pinterest_image_prompt"
+        ]
         key_positions = []
         for k in keys:
             pattern = rf'"{k}"\s*:'
@@ -460,6 +463,26 @@ def get_autocomplete_suggestions(page, topic):
 
 # ==================== STEP 3: GEMINI IMAGE DOWNLOAD ====================
 
+def get_candidate_images(page):
+    all_imgs = page.locator("img").all()
+    candidate_imgs = []
+    for img in all_imgs:
+        try:
+            src = img.get_attribute("src") or ""
+            # Filter out UI/logo/avatar images
+            is_ui_element = any(x in src.lower() for x in ["cot_logo", "orbit", "avatar", "logo", "icon", "static"])
+            is_valid_source = src.startswith("http") or src.startswith("blob:")
+            
+            if is_valid_source and not is_ui_element:
+                if img.is_visible():
+                    # Validate that it is a reasonably sized image (generated images are large)
+                    box = img.bounding_box()
+                    if box and box["width"] > 100 and box["height"] > 100:
+                        candidate_imgs.append(img)
+        except Exception:
+            pass
+    return candidate_imgs
+
 def download_meta_ai_image(context, prompt, output_path, chat_url):
     """
     Meta AI web interface ke zariye image generate aur download karta hai.
@@ -468,7 +491,19 @@ def download_meta_ai_image(context, prompt, output_path, chat_url):
     print(f"Prompt: '{prompt[:100]}...'")
     try:
         page = context.new_page()
-        page.goto(chat_url)
+        
+        # Navigate with retry logic for network/DNS robustness
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                page.goto(chat_url, timeout=30000)
+                break
+            except Exception as ge:
+                if attempt == max_retries - 1:
+                    raise ge
+                print(f"Navigation failed ({ge}). Retrying in 5 seconds...")
+                time.sleep(5)
+                
         time.sleep(8) # Stabilize load
         
         # Locate the contenteditable input field
@@ -481,6 +516,11 @@ def download_meta_ai_image(context, prompt, output_path, chat_url):
             page.close()
             return False
             
+        # Get initial candidate images count before sending the prompt
+        initial_candidates = get_candidate_images(page)
+        initial_count = len(initial_candidates)
+        print(f"Initial generated images in chat history: {initial_count}")
+        
         # Fill the prompt
         input_element.click()
         input_element.fill(prompt)
@@ -497,80 +537,99 @@ def download_meta_ai_image(context, prompt, output_path, chat_url):
             
         time.sleep(3)
         
-        # Dismiss potential login modal by pressing Escape
-        page.keyboard.press("Escape")
-        time.sleep(1)
-        
-        print("Waiting 30 seconds for images to generate on Meta AI...")
-        time.sleep(30)
-        
-        # Locate generated images, filtering out UI/logo images
-        all_imgs = page.locator("img").all()
-        candidate_imgs = []
-        for img in all_imgs:
+        # Dismiss potential login modal ONLY if it is a real login/signup dialog (prevents image generation cancellation)
+        modal_visible = False
+        dialogs = page.locator("div[role='dialog'], div[data-slot='dialog-content'], [class*='dialog-overlay']").all()
+        for d in dialogs:
             try:
-                src = img.get_attribute("src") or ""
-                if (src.startswith("http") or src.startswith("blob:")) and ("fbcdn.net" in src or "scontent" in src or "blob:" in src or "cot_logo" not in src):
-                    if img.is_visible():
-                        candidate_imgs.append(img)
+                if d.is_visible():
+                    text_content = d.inner_text().lower()
+                    if any(kw in text_content for kw in ["log in", "sign up", "continue with", "connect your"]):
+                        modal_visible = True
+                        break
             except Exception:
                 pass
                 
-        if not candidate_imgs:
-            print("No generated images found on Meta AI page.")
-            # Save screenshot for debugging
-            try:
-                page.screenshot(path=os.path.join(os.path.dirname(output_path), "meta_ai_generation_failed.png"))
-            except Exception:
-                pass
-            page.close()
-            return False
+        if modal_visible:
+            print("Login dialog detected. Dismissing with Escape key...")
+            page.keyboard.press("Escape")
+            time.sleep(1)
+        
+        # Dynamic polling: Wait for the number of generated images to increase
+        print("Waiting for new images to generate on Meta AI...")
+        start_time = time.time()
+        generation_timeout = 90  # Allow up to 90 seconds
+        new_images_detected = False
+        
+        while time.time() - start_time < generation_timeout:
+            current_candidates = get_candidate_images(page)
+            if len(current_candidates) > initial_count:
+                print(f"Success: New images detected! Count increased from {initial_count} to {len(current_candidates)}.")
+                time.sleep(5) # Let them render completely
+                new_images_detected = True
+                break
+            time.sleep(2)
             
-        print(f"Found {len(candidate_imgs)} candidate images on Meta AI.")
-        selected_img = random.choice(candidate_imgs)
+        if not new_images_detected:
+            print("Timeout: New images were not generated or detected within 90 seconds.")
+            # Fallback check: if there are any candidate images, try using the last 4 anyway
+            current_candidates = get_candidate_images(page)
+            if not current_candidates:
+                try:
+                    page.screenshot(path=os.path.join(os.path.dirname(output_path), "meta_ai_generation_failed.png"))
+                except Exception:
+                    pass
+                page.close()
+                return False
+        else:
+            current_candidates = get_candidate_images(page)
+            
+        # Select from the latest generated images only (history isolation)
+        num_new_images = len(current_candidates) - initial_count
+        if num_new_images <= 0:
+            num_new_images = 1 # Fallback to at least the last image
+            
+        latest_candidates = current_candidates[-num_new_images:]
+        print(f"Selecting from the {len(latest_candidates)} latest generated images (out of {len(current_candidates)} total candidates).")
+        selected_img = random.choice(latest_candidates)
         
         # Hover over the selected image to show the download button
         print("Hovering over selected image to reveal download button...")
         selected_img.hover()
-        time.sleep(2)
+        time.sleep(1)
         
-        # Search for download button in the image parent container
+        # Also hover over parent element to ensure hover is registered
+        try:
+            selected_img.locator("xpath=..").hover()
+            time.sleep(1)
+        except Exception:
+            pass
+        
+        # Search for download button in the image's ancestors (up to 5 levels)
         download_btn = None
         container = selected_img
-        for _ in range(3):
+        for level in range(1, 6):
             try:
                 container = container.locator("xpath=..")
+                buttons = container.locator("button, div[role='button'], a[role='button']").all()
+                for btn in buttons:
+                    try:
+                        html = btn.evaluate("el => el.outerHTML").lower()
+                        aria_label = btn.get_attribute("aria-label") or ""
+                        title = btn.get_attribute("title") or ""
+                        if any(x in html or x in aria_label.lower() or x in title.lower() for x in ["download", "save"]):
+                            download_btn = btn
+                            print(f"Found download button inside ancestor at level {level}")
+                            break
+                    except Exception:
+                        pass
+                if download_btn:
+                    break
             except Exception:
                 break
                 
-        buttons = container.locator("button, div[role='button']").all()
-        for btn in buttons:
-            try:
-                html = btn.evaluate("el => el.outerHTML").lower()
-                aria_label = btn.get_attribute("aria-label") or ""
-                if "download" in html or "download" in aria_label.lower() or "save" in html:
-                    download_btn = btn
-                    break
-            except Exception:
-                pass
-                
-        # If not found locally, search all visible buttons
         if not download_btn:
-            print("Download button not found in container, searching page globally...")
-            all_buttons = page.locator("button, div[role='button']").all()
-            for btn in all_buttons:
-                try:
-                    if btn.is_visible():
-                        html = btn.evaluate("el => el.outerHTML").lower()
-                        aria_label = btn.get_attribute("aria-label") or ""
-                        if "download" in html or "download" in aria_label.lower() or "save" in html:
-                            download_btn = btn
-                            break
-                except Exception:
-                    pass
-                    
-        if not download_btn:
-            print("Error: Could not locate the download button after hover.")
+            print("Error: Could not locate the download button inside image card.")
             try:
                 page.screenshot(path=os.path.join(os.path.dirname(output_path), "meta_ai_download_button_missing.png"))
             except Exception:
@@ -581,25 +640,38 @@ def download_meta_ai_image(context, prompt, output_path, chat_url):
         # Download the file
         print("Clicking download button and saving...")
         try:
-            with page.expect_download(timeout=15000) as download_info:
-                download_btn.click()
+            with page.expect_download(timeout=20000) as download_info:
+                # Trigger a direct DOM click to prevent layout shifting/zooming
+                download_btn.evaluate("el => el.click()")
             download = download_info.value
             download.save_as(output_path)
             print(f"SUCCESS: Image saved to {output_path}")
             page.close()
             return True
         except Exception as de:
-            print(f"Click download failed: {de}. Retrying with force click...")
+            print(f"JS click download failed: {de}. Retrying with Playwright click...")
             try:
-                with page.expect_download(timeout=10000) as download_info:
-                    download_btn.click(force=True)
+                download_btn.scroll_into_view_if_needed()
+                time.sleep(1)
+                with page.expect_download(timeout=15000) as download_info:
+                    download_btn.click()
                 download = download_info.value
                 download.save_as(output_path)
-                print(f"SUCCESS (force click): Image saved to {output_path}")
+                print(f"SUCCESS: Image saved to {output_path}")
                 page.close()
                 return True
             except Exception as de2:
-                print(f"Force click download failed: {de2}")
+                print(f"Playwright click download failed: {de2}. Retrying with force click...")
+                try:
+                    with page.expect_download(timeout=10000) as download_info:
+                        download_btn.click(force=True)
+                    download = download_info.value
+                    download.save_as(output_path)
+                    print(f"SUCCESS (force click): Image saved to {output_path}")
+                    page.close()
+                    return True
+                except Exception as de3:
+                    print(f"Force click download failed: {de3}")
                 
         page.close()
         return False
@@ -818,6 +890,8 @@ def run_blog_generator_playwright():
             # Connect over CDP
             browser = p.chromium.connect_over_cdp("http://localhost:9222")
             context = browser.contexts[0]
+            # Add stealth script to context to hide Playwright/automation indicators
+            context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
             # Create main Gemini page
             gemini_page = context.new_page()
@@ -838,7 +912,7 @@ def run_blog_generator_playwright():
             
             # --- 2. Navigate to ChatGPT to filter trend ---
             print("\n--- STEP 2: Connecting to ChatGPT for topic filtering ---")
-            gemini_page.goto("https://chatgpt.com")
+            gemini_page.goto("https://chatgpt.com/c/6a47d525-af3c-83e8-9b33-a5c2b2669d17")
             
             # Wait for text box to load in ChatGPT
             textbox = gemini_page.locator("#prompt-textarea, textarea[id='prompt-textarea']").first
@@ -873,8 +947,75 @@ def run_blog_generator_playwright():
             # Limit to top 15 diverse suggestions to prevent prompt clutter and Google SEO keyword stuffing penalties
             suggestions = suggestions[:15]
             
-            # --- 4. Content Generation Prompt (Multi-Turn) ---
-            print("\n--- STEP 4: Generating Blog Post Content via ChatGPT (Multi-Turn) ---")
+            # --- 4. Get Image Prompts from ChatGPT (BEFORE content generation to save quota and verify first) ---
+            print("\n--- STEP 4: Requesting Image Prompts from ChatGPT ---")
+            prompt_image_prompts = (
+                f"For the selected trending topic \"{selected_topic}\", write two photorealistic image prompts:\n"
+                "1. A landscape (16:9) image prompt representing the topic. Make it highly detailed, descriptive, photorealistic, with professional camera settings, specific textures, and natural lighting. Do NOT include laptops, screens, or text.\n"
+                "2. A matching vertical (9:16) version of that prompt. Avoid celebrity names.\n"
+                "Respond ONLY with a JSON object in this format (no markdown blocks, no other text):\n"
+                "{\n"
+                "  \"landscape_image_prompt\": \"...\",\n"
+                "  \"vertical_image_prompt\": \"...\"\n"
+                "}"
+            )
+            
+            raw_prompts_json = submit_and_wait_for_response(gemini_page, prompt_image_prompts, max_wait_seconds=90)
+            cleaned_prompts_json = clean_markdown_response(raw_prompts_json)
+            json_match_p = re.search(r"\{.*\}", cleaned_prompts_json, re.DOTALL)
+            prompts_data = None
+            if json_match_p:
+                prompts_data = fallback_json_parser(json_match_p.group(0))
+            else:
+                prompts_data = fallback_json_parser(cleaned_prompts_json)
+                
+            if not prompts_data:
+                print("Warning: Could not parse image prompts JSON. Using default backup prompts.")
+                prompts_data = {
+                    "landscape_image_prompt": f"A realistic, professional sports/conceptual close-up photograph representing the theme of {selected_topic}, natural lighting, sharp focus",
+                    "vertical_image_prompt": f"A realistic, professional sports/conceptual close-up vertical photograph representing the theme of {selected_topic}, natural lighting, sharp focus"
+                }
+                
+            image_prompt = prompts_data.get("landscape_image_prompt") or prompts_data.get("landscape_prompt") or prompts_data.get("image_prompt")
+            pinterest_prompt = prompts_data.get("vertical_image_prompt") or prompts_data.get("vertical_prompt") or prompts_data.get("pinterest_prompt") or prompts_data.get("pinterest_image_prompt")
+            
+            if not image_prompt:
+                image_prompt = create_safe_image_prompt(selected_topic, format_type="landscape")
+            if not pinterest_prompt:
+                pinterest_prompt = create_safe_image_prompt(selected_topic, format_type="vertical")
+                
+            # --- 5. Generate and Download Images from Meta AI ---
+            # Generate landscape image
+            print("\n--- STEP 5: Generating Landscape Image (16:9) ---")
+            landscape_path = os.path.join(SCRIPT_DIR, "assets", "landscape_image.png")
+            os.makedirs(os.path.dirname(landscape_path), exist_ok=True)
+            
+            success_landscape = download_meta_ai_image(
+                context, image_prompt, landscape_path,
+                "https://www.meta.ai/prompt/45be4302-feee-40d5-bafd-a3c1892005ef"
+            )
+            if not success_landscape:
+                print("Failed to download landscape image from Meta AI. Aborting blog creation as images are mandatory.")
+                gemini_page.close()
+                browser.close()
+                return None
+                
+            # Generate Pinterest vertical image
+            print("\n--- STEP 6: Generating Pinterest Vertical Image (9:16) ---")
+            pinterest_path = os.path.join(SCRIPT_DIR, "assets", "pinterest_image.png")
+            
+            success_pinterest = download_meta_ai_image(
+                context, pinterest_prompt, pinterest_path,
+                "https://www.meta.ai/prompt/f4278c21-9a38-4c35-9fd5-8b38ffc2df92"
+            )
+            if not success_pinterest:
+                print("Failed to download Pinterest vertical image from Meta AI. Aborting blog creation as images are mandatory.")
+                gemini_page.close()
+                browser.close()
+                return None
+                
+            # --- 7. Content Generation Prompt (Multi-Turn) ---
+            print("\n--- STEP 7: Generating Blog Post Content via ChatGPT (Multi-Turn) ---")
             
             # TURN 1: Write Introduction Section
             print("\n--- TURN 1: Generating Introduction ---")
@@ -918,25 +1059,24 @@ def run_blog_generator_playwright():
             html_content = f"{raw_intro}\n{raw_tutorial}\n{raw_monetization}"
             html_content = clean_markdown_response(html_content)
             
-            # TURN 4: Compile Metadata JSON & Markdown version
-            print("\n--- TURN 4: Compiling Metadata JSON ---")
+            # TURN 4: SEO Metadata compilation (Simplified JSON format)
+            print("\n--- TURN 4: Compiling SEO Metadata ---")
             prompt_turn4 = (
-                "Awesome. Based on the complete article we just generated, compile the SEO metadata and photorealistic image prompts.\n"
+                "Awesome. Based on the complete article we just generated, compile the SEO metadata.\n"
                 "Respond ONLY with a JSON object in this format. Do not wrap in markdown code blocks:\n"
                 "{\n"
                 "  \"title\": \"SEO Headline containing the keyword (strictly about the topic itself, e.g. secrets/history/stardom of the topic. DO NOT mention quiz, video, or QuizViral in the title)\",\n"
                 "  \"slug\": \"url-friendly-slug-with-keyword (strictly about the topic itself, no quiz/video terms)\",\n"
                 "  \"excerpt\": \"Compelling 2-sentence summary of the post (strictly about the topic itself)\",\n"
-                "  \"meta_title\": \"SEO Meta Title (exactly 50-60 characters featuring the topic and high-intent keywords like 'faceless quiz videos' or 'AI video generator' naturally at the end)\",\n"
+                "  \"meta_title\": \"SEO Meta Title (exactly 50-60 characters featuring the topic and high-intent keywords naturally at the end)\",\n"
                 "  \"meta_description\": \"SEO Meta Description (exactly 145-150 characters featuring the topic and high-intent keywords naturally at the end)\",\n"
-                "  \"markdown\": \"Complete blog post in markdown format (including title, headers, body, 10 quiz questions, and FAQs)\",\n"
-                "  \"landscape_image_prompt\": \"Write a highly detailed, descriptive, photorealistic prompt representing the topic itself (e.g., if the topic is a player, describe an action photo of a basketball game; if the topic is a landmark, describe a professional architectural photo at sunset). Describe professional camera settings (e.g. shot with 35mm lens, natural shadows, depth of field), specific textures, and natural lighting. Do NOT include laptops, video editing screens, or quiz icons. Avoid celebrity names.\",\n"
-                "  \"vertical_image_prompt\": \"Write a matching vertical (9:16) version of that photorealistic topic image prompt. Avoid celebrity names.\"\n"
+                "  \"markdown\": \"Complete blog post in markdown format (including title, headers, body, 10 quiz questions, and FAQs)\"\n"
                 "}"
             )
-            raw_metadata = submit_and_wait_for_response(gemini_page, prompt_turn4, max_wait_seconds=120)
-            print("Successfully read Turn 4 (Metadata JSON) response.")
+            raw_metadata = submit_and_wait_for_response(gemini_page, prompt_turn4, max_wait_seconds=180)
+            print("Successfully read Turn 4 (Metadata) response.")
             
+            # Clean ChatGPT response
             cleaned_json = clean_markdown_response(raw_metadata)
             
             # Find and parse JSON
@@ -946,9 +1086,13 @@ def run_blog_generator_playwright():
                 try:
                     blog_data = json.loads(json_match.group(0))
                 except Exception:
+                    # Fallback JSON regex parser
                     blog_data = fallback_json_parser(json_match.group(0))
             else:
-                blog_data = fallback_json_parser(cleaned_json)
+                try:
+                    blog_data = json.loads(cleaned_json)
+                except Exception:
+                    blog_data = fallback_json_parser(cleaned_json)
                 
             if not blog_data:
                 print("Error: Could not parse metadata JSON from ChatGPT. Trying custom build...")
@@ -958,52 +1102,14 @@ def run_blog_generator_playwright():
                     "excerpt": f"Discover how to create viral quiz videos about {selected_topic} automatically.",
                     "meta_title": f"How to Make Quiz Videos about {selected_topic} Instantly",
                     "meta_description": f"Learn how to create automated faceless quiz videos about {selected_topic} to grow your channel.",
-                    "markdown": f"# The Ultimate Guide to {selected_topic}\n\n" + html_content.replace("<p>", "").replace("</p>", "\n\n").replace("<h2>", "## ").replace("</h2>", "\n\n"),
-                    "landscape_image_prompt": f"A realistic, professional sports/conceptual close-up photograph representing the theme of {selected_topic}, natural lighting, sharp focus",
-                    "vertical_image_prompt": f"A realistic, professional sports/conceptual close-up vertical photograph representing the theme of {selected_topic}, natural lighting, sharp focus"
+                    "markdown": f"# The Ultimate Guide to {selected_topic}\n\n" + html_content.replace("<p>", "").replace("</p>", "\n\n").replace("<h2>", "## ").replace("</h2>", "\n\n")
                 }
             
-            # Attach combined HTML
+            # Attach combined HTML and downloaded image paths
             blog_data["html"] = html_content
+            blog_data["local_image"] = landscape_path
+            blog_data["local_pinterest_image"] = pinterest_path
             
-            # --- 5. Generate Landscape Image ---
-            print("\n--- STEP 5: Generating Landscape Image (16:9) ---")
-            # Retrieve detailed prompt from ChatGPT metadata JSON or build fallback
-            image_prompt = blog_data.get("landscape_image_prompt")
-            if not image_prompt:
-                image_prompt = create_safe_image_prompt(blog_data.get("title", selected_topic), format_type="landscape")
-            
-            landscape_path = os.path.join(SCRIPT_DIR, "assets", "landscape_image.png")
-            os.makedirs(os.path.dirname(landscape_path), exist_ok=True)
-            
-            success_landscape = download_meta_ai_image(
-                context, image_prompt, landscape_path,
-                "https://www.meta.ai/prompt/bd8847d8-82a7-4538-a589-beab3dce559b"
-            )
-            if success_landscape:
-                blog_data["local_image"] = landscape_path
-            else:
-                print("Failed to download landscape image from Meta AI.")
-                blog_data["local_image"] = None
-                
-            # --- 6. Generate Pinterest Vertical Image ---
-            print("\n--- STEP 6: Generating Pinterest Vertical Image (9:16) ---")
-            pinterest_prompt = blog_data.get("vertical_image_prompt")
-            if not pinterest_prompt:
-                pinterest_prompt = create_safe_image_prompt(blog_data.get("title", selected_topic), format_type="vertical")
-            
-            pinterest_path = os.path.join(SCRIPT_DIR, "assets", "pinterest_image.png")
-            
-            success_pinterest = download_meta_ai_image(
-                context, pinterest_prompt, pinterest_path,
-                "https://www.meta.ai/prompt/bfc3bc3c-85ab-47a0-9ab7-f619f0cc751d"
-            )
-            if success_pinterest:
-                blog_data["local_pinterest_image"] = pinterest_path
-            else:
-                print("Failed to download Pinterest vertical image from Meta AI.")
-                blog_data["local_pinterest_image"] = None
-                
             # Close browser
             gemini_page.close()
             browser.close()
@@ -1028,6 +1134,7 @@ def get_latest_fb_video():
             with sync_playwright() as p:
                 browser = p.chromium.connect_over_cdp("http://localhost:9222")
                 context = browser.contexts[0]
+                context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
                 page = context.new_page()
                 page.goto(fb_page_url)
                 time.sleep(5)
@@ -1161,10 +1268,58 @@ def git_push_changes(title):
     except Exception as e:
         print(f"Git push failed: {e}")
 
+def cleanup_old_blog_data():
+    print("Initiating old blog data cleanup to free up space...")
+    try:
+        # 1. Clean temporary files in local assets directory
+        assets_dir = os.path.join(SCRIPT_DIR, "assets")
+        if os.path.exists(assets_dir):
+            for file_name in os.listdir(assets_dir):
+                file_path = os.path.join(assets_dir, file_name)
+                # Keep logo, but delete temp images and screenshots
+                if os.path.isfile(file_path):
+                    if any(x in file_name.lower() for x in ["landscape", "pinterest", "failed", "missing"]):
+                        try:
+                            os.remove(file_path)
+                            print(f"Removed temporary file: {file_name}")
+                        except Exception:
+                            pass
+                            
+        # 2. Garbage collect orphaned images in frontend public directory
+        public_blog_dir = os.path.join(SCRIPT_DIR, "frontend", "public", "assets", "blog")
+        blog_posts_file = os.path.join(SCRIPT_DIR, "frontend", "src", "data", "blogPosts.js")
+        
+        if os.path.exists(public_blog_dir) and os.path.exists(blog_posts_file):
+            # Read active blog posts configuration to check references
+            try:
+                with open(blog_posts_file, "r", encoding="utf-8") as f:
+                    js_content = f.read()
+            except Exception as re:
+                print(f"Could not read blogPosts.js: {re}")
+                return
+                
+            for file_name in os.listdir(public_blog_dir):
+                file_path = os.path.join(public_blog_dir, file_name)
+                if os.path.isfile(file_path):
+                    # Check if the filename is referenced anywhere in the JS database
+                    if file_name not in js_content:
+                        try:
+                            os.remove(file_path)
+                            print(f"Garbage collected orphaned blog image: {file_name}")
+                        except Exception as de:
+                            print(f"Failed to delete {file_name}: {de}")
+                            
+        print("Cleanup completed successfully!")
+    except Exception as e:
+        print(f"Error during old blog data cleanup: {e}")
+
 # ==================== ORCHESTRATOR ====================
 
 def main():
     try:
+        # Cleanup old/temporary/orphaned blog files
+        cleanup_old_blog_data()
+        
         # 0. Facebook Video scraper update
         get_latest_fb_video()
         
