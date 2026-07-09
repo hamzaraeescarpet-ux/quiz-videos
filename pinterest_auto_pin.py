@@ -844,14 +844,23 @@ def run_pinterest_syndication(blog_data):
         return
         
     # If the image is a URL, download it. If it is already a local path, use it directly!
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    local_image = None
     if image_url.startswith("http://") or image_url.startswith("https://"):
         local_image = download_temp_image(image_url)
     else:
+        # Check if the path is relative to the frontend public directory
+        clean_path = image_url.lstrip("/\\")
+        public_path = os.path.join(script_dir, "frontend", "public", clean_path)
+        
         if os.path.exists(image_url):
             print(f"Using local Pinterest image: {image_url}")
             local_image = image_url
+        elif os.path.exists(public_path):
+            print(f"Using local Pinterest image resolved via frontend public: {public_path}")
+            local_image = public_path
         else:
-            print(f"Aborting Pinterest syndication: Local image path not found: {image_url}")
+            print(f"Aborting Pinterest syndication: Local image path not found: {image_url} (checked: {public_path})")
             return
             
     if not local_image:
