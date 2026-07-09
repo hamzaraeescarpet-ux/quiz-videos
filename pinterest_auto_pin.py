@@ -846,8 +846,10 @@ def run_pinterest_syndication(blog_data):
     # If the image is a URL, download it. If it is already a local path, use it directly!
     script_dir = os.path.dirname(os.path.abspath(__file__))
     local_image = None
+    is_temp_download = False
     if image_url.startswith("http://") or image_url.startswith("https://"):
         local_image = download_temp_image(image_url)
+        is_temp_download = True
     else:
         # Check if the path is relative to the frontend public directory
         clean_path = image_url.lstrip("/\\")
@@ -897,12 +899,14 @@ def run_pinterest_syndication(blog_data):
             
     print(f"\n=================== PINTEREST SYNDICATION COMPLETE ({successful_pins}/{len(CHROME_PROFILES)} posted) ===================")
     
-    # Cleanup temp file
-    try:
-        if os.path.exists(local_image):
-            os.remove(local_image)
-    except Exception:
-        pass
+    # Cleanup temp file ONLY if we downloaded it
+    if is_temp_download:
+        try:
+            if os.path.exists(local_image):
+                os.remove(local_image)
+                print("Cleaned up temporary downloaded Pinterest image.")
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     # Check if user wants to login manually to a specific profile
