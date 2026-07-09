@@ -84,8 +84,12 @@ def git_push_changes(title):
         subprocess.run(["git", "push", "github", "main:master"], cwd=SCRIPT_DIR, check=True)
         
         # Push to Hugging Face
-        print("Pushing to Hugging Face Space...")
-        subprocess.run(["git", "push", "origin", "main"], cwd=SCRIPT_DIR, check=True)
+        try:
+            print("Pushing to Hugging Face Space...")
+            subprocess.run(["git", "push", "origin", "main"], cwd=SCRIPT_DIR, check=True)
+        except Exception as he:
+            print(f"Warning: Push to Hugging Face (origin) failed or was skipped: {he}.")
+            print("This is normal as Hugging Face space rejects non-LFS images. Your GitHub/Vercel changes are still safe!")
         print("Git Push Completed! Deployments triggered.")
     except Exception as e:
         print(f"Git push failed: {e}")

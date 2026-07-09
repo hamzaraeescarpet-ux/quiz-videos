@@ -1256,14 +1256,19 @@ def ping_indexnow(slug):
                 print("IndexNow ping successful.")
     except Exception:
         pass
-
 def git_push_changes(title):
     print("Staging and pushing changes to GitHub...")
     try:
         subprocess.run(["git", "add", "."], cwd=SCRIPT_DIR, check=True)
         subprocess.run(["git", "commit", "-m", f"chore(blog): auto-publish post '{title}'"], cwd=SCRIPT_DIR, check=True)
+        print("Pushing to GitHub (Vercel)...")
         subprocess.run(["git", "push", "github", "main"], cwd=SCRIPT_DIR, check=True)
-        subprocess.run(["git", "push", "origin", "main"], cwd=SCRIPT_DIR, check=True) # Hugging Face
+        try:
+            print("Pushing to Hugging Face Space (origin)...")
+            subprocess.run(["git", "push", "origin", "main"], cwd=SCRIPT_DIR, check=True)
+        except Exception as he:
+            print(f"Warning: Push to Hugging Face (origin) failed or was rejected: {he}.")
+            print("This is expected because Hugging Face rejects non-LFS images. Your Vercel deployment on GitHub will still succeed!")
         print("Git Push Completed!")
     except Exception as e:
         print(f"Git push failed: {e}")
