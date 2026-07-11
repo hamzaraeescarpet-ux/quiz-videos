@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "omniroute": {
+      "serverUrl": "http://localhost:20128/api/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer sk-44273f929f4a24a8-5d9d68-78bfec40"
+      }
+    }
+  }
+}
