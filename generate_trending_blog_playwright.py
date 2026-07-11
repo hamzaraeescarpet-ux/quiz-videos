@@ -52,6 +52,262 @@ CTA_URL = os.environ.get("CTA_URL", "https://quizviral-nine.vercel.app")
 BLOG_BASE_URL = os.environ.get("BLOG_BASE_URL", "https://quizviral-nine.vercel.app/blog")
 PUBLISH_STATUS = os.environ.get("PUBLISH_STATUS", "draft") # Use "draft" to review first
 
+# ==================== HYBRID TOPIC & SAFE SCALING CONFIG ====================
+import difflib
+
+DAILY_POST_TARGET = 3
+
+PRODUCT_SEEDS = [
+    {
+        "topic": "faceless YouTube quiz channel ideas",
+        "keywords": ["faceless youtube channel", "quiz channel ideas", "youtube channel ideas", "faceless creator"],
+        "angle": "Explain how creators can launch a faceless channel in high-demand niches using QuizViral AI. Highlight specific channel concepts."
+    },
+    {
+        "topic": "best quiz niches for Shorts",
+        "keywords": ["quiz niches", "youtube shorts niches", "best niches for shorts", "viral shorts ideas"],
+        "angle": "Detail the top performing trivia and quiz categories on YouTube Shorts and TikTok, explaining why short-form attention spans love them."
+    },
+    {
+        "topic": "quiz video monetization breakdown",
+        "keywords": ["quiz channel monetization", "youtube shorts monetization", "make money with quizzes", "youtube partner program"],
+        "angle": "Analyze the revenue potential of automated quiz channels, explaining RPM, CPM, and how to combine YPP with other revenue streams."
+    },
+    {
+        "topic": "CSV bulk video workflow tips",
+        "keywords": ["bulk video creation", "csv import workflow", "scale youtube shorts", "video generator workflow"],
+        "angle": "Provide a step-by-step guide on using spreadsheet templates to import 100+ questions and generate bulk videos in minutes."
+    },
+    {
+        "topic": "how to build a viral trivia brand",
+        "keywords": ["viral trivia channel", "build a trivia brand", "social media branding", "community engagement"],
+        "angle": "Discuss the importance of logo, color themes, consistent templates, and community polls to build a loyal subscriber base."
+    },
+    {
+        "topic": "YouTube Shorts vs TikTok for quiz channels",
+        "keywords": ["youtube shorts vs tiktok", "short form video platforms", "quiz video reach", "audience demographics"],
+        "angle": "Compare the algorithm differences, monetization features, and audience behavior on YouTube Shorts and TikTok for trivia channels."
+    },
+    {
+        "topic": "how to write engaging trivia questions",
+        "keywords": ["trivia questions", "engaging quiz questions", "how to write quizzes", "interactive content"],
+        "angle": "Provide tips on crafting questions that balance difficulty, hook the viewer in the first 3 seconds, and encourage comments."
+    },
+    {
+        "topic": "automated faceless channel mistakes to avoid",
+        "keywords": ["faceless channel mistakes", "youtube automation mistakes", "scaled content abuse", "helpful content guidelines"],
+        "angle": "Point out common pitfalls like poor audio quality, repetitive templates, and lack of unique angles, showing how to avoid them."
+    },
+    {
+        "topic": "boosting audience retention on short quiz videos",
+        "keywords": ["audience retention", "video watch time", "shorts retention tips", "viewer engagement"],
+        "angle": "Explain tactical tricks like countdown timers, audio cues, and visual suspense to keep viewers watching until the very end."
+    },
+    {
+        "topic": "leveraging trending news for quiz videos",
+        "keywords": ["trending quiz videos", "real time content", "news trivia", "google trends workflow"],
+        "angle": "Show how to quickly capitalize on trending sports matches, celebrity events, or pop culture news by spinning up timely quiz videos."
+    }
+]
+
+# Alternate structural/phrasing templates for Turn 3 monetization section
+TEMPLATES = [
+    {
+        "name": "Side Hustle Blueprint",
+        "prompt": (
+            "Write this final section using a 'Side Hustle Case Study & Step-by-Step Blueprint' structure:\n"
+            "1. Use the header '<h2>Step-by-Step Guide: Launching a Quiz Channel from Scratch</h2>'. "
+            "Write a practical step-by-step blueprint of how a creator can launch a channel today using QuizViral AI's "
+            "1-click bulk generation from CSV spreadsheet imports, using engaging background loops (Minecraft, Space, Nature), "
+            "and generating natural AI voiceovers. Explain the workflow clearly.\n"
+            "2. Use the header '<h2>Monetizing Your Channel: Beyond Ad Revenue</h2>'. Explain the YouTube Partner Program (YPP) "
+            "Shorts requirements (10M views in 90 days) but focus heavily on alternative monetization channels: affiliate marketing, "
+            "print-on-demand merchandise, and digital trivia downloads.\n"
+            "3. Use the header '<h2>Answers to Common Questions</h2>'. Provide 3 FAQs addressing time-commitment, "
+            "channel originalization, and copyright safety."
+        )
+    },
+    {
+        "name": "Retention Masterclass",
+        "prompt": (
+            "Write this final section using a 'High-Growth Traffic & Retention Masterclass' structure:\n"
+            "1. Use the header '<h2>Virality Blueprint: How QuizViral AI Automates Retention</h2>'. Focus on the psychology of "
+            "viewer retention, explaining how QuizViral AI's background loops (Minecraft, Space, Nature) and realistic TTS voiceovers "
+            "hook short attention spans. Detail how the CSV bulk workflow allows testing 100+ quiz video variations quickly.\n"
+            "2. Use the header '<h2>The Math of a Successful Shorts Channel</h2>'. Detail the economics of the YouTube Partner Program (YPP), "
+            "specifically the 10M views in 90 days requirement. Explain RPM/CPM and how to supplement it with high-ticket affiliate links "
+            "and digital trivia packs.\n"
+            "3. Use the header '<h2>Quiz Creator FAQ</h2>'. Provide 3 FAQs focusing on algorithm optimization, Shorts vs TikTok, "
+            "and picking a viral quiz niche."
+        )
+    },
+    {
+        "name": "Efficiency Guide",
+        "prompt": (
+            "Write this final section using an 'Automation Tool Comparison & Efficiency Guide' structure:\n"
+            "1. Use the header '<h2>Why CSV Bulk Creation Beats Manual Editing</h2>'. Compare traditional manual video editing tools "
+            "with QuizViral AI's 1-click bulk generation from spreadsheet data. Focus on efficiency, template customization, and voiceovers.\n"
+            "2. Use the header '<h2>Scaling to Monetization: A 90-Day Plan</h2>'. Outline a timeline-based roadmap to hit the "
+            "YPP monetization threshold (10M Shorts views in 90 days) by leveraging daily bulk uploads. Explain how to sell digital "
+            "trivia books and sponsorships along the way.\n"
+            "3. Use the header '<h2>Frequently Asked Questions</h2>'. Provide 3 FAQs addressing daily upload frequency, managing "
+            "multiple channels, and voiceover realism."
+        )
+    },
+    {
+        "name": "Creator Economy Strategy",
+        "prompt": (
+            "Write this final section using a 'Creator Economy & Content Strategy Analyst' structure:\n"
+            "1. Use the header '<h2>Leveraging SaaS Automation for Modern Content Brands</h2>'. Analyze the rise of faceless YouTube channels, "
+            "showing how QuizViral AI's automated voiceovers and video loops (Minecraft parkour, space, nature) lower the barrier to entry "
+            "for creators using CSV imports.\n"
+            "2. Use the header '<h2>Unlocking Multi-Stream Revenue on YouTube</h2>'. Explain the monetization roadmap, including the YPP baseline "
+            "(10M Shorts views in 90 days) and how creators can build long-term value via email lists, custom merchandise, and digital downloads.\n"
+            "3. Use the header '<h2>FAQ for Video Creators</h2>'. Provide 3 FAQs addressing monetization approval, channel growth expectations, "
+            "and content originalization."
+        )
+    }
+]
+
+def parse_blog_posts():
+    if not os.path.exists(BLOG_POSTS_FILE):
+        return []
+    try:
+        with open(BLOG_POSTS_FILE, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        match = re.search(r"export const blogPosts = \[(.*)\];\s*$", content, re.DOTALL)
+        if not match:
+            return []
+            
+        array_content = match.group(1).strip()
+        title_matches = list(re.finditer(r"\btitle:\s*", array_content))
+        blocks = []
+        for i, m in enumerate(title_matches):
+            start = m.start()
+            end = title_matches[i+1].start() if i+1 < len(title_matches) else len(array_content)
+            blocks.append(array_content[start:end])
+            
+        posts = []
+        for block in blocks:
+            post = {}
+            fields = ["title", "slug", "excerpt", "date", "readTime", "author", "image", "pinterest_image", "metaDescription", "trendingKeyword", "topicSource", "topic_source"]
+            for field in fields:
+                pattern = rf"\b{field}:\s*['\"`]([^'\"`]+?)['\"`]"
+                f_match = re.search(pattern, block)
+                if f_match:
+                    post[field] = f_match.group(1).strip()
+            
+            content_match = re.search(r"\bcontent:\s*['\"`](.*?)['\"`],?\s*(?:\b\w+:|}$)", block, re.DOTALL)
+            if content_match:
+                post["content"] = content_match.group(1).strip()
+            else:
+                content_match = re.search(r"\bcontent:\s*['\"`](.*?)['\"`]", block, re.DOTALL)
+                if content_match:
+                    post["content"] = content_match.group(1).strip()
+            posts.append(post)
+        return posts
+    except Exception as e:
+        print(f"Error parsing blog posts: {e}")
+        return []
+
+def determine_next_topic_source(posts):
+    today_str = datetime.now().strftime("%B %d, %Y")
+    today_posts = [p for p in posts if p.get("date") == today_str]
+    
+    if len(today_posts) > 0:
+        product_today = sum(1 for p in today_posts if p.get("topicSource", p.get("topic_source", "trend")) == "product")
+        total_today = len(today_posts)
+        if (product_today / total_today) < 0.40:
+            return "product"
+        else:
+            return "trend"
+            
+    if len(posts) > 0:
+        recent_posts = posts[:10]
+        product_recent = sum(1 for p in recent_posts if p.get("topicSource", p.get("topic_source", "trend")) == "product")
+        total_recent = len(recent_posts)
+        if (product_recent / total_recent) < 0.40:
+            return "product"
+        else:
+            return "trend"
+            
+    return "trend" if random.random() < 0.60 else "product"
+
+def select_next_product_topic(posts):
+    existing_slugs_and_titles = []
+    for p in posts:
+        existing_slugs_and_titles.append(p.get("slug", "").lower())
+        existing_slugs_and_titles.append(p.get("title", "").lower())
+        
+    unused_seeds = []
+    for seed in PRODUCT_SEEDS:
+        topic_lower = seed["topic"].lower()
+        is_used = False
+        for est in existing_slugs_and_titles:
+            if topic_lower in est or est in topic_lower or seed["topic"].lower().replace(" ", "-") in est:
+                is_used = True
+                break
+        if not is_used:
+            unused_seeds.append(seed)
+            
+    if unused_seeds:
+        selected = unused_seeds[0]
+        print(f"[Topic Selector] Selected unused product seed topic: '{selected['topic']}'")
+        return selected
+    else:
+        seed_scores = {}
+        for idx, seed in enumerate(PRODUCT_SEEDS):
+            found_pos = float('inf')
+            for pos, p in enumerate(posts):
+                if seed["topic"].lower() in p.get("title", "").lower() or seed["topic"].lower().replace(" ", "-") in p.get("slug", "").lower():
+                    found_pos = pos
+                    break
+            seed_scores[idx] = found_pos
+            
+        best_idx = max(seed_scores, key=seed_scores.get)
+        selected = PRODUCT_SEEDS[best_idx]
+        print(f"[Topic Selector] Selected oldest used product seed topic: '{selected['topic']}'")
+        return selected
+
+def get_string_similarity(str1, str2):
+    return difflib.SequenceMatcher(None, str1.lower(), str2.lower()).ratio()
+
+def extract_intro_opening(markdown_content):
+    # Convert literal \n escapes to actual newlines
+    markdown_content = markdown_content.replace('\\n', '\n')
+    # Remove image markdown
+    cleaned = re.sub(r'!\[.*?\]\(.*?\)', '', markdown_content)
+    # Remove headers (lines starting with #)
+    lines = cleaned.split('\n')
+    text_lines = []
+    for line in lines:
+        line_strip = line.strip()
+        if not line_strip:
+            continue
+        if line_strip.startswith('#'):
+            continue
+        text_lines.append(line_strip)
+    
+    full_text = " ".join(text_lines)
+    return full_text[:100].strip()
+
+def extract_monetization_text(markdown_content):
+    # Convert literal \n escapes to actual newlines
+    markdown_content = markdown_content.replace('\\n', '\n')
+    parts = re.split(r'\n##\s+', markdown_content)
+    monetization_parts = []
+    for part in parts:
+        part_lower = part.lower()
+        if "quizviral" in part_lower or "monetiz" in part_lower or "revenue" in part_lower or "shorts views" in part_lower:
+            monetization_parts.append(part.strip())
+    
+    if monetization_parts:
+        return "\n".join(monetization_parts)
+    
+    content_len = len(markdown_content)
+    return markdown_content[int(content_len * 0.7):]
+
 # Imports from helper script for interlinking and alt-tags
 try:
     from ghost_blog_automation import (
@@ -896,61 +1152,90 @@ def run_blog_generator_playwright():
             # Create main Gemini page
             gemini_page = context.new_page()
             
-            # --- 1. Scrape Trends ---
-            # We use a temporary page for trends scraping so gemini_page doesn't navigate away
-            print("\n--- STEP 1: Scraping Google Trends ---")
-            temp_page = context.new_page()
-            top_trends = get_trends_from_page_and_rss(temp_page)
-            temp_page.close()
+            # --- Parse existing blog posts to enforce topic split ---
+            posts = parse_blog_posts()
+            source = determine_next_topic_source(posts)
+            print(f"\n[Topic Selection] Selected source for this run: '{source.upper()}'")
             
-            if not top_trends:
-                print("No trending topics found. Aborting.")
-                gemini_page.close()
-                return None
+            selected_topic = ""
+            suggestions = []
+            angle = ""
+            
+            if source == "trend":
+                # --- 1. Scrape Trends ---
+                # We use a temporary page for trends scraping so gemini_page doesn't navigate away
+                print("\n--- STEP 1: Scraping Google Trends ---")
+                temp_page = context.new_page()
+                top_trends = get_trends_from_page_and_rss(temp_page)
+                temp_page.close()
                 
-            print(f"Top trends to filter: {top_trends}")
-            
-            # --- 2. Navigate to ChatGPT to filter trend ---
-            print("\n--- STEP 2: Connecting to ChatGPT for topic filtering ---")
-            gemini_page.goto("https://chatgpt.com/c/6a47d525-af3c-83e8-9b33-a5c2b2669d17")
-            
-            # Wait for text box to load in ChatGPT
-            textbox = gemini_page.locator("#prompt-textarea, textarea[id='prompt-textarea']").first
-            try:
-                textbox.wait_for(state="visible", timeout=30000)
-            except Exception:
-                pass
-            time.sleep(5)
-            
-            filter_prompt = (
-                f"Out of these 5 trending topics: {json.dumps(top_trends)}. "
-                "Which one is the easiest and most interesting to write a trivia/quiz blog post about? "
-                "Choose exactly one. Respond with ONLY the chosen topic name, and absolutely nothing else."
-            )
-            
-            selected_topic = submit_and_wait_for_response(gemini_page, filter_prompt, max_wait_seconds=120)
-            # Clean possible markdown or quote wrappers by ChatGPT
-            selected_topic = selected_topic.strip('"\'`').replace('\n', '').strip()
-            print(f"ChatGPT selected topic: '{selected_topic}'")
-            
-            if not selected_topic or len(selected_topic) > 80:
-                print("Invalid topic selected by ChatGPT. Defaulting to first trend.")
-                selected_topic = top_trends[0]
+                if not top_trends:
+                    print("No trending topics found. Aborting.")
+                    gemini_page.close()
+                    return None
+                    
+                print(f"Top trends to filter: {top_trends}")
                 
-            # --- 3. Google Search Autocomplete Suggestions ---
-            # We use a temporary page for autocomplete so gemini_page doesn't navigate away
-            print("\n--- STEP 3: Scraping Google Autocomplete ---")
-            search_page = context.new_page()
-            suggestions = get_autocomplete_suggestions(search_page, selected_topic)
-            search_page.close()
-            
-            # Limit to top 15 diverse suggestions to prevent prompt clutter and Google SEO keyword stuffing penalties
-            suggestions = suggestions[:15]
-            
+                # --- 2. Navigate to ChatGPT to filter trend ---
+                print("\n--- STEP 2: Connecting to ChatGPT for topic filtering ---")
+                gemini_page.goto("https://chatgpt.com/c/6a47d525-af3c-83e8-9b33-a5c2b2669d17")
+                
+                # Wait for text box to load in ChatGPT
+                textbox = gemini_page.locator("#prompt-textarea, textarea[id='prompt-textarea']").first
+                try:
+                    textbox.wait_for(state="visible", timeout=30000)
+                except Exception:
+                    pass
+                time.sleep(5)
+                
+                filter_prompt = (
+                    f"Out of these 5 trending topics: {json.dumps(top_trends)}. "
+                    "Which one is the easiest and most interesting to write a trivia/quiz blog post about? "
+                    "Choose exactly one. Respond with ONLY the chosen topic name, and absolutely nothing else."
+                )
+                
+                selected_topic = submit_and_wait_for_response(gemini_page, filter_prompt, max_wait_seconds=120)
+                # Clean possible markdown or quote wrappers by ChatGPT
+                selected_topic = selected_topic.strip('"\'`').replace('\n', '').strip()
+                print(f"ChatGPT selected topic: '{selected_topic}'")
+                
+                if not selected_topic or len(selected_topic) > 80:
+                    print("Invalid topic selected by ChatGPT. Defaulting to first trend.")
+                    selected_topic = top_trends[0]
+                    
+                # --- 3. Google Search Autocomplete Suggestions ---
+                # We use a temporary page for autocomplete so gemini_page doesn't navigate away
+                print("\n--- STEP 3: Scraping Google Autocomplete ---")
+                search_page = context.new_page()
+                suggestions = get_autocomplete_suggestions(search_page, selected_topic)
+                search_page.close()
+                
+                # Limit to top 15 diverse suggestions to prevent prompt clutter and Google SEO keyword stuffing penalties
+                suggestions = suggestions[:15]
+            else:
+                # --- Product Source Topic Selection ---
+                product_info = select_next_product_topic(posts)
+                selected_topic = product_info["topic"]
+                suggestions = product_info["keywords"]
+                angle = product_info["angle"]
+                print(f"[Topic Selection] Selected product seed topic: '{selected_topic}'")
+                print(f"[Topic Selection] Keywords: {suggestions}")
+                print(f"[Topic Selection] Angle: {angle}")
+                
+                # Navigate to ChatGPT for subsequent turns
+                print("\n--- STEP 2: Connecting to ChatGPT for content generation ---")
+                gemini_page.goto("https://chatgpt.com/c/6a47d525-af3c-83e8-9b33-a5c2b2669d17")
+                textbox = gemini_page.locator("#prompt-textarea, textarea[id='prompt-textarea']").first
+                try:
+                    textbox.wait_for(state="visible", timeout=30000)
+                except Exception:
+                    pass
+                time.sleep(5)
+                
             # --- 4. Get Image Prompts from ChatGPT (BEFORE content generation to save quota and verify first) ---
             print("\n--- STEP 4: Requesting Image Prompts from ChatGPT ---")
             prompt_image_prompts = (
-                f"For the selected trending topic \"{selected_topic}\", write two photorealistic image prompts:\n"
+                f"For the selected topic \"{selected_topic}\", write two photorealistic image prompts:\n"
                 "1. A landscape (16:9) image prompt representing the topic. Make it highly detailed, descriptive, photorealistic, with professional camera settings, specific textures, and natural lighting. Do NOT include laptops, screens, or text.\n"
                 "2. A matching vertical (9:16) version of that prompt. Avoid celebrity names.\n"
                 "Respond ONLY with a JSON object in this format (no markdown blocks, no other text):\n"
@@ -1019,41 +1304,130 @@ def run_blog_generator_playwright():
             
             # TURN 1: Write Introduction Section
             print("\n--- TURN 1: Generating Introduction ---")
-            prompt_turn1 = (
-                f"We are writing a blog post about the trending topic: \"{selected_topic}\".\n"
-                f"Target Keyword: \"{selected_topic}\"\n"
-                f"Additional keywords to include: {json.dumps(suggestions)}.\n\n"
-                f"Write a compelling, SEO-optimized Introduction section (minimum 400 words) starting with an <h1> tag containing the target keyword. "
-                f"Focus strictly on \"{selected_topic}\", why it is currently trending, its significance, background, and key facts. "
-                "Do NOT mention quiz videos, video creators, bulk quiz makers, or QuizViral AI here. Focus 100% on the topic itself.\n"
-                "Respond with ONLY raw HTML body content. Do not include <html>, <head>, or <body> wrappers, and do not wrap in markdown code blocks."
-            )
+            if source == "trend":
+                prompt_turn1 = (
+                    f"We are writing a blog post about the trending topic: \"{selected_topic}\".\n"
+                    f"Target Keyword: \"{selected_topic}\"\n"
+                    f"Background research context (use these terms/topics naturally to guide the article, but do not list them out): {json.dumps(suggestions)}.\n\n"
+                    f"Write a compelling, SEO-optimized Introduction section (minimum 400 words) starting with an <h1> tag containing the target keyword. "
+                    f"Focus strictly on \"{selected_topic}\", why it is currently trending, its significance, background, and key facts. "
+                    f"Also, weave in how content creators or YouTubers can leverage this specific trending interest to build highly engaging "
+                    f"quiz and trivia videos, introducing QuizViral AI as the tool to instantly bulk-generate these videos from CSV imports.\n"
+                    f"Do not list out search queries or keyword variations as a sentence (e.g. 'searches such as X, Y, Z'). Write naturally, as if for a human reader, not an SEO checklist.\n"
+                    "Respond with ONLY raw HTML body content. Do not include <html>, <head>, or <body> wrappers, and do not wrap in markdown code blocks."
+                )
+            else:
+                prompt_turn1 = (
+                    f"We are writing a blog post about: \"{selected_topic}\".\n"
+                    f"Target Keyword: \"{selected_topic}\"\n"
+                    f"Background research context (use these terms/topics naturally to guide the article, but do not list them out): {json.dumps(suggestions)}.\n\n"
+                    f"Write a compelling, SEO-optimized Introduction section (minimum 400 words) starting with an <h1> tag containing the target keyword. "
+                    f"Focus on \"{selected_topic}\", outlining the core strategies, value, and ideas for creators wanting to grow their channels. "
+                    f"Weave in how QuizViral AI enables creators to capitalize on this via automated bulk video generation from CSV imports.\n"
+                    f"Do not list out search queries or keyword variations as a sentence (e.g. 'searches such as X, Y, Z'). Write naturally, as if for a human reader, not an SEO checklist.\n"
+                    "Respond with ONLY raw HTML body content. Do not include <html>, <head>, or <body> wrappers, and do not wrap in markdown code blocks."
+                )
             raw_intro = submit_and_wait_for_response(gemini_page, prompt_turn1, max_wait_seconds=150)
             print("Successfully read Turn 1 (Introduction) response.")
             
+            # --- Intro Similarity Check Safeguard ---
+            last_10_posts = posts[:10]
+            for attempt in range(3):
+                plain_new_intro = re.sub(r'<[^>]+>', ' ', raw_intro)
+                plain_new_intro = " ".join(plain_new_intro.split())
+                new_intro_opening = plain_new_intro[:100].strip()
+                
+                max_similarity = 0.0
+                matched_slug = ""
+                for p in last_10_posts:
+                    old_intro_opening = extract_intro_opening(p.get("content", ""))
+                    similarity = get_string_similarity(new_intro_opening, old_intro_opening)
+                    if similarity > max_similarity:
+                        max_similarity = similarity
+                        matched_slug = p.get("slug", "")
+                        
+                print(f"Intro opening similarity check (Attempt {attempt+1}/3): max similarity = {max_similarity:.2%} (with '{matched_slug}')")
+                if max_similarity <= 0.70:
+                    break
+                else:
+                    print(f"Similarity exceeds 70%! Regenerating introduction...")
+                    regen_prompt = (
+                        f"The introduction you generated is too similar to our previous blog posts (similarity: {max_similarity:.2%}). "
+                        f"Please rewrite the Introduction section for \"{selected_topic}\" from scratch. "
+                        "It MUST read as legacy-free, fresh, and meaningfully different from prior posts in its wording, sentence structure, and flow. "
+                        "Do not use repetitive patterns. Start with the <h1> tag as before, and respond with ONLY the raw HTML content."
+                    )
+                    raw_intro = submit_and_wait_for_response(gemini_page, regen_prompt, max_wait_seconds=150)
+            
             # TURN 2: Write Tutorial & 10 Quiz Questions
             print("\n--- TURN 2: Generating Tutorial & 10 Quiz Questions ---")
-            prompt_turn2 = (
-                f"Excellent. Now write the second section (minimum 600 words):\n"
-                f"- Go deeper into details, history, analysis, or current events about \"{selected_topic}\" to provide maximum value to the reader.\n"
-                f"- Include 10 complete quiz questions about \"{selected_topic}\" with 4 options (A, B, C, D) and specify the correct answer clearly. Format these questions as structured HTML lists or tables.\n\n"
-                "Do NOT mention video creation tools, AI generators, or QuizViral AI here. Focus 100% on the topic itself. "
-                "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
-            )
+            if source == "trend":
+                prompt_turn2 = (
+                    f"Excellent. Now write the second section (minimum 600 words):\n"
+                    f"- Go deeper into details, history, analysis, or current events about \"{selected_topic}\" to provide maximum value to the reader.\n"
+                    f"- Include 10 complete quiz questions about \"{selected_topic}\" with 4 options (A, B, C, D) and specify the correct answer clearly. Format these questions as structured HTML lists or tables.\n"
+                    f"- REQUIRED UNIQUE ANGLE: You must include at least one specific, non-generic detail, statistic, or creative angle that connects this specific trend (e.g., specific game details, player stats, or pop culture moments) to quiz-content creation (e.g., explaining how these details can build suspense in a YouTube Short or drive higher comments by debating a polarizing question).\n\n"
+                    "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
+                )
+            else:
+                prompt_turn2 = (
+                    f"Excellent. Now write the second section (minimum 600 words):\n"
+                    f"- Go deeper into details, strategies, and tips about \"{selected_topic}\" to provide maximum value to the reader.\n"
+                    f"- Specific angle to cover: \"{angle}\"\n"
+                    f"- Include 10 complete sample quiz questions or template ideas about \"{selected_topic}\" with 4 options (A, B, C, D) and specify the correct answer clearly. Format these questions as structured HTML lists or tables so creators can easily copy them for CSV import.\n"
+                    f"- REQUIRED UNIQUE ANGLE: You must include at least one specific, non-generic detail, statistic, or creative angle that connects this topic directly to quiz-content creation tips using QuizViral AI.\n\n"
+                    "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
+                )
             raw_tutorial = submit_and_wait_for_response(gemini_page, prompt_turn2, max_wait_seconds=180)
             print("Successfully read Turn 2 (Tutorial & Quiz Questions) response.")
             
             # TURN 3: Write Monetization & FAQs
             print("\n--- TURN 3: Generating Monetization & FAQs ---")
+            selected_template = random.choice(TEMPLATES)
+            print(f"Selected Turn 3 monetization template: '{selected_template['name']}'")
             prompt_turn3 = (
                 f"Excellent. Now write the final section (minimum 500 words):\n"
-                f"- Introduce QuizViral AI: Explain how content creators can leverage the viral interest in \"{selected_topic}\" by using QuizViral AI to mass-produce 100+ quiz videos about \"{selected_topic}\" in 1 click using CSV spreadsheet imports, choosing background loops (Minecraft, Space, Nature), and generating natural AI voiceovers.\n"
-                f"- YouTube Quiz Channel Monetization Strategy: securing YPP status (10M shorts views in 90 days), and alternate revenue streams (affiliates, print-on-demand, digital trivia downloads).\n"
-                f"- 3 Frequently Asked Questions (FAQs) about automated quiz channels.\n\n"
+                f"{selected_template['prompt']}\n\n"
+                f"IMPORTANT: Tailor this template to the context of \"{selected_topic}\" naturally so it feels custom-tailored rather than a generic boilerplate paragraph. "
                 "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
             )
             raw_monetization = submit_and_wait_for_response(gemini_page, prompt_turn3, max_wait_seconds=150)
             print("Successfully read Turn 3 (Monetization & FAQs) response.")
+            
+            # --- Monetization Similarity Check Safeguard ---
+            for attempt in range(3):
+                plain_new_monetization = re.sub(r'<[^>]+>', ' ', raw_monetization)
+                plain_new_monetization = " ".join(plain_new_monetization.split())
+                
+                max_similarity = 0.0
+                matched_slug = ""
+                for p in last_10_posts:
+                    old_monetization = extract_monetization_text(p.get("content", ""))
+                    plain_old_monetization = re.sub(r'<[^>]+>', ' ', old_monetization)
+                    plain_old_monetization = " ".join(plain_old_monetization.split())
+                    
+                    similarity = get_string_similarity(plain_new_monetization[:500], plain_old_monetization[:500])
+                    if similarity > max_similarity:
+                        max_similarity = similarity
+                        matched_slug = p.get("slug", "")
+                        
+                print(f"Monetization section similarity check (Attempt {attempt+1}/3): max similarity = {max_similarity:.2%} (with '{matched_slug}')")
+                if max_similarity <= 0.70:
+                    break
+                else:
+                    print(f"Similarity exceeds 70%! Regenerating monetization section...")
+                    new_template = random.choice([t for t in TEMPLATES if t["name"] != selected_template["name"]])
+                    selected_template = new_template
+                    print(f"Selected alternate Turn 3 template: '{selected_template['name']}'")
+                    regen_prompt = (
+                        f"The monetization/FAQ section you generated is too similar to our previous blog posts (similarity: {max_similarity:.2%}). "
+                        f"Please rewrite the monetization and FAQ section for \"{selected_topic}\" from scratch. "
+                        "It MUST read as meaningfully different from prior posts. Use completely different phrasing, style, and sentence structure.\n"
+                        f"Follow this specific template structure:\n{selected_template['prompt']}\n"
+                        f"IMPORTANT: Tailor it to the context of \"{selected_topic}\" naturally.\n"
+                        "Respond with ONLY raw HTML body content."
+                    )
+                    raw_monetization = submit_and_wait_for_response(gemini_page, regen_prompt, max_wait_seconds=150)
             
             # Combine the HTML components
             html_content = f"{raw_intro}\n{raw_tutorial}\n{raw_monetization}"
@@ -1115,6 +1489,7 @@ def run_blog_generator_playwright():
             browser.close()
             
             blog_data["trendingKeyword"] = selected_topic
+            blog_data["topic_source"] = source
             return blog_data
             
         except Exception as e:
@@ -1189,12 +1564,13 @@ def update_blog_posts_file(new_post):
         "metaDescription": new_post["meta_description"],
         "seoKeywords": [new_post["trendingKeyword"], "QuizViral AI"],
         "content": new_post["markdown"],
-        "trendingKeyword": new_post["trendingKeyword"]
+        "trendingKeyword": new_post["trendingKeyword"],
+        "topicSource": new_post.get("topic_source", "trend")
     }
     
     new_post_str = json.dumps(post_item, indent=2)
     # Re-align JSON properties names for compatibility with JS parser
-    for prop in ["title", "slug", "excerpt", "date", "readTime", "author", "image", "pinterest_image", "metaDescription", "seoKeywords", "content", "trendingKeyword"]:
+    for prop in ["title", "slug", "excerpt", "date", "readTime", "author", "image", "pinterest_image", "metaDescription", "seoKeywords", "content", "trendingKeyword", "topicSource"]:
         new_post_str = new_post_str.replace(f'"{prop}":', f'{prop}:')
 
     if posts_array_content:
