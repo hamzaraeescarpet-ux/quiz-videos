@@ -499,6 +499,43 @@ def resubmit_sitemap_gsc_playwright(context):
     except Exception as e:
         print(f"Warning: GSC sitemap resubmission failed: {e}. Continuing pipeline...")
 
+def verify_live_sitemap(local_count):
+    print(f"\n--- Verifying Live Sitemap (Target Count: {local_count}) ---")
+    live_url = "https://quizviral-nine.vercel.app/sitemap.xml"
+    
+    for attempt in range(5):
+        print(f"Fetch attempt {attempt + 1}/5...")
+        try:
+            import ssl
+            context = ssl._create_unverified_context()
+            req = urllib.request.Request(
+                live_url,
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            )
+            with urllib.request.urlopen(req, timeout=15, context=context) as response:
+                if response.getcode() == 200:
+                    content = response.read()
+                    root = ET.fromstring(content)
+                    locs = root.findall(".//{http://www.sitemaps.org/schemas/sitemap/0.9}loc")
+                    live_count = len(locs)
+                    print(f"  Live sitemap contains {live_count} URLs.")
+                    if live_count == local_count:
+                        print("  SUCCESS: Live sitemap matches the local sitemap count!")
+                        return True
+                    else:
+                        print(f"  Count mismatch (live: {live_count}, local: {local_count}). Vercel build might still be running...")
+                else:
+                    print(f"  Received non-200 status code: {response.getcode()}")
+        except Exception as e:
+            print(f"  Error fetching/parsing live sitemap: {e}")
+        
+        if attempt < 4:
+            time.sleep(30)
+            
+    print("  WARNING: Live sitemap count does not match local count after 2.5 minutes.")
+    print("  This could indicate that Vercel is still building, deployment failed, or there is an edge cache issue.")
+    return False
+
 def validate_meta_title_robust(title):
     keywords = ["faceless quiz videos", "AI video generator", "bulk quiz maker"]
     title = title.strip()
@@ -1843,34 +1880,90 @@ def generate_sitemap_from_posts():
     sitemap_path = os.path.join(SCRIPT_DIR, "frontend", "public", "sitemap.xml")
     today_str = datetime.now().strftime("%Y-%m-%d")
     
-    slugs = []
-    if os.path.exists(BLOG_POSTS_FILE):
+    # Helper to parse different date formats to YYYY-MM-DD
+    def parse_w3c_date(date_str):
+        if not date_str:
+            return today_str
         try:
-            with open(BLOG_POSTS_FILE, "r", encoding="utf-8") as f:
-                content = f.read()
-            slugs = re.findall(r"\bslug:\s*['\"`]([^'\"`]+?)['\"`]", content)
-            slugs = list(dict.fromkeys(slugs))
+            # e.g., "July 11, 2026"
+            dt = datetime.strptime(date_str.strip(), "%B %d, %Y")
+            return dt.strftime("%Y-%m-%d")
         except Exception:
-            pass
+            try:
+                # e.g., "June 19, 2026"
+                dt = datetime.strptime(date_str.strip(), "%b %d, %Y")
+                return dt.strftime("%Y-%m-%d")
+            except Exception:
+                try:
+                    # Already in YYYY-MM-DD
+                    dt = datetime.strptime(date_str.strip(), "%Y-%m-%d")
+                    return dt.strftime("%Y-%m-%d")
+                except Exception:
+                    return today_str
+
+    posts = parse_blog_posts()
+    
+    # Determine the latest blog post date to use as lastmod for / and /blog
+    latest_post_date = today_str
+    post_dates = []
+    for p in posts:
+        d_val = p.get("date")
+        if d_val:
+            post_dates.append(parse_w3c_date(d_val))
             
+    if post_dates:
+        latest_post_date = max(post_dates)
+        
     xml_lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-        f'  <url><loc>https://quizviral-nine.vercel.app/</loc><lastmod>{today_str}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>',
-        f'  <url><loc>https://quizviral-nine.vercel.app/pricing</loc><lastmod>{today_str}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
-        f'  <url><loc>https://quizviral-nine.vercel.app/blog</loc><lastmod>{today_str}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>'
+        '  <url>',
+        '    <loc>https://quizviral-nine.vercel.app/</loc>',
+        f'    <lastmod>{latest_post_date}</lastmod>',
+        '    <changefreq>daily</changefreq>',
+        '    <priority>1.0</priority>',
+        '  </url>',
+        '  <url>',
+        '    <loc>https://quizviral-nine.vercel.app/pricing</loc>',
+        f'    <lastmod>{today_str}</lastmod>',
+        '    <changefreq>weekly</changefreq>',
+        '    <priority>0.8</priority>',
+        '  </url>',
+        '  <url>',
+        '    <loc>https://quizviral-nine.vercel.app/blog</loc>',
+        f'    <lastmod>{latest_post_date}</lastmod>',
+        '    <changefreq>daily</changefreq>',
+        '    <priority>0.9</priority>',
+        '  </url>'
     ]
-    for s in slugs:
-        xml_lines.append(f'  <url><loc>https://quizviral-nine.vercel.app/blog/{s}</loc><lastmod>{today_str}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>')
+    
+    for p in posts:
+        slug = p.get("slug")
+        if not slug:
+            continue
+        p_date = parse_w3c_date(p.get("date"))
+        xml_lines.extend([
+            '  <url>',
+            f'    <loc>https://quizviral-nine.vercel.app/blog/{slug}</loc>',
+            f'    <lastmod>{p_date}</lastmod>',
+            '    <changefreq>monthly</changefreq>',
+            '    <priority>0.6</priority>',
+            '  </url>'
+        ])
+        
     xml_lines.append('</urlset>')
+    
+    url_count = 3 + len([p for p in posts if p.get("slug")])
     
     try:
         os.makedirs(os.path.dirname(sitemap_path), exist_ok=True)
         with open(sitemap_path, "w", encoding="utf-8") as f:
             f.write("\n".join(xml_lines) + "\n")
-        return True
-    except Exception:
-        return False
+        print(f"Sitemap successfully generated at {sitemap_path} with {url_count} URLs.")
+        return url_count
+    except Exception as e:
+        print(f"Error generating sitemap.xml: {e}")
+        return 0
 
 def ping_indexnow(slug):
     url_to_index = f"https://quizviral-nine.vercel.app/blog/{slug}"
@@ -2053,7 +2146,7 @@ def main():
         
         if success_js:
             # 8. Sitemap and IndexNow
-            generate_sitemap_from_posts()
+            sitemap_count = generate_sitemap_from_posts()
             ping_indexnow(blog_data["slug"])
             
             # 9. Build and push changes to trigger deployment
@@ -2061,6 +2154,10 @@ def main():
             build_res = subprocess.run(["npm", "run", "build"], cwd=os.path.join(SCRIPT_DIR, "frontend"), shell=True)
             if build_res.returncode == 0:
                 git_push_changes(blog_data["title"])
+                
+                # 12. Verify Live Sitemap count after deploy (polls to allow Vercel build to deploy)
+                if sitemap_count > 0:
+                    verify_live_sitemap(sitemap_count)
                 
                 # 11. Request indexing on Google Search Console & resubmit sitemap
                 try:
