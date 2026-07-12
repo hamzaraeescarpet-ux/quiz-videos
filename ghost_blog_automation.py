@@ -128,6 +128,7 @@ def validate_meta_title(title):
     """
     Enforces a strict 50-60 character length limit.
     Ensures at least one high-intent keyword is included.
+    Cuts back to the last complete word/separator boundary if too long.
     """
     keywords = ["faceless quiz videos", "AI video generator", "bulk quiz maker"]
     title = title.strip()
@@ -135,23 +136,26 @@ def validate_meta_title(title):
     # 1. Inject keyword if missing
     has_kw = any(kw.lower() in title.lower() for kw in keywords)
     if not has_kw:
-        # Append a keyword while respecting maximum limit
         phrase = " | AI Video Generator"
-        if len(title) + len(phrase) <= 60:
-            title += phrase
-        else:
-            title = title[:60 - len(phrase)] + phrase
+        title = title + phrase
             
-    # 2. Strict character bounds enforcement (50-60 chars)
+    # 2. Pad if too short
     if len(title) < 50:
-        # Pad with relevant branding text
         padding = " | QuizViral AI Generator"
-        title = (title + padding)[:60]
-        if len(title) < 50:
-            title = title.ljust(50, '.')
-    elif len(title) > 60:
-        # Truncate and add ellipsis
-        title = title[:57] + "..."
+        title = title + padding
+        
+    # 3. Strict character bounds enforcement (50-60 chars) with word boundary safety
+    if len(title) > 60:
+        truncated = title[:57]
+        # Find last space, pipe, or hyphen separator
+        last_sep = max(truncated.rfind(' '), truncated.rfind('|'), truncated.rfind('-'))
+        if last_sep > 30:
+            title = title[:last_sep].strip() + "..."
+        else:
+            title = truncated.strip() + "..."
+            
+    if len(title) < 50:
+        title = title.ljust(50, '.')
         
     return title
 
@@ -159,6 +163,7 @@ def validate_meta_description(desc):
     """
     Enforces a strict 145-150 character length limit.
     Ensures at least one high-intent keyword is included.
+    Cuts back to the last complete sentence or word boundary if too long.
     """
     keywords = ["faceless quiz videos", "AI video generator", "bulk quiz maker"]
     desc = desc.strip()
@@ -167,18 +172,35 @@ def validate_meta_description(desc):
     has_kw = any(kw.lower() in desc.lower() for kw in keywords)
     if not has_kw:
         suffix = " Create shorts fast with our bulk quiz maker and AI video generator."
-        desc = (desc + suffix)[:150]
+        desc = desc + suffix
         
-    # 2. Strict character bounds enforcement (145-150 chars)
+    # 2. Pad if too short
     if len(desc) < 145:
-        # Pad with optimized description content
         padding = " Build viral automated quiz channels easily. Import questions, select background videos, generate TTS voiceovers, and export vertical clips."
-        desc = (desc + padding)[:150]
-        if len(desc) < 145:
-            desc = desc.ljust(145, '.')
-    elif len(desc) > 150:
-        # Truncate and add ellipsis
-        desc = desc[:147] + "..."
+        desc = desc + padding
+        
+    # 3. Strict character bounds enforcement (145-150 chars)
+    if len(desc) > 150:
+        # Try to find a sentence boundary between 120 and 150 characters
+        sentence_end = -1
+        for match in re.finditer(r'([.!?])(?:\s+|$)', desc[:150]):
+            end_idx = match.end(1)
+            if 120 <= end_idx <= 150:
+                sentence_end = end_idx
+                
+        if sentence_end != -1:
+            desc = desc[:sentence_end].strip()
+        else:
+            # Truncate at last word boundary
+            truncated = desc[:147]
+            last_space = truncated.rfind(' ')
+            if last_space > 100:
+                desc = desc[:last_space].strip() + "..."
+            else:
+                desc = truncated.strip() + "..."
+                
+    if len(desc) < 145:
+        desc = desc.ljust(145, '.')
         
     return desc
 

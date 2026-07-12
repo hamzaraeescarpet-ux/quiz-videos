@@ -3,7 +3,7 @@
 QuizViral AI - Trending Blog Post Generator (Playwright & Gemini)
 ================================================================
 This script automates the full SEO blog generation pipeline using Playwright
-to control Chrome (port 9222):
+to control Chrome (port 9224):
 1. Navigates to Google Trends (US) to scrape the top 5 trending topics.
 2. Prompts Gemini to select the easiest/most interesting topic for a quiz video.
 3. Performs Google Autocomplete Suggestion research by typing the topic + ' a', ' b', ' y', ' z'.
@@ -51,6 +51,7 @@ GHOST_API_VERSION = os.environ.get("GHOST_API_VERSION", "v2")
 CTA_URL = os.environ.get("CTA_URL", "https://quizviral-nine.vercel.app")
 BLOG_BASE_URL = os.environ.get("BLOG_BASE_URL", "https://quizviral-nine.vercel.app/blog")
 PUBLISH_STATUS = os.environ.get("PUBLISH_STATUS", "draft") # Use "draft" to review first
+GSC_PROPERTY = os.environ.get("GSC_PROPERTY", "https://quizviral-nine.vercel.app/")
 
 # ==================== HYBRID TOPIC & SAFE SCALING CONFIG ====================
 import difflib
@@ -308,6 +309,246 @@ def extract_monetization_text(markdown_content):
     content_len = len(markdown_content)
     return markdown_content[int(content_len * 0.7):]
 
+# ==================== GOOGLE SEARCH CONSOLE INTEGRATION ====================
+
+def request_gsc_indexing_playwright(context, post_url):
+    print(f"\n--- Google Search Console URL Inspection for: '{post_url}' ---")
+    try:
+        page = context.new_page()
+        
+        gsc_property_encoded = urllib.parse.quote_plus(GSC_PROPERTY)
+        post_url_encoded = urllib.parse.quote_plus(post_url)
+        
+        inspection_url = f"https://search.google.com/search-console/inspect?resource_id={gsc_property_encoded}&id={post_url_encoded}"
+        print(f"Navigating to GSC URL Inspection: {inspection_url}")
+        
+        page.goto(inspection_url, timeout=60000)
+        time.sleep(10) # Wait for page load
+        
+        print("Waiting for initial index retrieval status to finish...")
+        try:
+            page.wait_for_selector("text=on Google, text=not on Google, text=not in the index", timeout=45000)
+        except Exception as te:
+            print(f"Status retrieval wait timed out or text was not found: {te}. Proceeding anyway...")
+            
+        time.sleep(5)
+        
+        page_text = page.locator("body").inner_text()
+        is_not_on_google = any(x in page_text for x in ["URL is not on Google", "URL is not in the index", "URL is not on", "not in the index"])
+        
+        if is_not_on_google or "Request indexing" in page_text:
+            print("URL is not on Google. Requesting indexing...")
+            
+            selectors = [
+                "text=Request indexing",
+                "text=REQUEST INDEXING",
+                "button:has-text('Request indexing')",
+                "div[role='button']:has-text('Request indexing')",
+                "div[role='button']:has-text('REQUEST INDEXING')"
+            ]
+            
+            clicked = False
+            for sel in selectors:
+                try:
+                    btn = page.locator(sel).first
+                    if btn.is_visible() and btn.is_enabled():
+                        print(f"Clicking Request Indexing button with selector: {sel}")
+                        btn.click()
+                        clicked = True
+                        break
+                except Exception:
+                    pass
+            
+            if not clicked:
+                try:
+                    page.get_by_text("Request indexing", exact=False).first.click(timeout=5000)
+                    clicked = True
+                    print("Clicked Request Indexing using get_by_text fallback.")
+                except Exception as ce:
+                    print(f"Failed to click Request Indexing button: {ce}")
+            
+            if clicked:
+                print("Waiting for GSC to test if live URL can be indexed (this can take up to 2-3 minutes)...")
+                time.sleep(5)
+                
+                start_time = time.time()
+                success_detected = False
+                quota_exceeded_detected = False
+                
+                while time.time() - start_time < 180:
+                    dialog_text = ""
+                    try:
+                        dialog = page.locator("div[role='dialog'], mwc-dialog, .modal-dialog").first
+                        if dialog.is_visible():
+                            dialog_text = dialog.inner_text()
+                    except Exception:
+                        pass
+                        
+                    body_text = page.locator("body").inner_text()
+                    
+                    if any(x in dialog_text or x in body_text for x in ["Indexing requested", "added to a priority crawl", "Priority crawl queue"]):
+                        print("SUCCESS: Google Search Console confirmed 'Indexing requested'!")
+                        success_detected = True
+                        break
+                    elif any(x in dialog_text or x in body_text for x in ["Quota exceeded", "Daily quota reached", "limit reached", "try again tomorrow"]):
+                        print("WARNING: Google Search Console indexing request quota exceeded for today.")
+                        quota_exceeded_detected = True
+                        break
+                    elif "Testing if live" in body_text or "Testing if live" in dialog_text:
+                        pass
+                    
+                    time.sleep(5)
+                
+                try:
+                    close_btn = page.locator("div[role='dialog'] button:has-text('Got it'), button:has-text('Got it'), button:has-text('OK'), button:has-text('Dismiss')").first
+                    if close_btn.is_visible():
+                        close_btn.click()
+                        time.sleep(1)
+                except Exception:
+                    pass
+                    
+                if not success_detected and not quota_exceeded_detected:
+                    print("Warning: Inspection dialog finished, but no explicit confirmation text was matched.")
+            else:
+                print("Request Indexing button was not clicked.")
+        else:
+            print("URL is already indexed on Google. No indexing request needed.")
+            
+        page.close()
+    except Exception as e:
+        print(f"Warning: Google Search Console URL inspection failed: {e}. Continuing pipeline...")
+
+def resubmit_sitemap_gsc_playwright(context):
+    print("\n--- Google Search Console Sitemap Resubmission ---")
+    try:
+        page = context.new_page()
+        
+        gsc_property_encoded = urllib.parse.quote_plus(GSC_PROPERTY)
+        sitemaps_url = f"https://search.google.com/search-console/sitemaps?resource_id={gsc_property_encoded}"
+        print(f"Navigating to GSC Sitemaps page: {sitemaps_url}")
+        
+        page.goto(sitemaps_url, timeout=60000)
+        time.sleep(8)
+        
+        input_selectors = [
+            "input[aria-label*='sitemap' i]",
+            "input[placeholder*='sitemap' i]",
+            "input[type='text']",
+            "input[name*='sitemap' i]"
+        ]
+        
+        input_element = None
+        for sel in input_selectors:
+            try:
+                elem = page.locator(sel).first
+                if elem.is_visible():
+                    input_element = elem
+                    break
+            except Exception:
+                pass
+                
+        if not input_element:
+            input_element = page.get_by_role("textbox").first
+            
+        if input_element and input_element.is_visible():
+            print("Entering 'sitemap.xml' into sitemap text box...")
+            input_element.click()
+            input_element.fill("sitemap.xml")
+            time.sleep(1)
+            
+            submit_selectors = [
+                "button:has-text('Submit')",
+                "button:has-text('SUBMIT')",
+                "text=Submit",
+                "text=SUBMIT"
+            ]
+            
+            submitted = False
+            for sel in submit_selectors:
+                try:
+                    btn = page.locator(sel).first
+                    if btn.is_visible() and btn.is_enabled():
+                        print(f"Clicking Submit button with selector: {sel}")
+                        btn.click()
+                        submitted = True
+                        break
+                except Exception:
+                    pass
+            
+            if not submitted:
+                print("Submit button not found. Pressing Enter key...")
+                input_element.press("Enter")
+                submitted = True
+                
+            if submitted:
+                print("Waiting for sitemap submission confirmation...")
+                time.sleep(5)
+                try:
+                    close_btn = page.locator("button:has-text('Got it'), button:has-text('Dismiss'), button:has-text('OK')").first
+                    if close_btn.is_visible():
+                        close_btn.click()
+                except Exception:
+                    pass
+                print("Sitemap submission complete.")
+            else:
+                print("Warning: Could not submit the sitemap.")
+        else:
+            print("Warning: Could not locate sitemap input field.")
+            
+        page.close()
+    except Exception as e:
+        print(f"Warning: GSC sitemap resubmission failed: {e}. Continuing pipeline...")
+
+def validate_meta_title_robust(title):
+    keywords = ["faceless quiz videos", "AI video generator", "bulk quiz maker"]
+    title = title.strip()
+    has_kw = any(kw.lower() in title.lower() for kw in keywords)
+    if not has_kw:
+        phrase = " | AI Video Generator"
+        title = title + phrase
+    if len(title) < 50:
+        padding = " | QuizViral AI Generator"
+        title = title + padding
+    if len(title) > 60:
+        truncated = title[:57]
+        last_sep = max(truncated.rfind(' '), truncated.rfind('|'), truncated.rfind('-'))
+        if last_sep > 30:
+            title = title[:last_sep].strip() + "..."
+        else:
+            title = truncated.strip() + "..."
+    if len(title) < 50:
+        title = title.ljust(50, '.')
+    return title
+
+def validate_meta_description_robust(desc):
+    keywords = ["faceless quiz videos", "AI video generator", "bulk quiz maker"]
+    desc = desc.strip()
+    has_kw = any(kw.lower() in desc.lower() for kw in keywords)
+    if not has_kw:
+        suffix = " Create shorts fast with our bulk quiz maker and AI video generator."
+        desc = desc + suffix
+    if len(desc) < 145:
+        padding = " Build viral automated quiz channels easily. Import questions, select background videos, generate TTS voiceovers, and export vertical clips."
+        desc = desc + padding
+    if len(desc) > 150:
+        sentence_end = -1
+        for match in re.finditer(r'([.!?])(?:\s+|$)', desc[:150]):
+            end_idx = match.end(1)
+            if 120 <= end_idx <= 150:
+                sentence_end = end_idx
+        if sentence_end != -1:
+            desc = desc[:sentence_end].strip()
+        else:
+            truncated = desc[:147]
+            last_space = truncated.rfind(' ')
+            if last_space > 100:
+                desc = desc[:last_space].strip() + "..."
+            else:
+                desc = truncated.strip() + "..."
+    if len(desc) < 145:
+        desc = desc.ljust(145, '.')
+    return desc
+
 # Imports from helper script for interlinking and alt-tags
 try:
     from ghost_blog_automation import (
@@ -318,9 +559,8 @@ try:
         load_existing_blogs
     )
 except ImportError:
-    # Inline fallbacks if ghost_blog_automation is not available
-    def validate_meta_title(t): return t[:60]
-    def validate_meta_description(d): return d[:150]
+    validate_meta_title = validate_meta_title_robust
+    validate_meta_description = validate_meta_description_robust
     def apply_smart_interlinking(h, b, c, u): return h
     def set_image_alt_tags(h, k, t): return h
     def load_existing_blogs(s): return {}
@@ -1361,11 +1601,23 @@ def run_blog_generator_playwright():
             
             # TURN 2: Write Tutorial & 10 Quiz Questions
             print("\n--- TURN 2: Generating Tutorial & 10 Quiz Questions ---")
+            
+            # Get titles and slugs of the last 3 posts to avoid repeating unique details
+            recent_post_info = []
+            for p in posts[:3]:
+                r_title = p.get('title')
+                r_slug = p.get('slug')
+                if r_title:
+                    recent_post_info.append(f"- Title: {r_title} (Slug: {r_slug})")
+            recent_context_str = "\n".join(recent_post_info) if recent_post_info else "None"
+            
             if source == "trend":
                 prompt_turn2 = (
                     f"Excellent. Now write the second section (minimum 600 words):\n"
                     f"- Go deeper into details, history, analysis, or current events about \"{selected_topic}\" to provide maximum value to the reader.\n"
-                    f"- Include 10 complete quiz questions about \"{selected_topic}\" with 4 options (A, B, C, D) and specify the correct answer clearly. Format these questions as structured HTML lists or tables.\n"
+                    f"- Include 10 complete quiz questions about \"{selected_topic}\".\n"
+                    f"- SPECIFICITY REQUIREMENT: You must include at least one specific, concrete, non-generic detail in this tutorial section (e.g., a real-world example scenario, a specific statistic/number, or a named recurring content format). To ensure uniqueness and prevent boilerplate, do NOT reuse details, formats, or angles from our recent posts:\n{recent_context_str}\n"
+                    f"- FORMATTING RULES FOR QUIZ QUESTIONS: Each of the 10 quiz questions and its 4 options must be a single self-contained block (e.g., a <p> or <h3> containing the question text, followed by an <ul> containing exactly the 4 <li> options with letters A, B, C, D, with the correct answer stated in a separate paragraph or block directly after). You must NEVER use a top-level <ol> wrapping multiple questions together. Numbered list elements (<ol> or restarting list items) must never restart or continue across separate questions.\n"
                     f"- REQUIRED UNIQUE ANGLE: You must include at least one specific, non-generic detail, statistic, or creative angle that connects this specific trend (e.g., specific game details, player stats, or pop culture moments) to quiz-content creation (e.g., explaining how these details can build suspense in a YouTube Short or drive higher comments by debating a polarizing question).\n\n"
                     "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
                 )
@@ -1374,7 +1626,9 @@ def run_blog_generator_playwright():
                     f"Excellent. Now write the second section (minimum 600 words):\n"
                     f"- Go deeper into details, strategies, and tips about \"{selected_topic}\" to provide maximum value to the reader.\n"
                     f"- Specific angle to cover: \"{angle}\"\n"
-                    f"- Include 10 complete sample quiz questions or template ideas about \"{selected_topic}\" with 4 options (A, B, C, D) and specify the correct answer clearly. Format these questions as structured HTML lists or tables so creators can easily copy them for CSV import.\n"
+                    f"- Include 10 complete sample quiz questions or template ideas about \"{selected_topic}\".\n"
+                    f"- SPECIFICITY REQUIREMENT: You must include at least one specific, concrete, non-generic detail in this tutorial section (e.g., a real-world example scenario, a specific statistic/number, or a named recurring content format). To ensure uniqueness and prevent boilerplate, do NOT reuse details, formats, or angles from our recent posts:\n{recent_context_str}\n"
+                    f"- FORMATTING RULES FOR QUIZ QUESTIONS: Each of the 10 quiz questions and its 4 options must be a single self-contained block (e.g., a <p> or <h3> containing the question text, followed by an <ul> containing exactly the 4 <li> options with letters A, B, C, D, with the correct answer stated in a separate paragraph or block directly after). You must NEVER use a top-level <ol> wrapping multiple questions together. Numbered list elements (<ol> or restarting list items) must never restart or continue across separate questions.\n"
                     f"- REQUIRED UNIQUE ANGLE: You must include at least one specific, non-generic detail, statistic, or creative angle that connects this topic directly to quiz-content creation tips using QuizViral AI.\n\n"
                     "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
                 )
@@ -1808,6 +2062,22 @@ def main():
             if build_res.returncode == 0:
                 git_push_changes(blog_data["title"])
                 
+                # 11. Request indexing on Google Search Console & resubmit sitemap
+                try:
+                    launched_gsc = launch_chrome_if_needed()
+                    if launched_gsc:
+                        print("Connecting to Chrome debug instance for Google Search Console tasks...")
+                        with sync_playwright() as p:
+                            browser = p.chromium.connect_over_cdp("http://localhost:9222")
+                            if browser.contexts:
+                                context = browser.contexts[0]
+                                post_url = f"https://quizviral-nine.vercel.app/blog/{blog_data['slug']}"
+                                request_gsc_indexing_playwright(context, post_url)
+                                resubmit_sitemap_gsc_playwright(context)
+                            browser.close()
+                except Exception as gsc_err:
+                    print(f"Warning: Google Search Console automation failed: {gsc_err}")
+                
                 # 10. Trigger Pinterest Auto-Pin syndication using the vertical image!
                 try:
                     from pinterest_auto_pin import run_pinterest_syndication
@@ -1816,7 +2086,7 @@ def main():
                 except Exception as e:
                     print(f"Pinterest syndication failed: {e}")
             else:
-                print("Local build check failed! Aborting Git Push & Pinterest pinning to avoid breaking production.")
+                print("Local build check failed! Aborting Git Push, GSC indexing, & Pinterest pinning to avoid breaking production.")
                 
     finally:
         # Always terminate Chrome debug instance
