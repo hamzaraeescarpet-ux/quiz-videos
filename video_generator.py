@@ -23,13 +23,26 @@ except Exception:
 def create_rounded_text(text, fontsize, txt_color, bg_color, font_path, size, align='center', radius=40, padding=70, border_color=None, border_width=0):
     if font_path == 'Arial':
         font_path = 'Arial-Bold'
+        
+    stroke_w = max(1.5, fontsize / 15)
+    shadow_off = max(2, int(fontsize / 15))
+    
+    # Shadow clip: solid black text silhouette
+    shadow_clip = TextClip(
+        text, fontsize=fontsize, color='black', font=font_path,
+        method='caption', align=align, size=size,
+        stroke_color='black', stroke_width=stroke_w + 1
+    )
+    
+    # Main text clip with thick black outline
     txt_clip = TextClip(
         text, fontsize=fontsize, color=txt_color, font=font_path,
         method='caption', align=align, size=size,
-        stroke_color=txt_color, stroke_width=1.5
+        stroke_color='black', stroke_width=stroke_w
     )
+    
     w, h = txt_clip.size
-    bg_w, bg_h = w + padding, h + padding
+    bg_w, bg_h = w + padding + shadow_off, h + padding + shadow_off
     
     # If radius is -1, make it a perfect pill capsule
     if radius == -1:
@@ -37,15 +50,30 @@ def create_rounded_text(text, fontsize, txt_color, bg_color, font_path, size, al
         
     img = Image.new('RGBA', (bg_w, bg_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    draw.rounded_rectangle((0, 0, bg_w, bg_h), radius=radius, fill=bg_color, outline=border_color, width=border_width)
+    # Draw background box (excluding the bottom-right shadow margin)
+    draw.rounded_rectangle(
+        (0, 0, bg_w - shadow_off, bg_h - shadow_off),
+        radius=radius, fill=bg_color, outline=border_color, width=border_width
+    )
     
     img_array = np.array(img)
     rgb = img_array[:, :, :3]
     alpha = img_array[:, :, 3] / 255.0
     
     bg_clip = ImageClip(rgb).set_mask(ImageClip(alpha, ismask=True))
-    composite = CompositeVideoClip([bg_clip, txt_clip.set_position('center')], size=(bg_w, bg_h))
+    
+    # Position clips
+    shadow_pos = (padding // 2 + shadow_off, padding // 2 + shadow_off)
+    main_pos = (padding // 2, padding // 2)
+    
+    composite = CompositeVideoClip([
+        bg_clip,
+        shadow_clip.set_position(shadow_pos),
+        txt_clip.set_position(main_pos)
+    ], size=(bg_w, bg_h))
+    
     composite.txt_clip = txt_clip
+    composite.shadow_clip = shadow_clip
     composite.bg_clip = bg_clip
     return composite
 
@@ -649,10 +677,10 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     theme_color = box_color if box_color else "#E74C3C"
     theme_rgb = hex_to_rgb(theme_color, (231, 76, 60))
     
-    # Beautiful Question Card using plain theme color with solid white border (6px)
+    # Beautiful Question Card using semi-transparent dark grey box with theme colored border
     txt_q = create_rounded_text(
-        q_text, fontsize=70, txt_color='white', bg_color=theme_rgb + (255,), font_path=font_to_use,
-        size=(800, None), align='center', padding=25, radius=35, border_color=(255, 255, 255, 255), border_width=6
+        q_text, fontsize=70, txt_color='white', bg_color=(15, 15, 15, 200), font_path=font_to_use,
+        size=(800, None), align='center', padding=25, radius=35, border_color=theme_rgb + (255,), border_width=6
     ).set_position(('center', 220)).set_duration(total_duration).crossfadein(0.5)
 
     # High-quality dynamic Option Cards (A, B, C, D) fully rounded like capsules with White Borders
@@ -660,15 +688,18 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
     opt_vals = [opt1_val, opt2_val, opt3_val, opt4_val]
     y_coords = [680, 830, 980, 1130]
     
+    opt_colors = ["#FFD000", "#00E5FF", "#FF2A6D", "#00E676"] # Alternating colorful options: Yellow, Blue, Red, Green
+    
     option_clips = []
     for idx, (label, val, y) in enumerate(zip(opt_labels, opt_vals, y_coords), start=1):
         opt_text = f"  {label})  {val}"
+        opt_color = opt_colors[idx - 1]
         
         if idx == correct_idx:
-            # Active normal card before reveal with thick white border (padding=30 for narrower look)
+            # Active normal card before reveal with theme color outline and colorful text
             normal_before = create_rounded_text(
-                opt_text, fontsize=52, txt_color='white', bg_color=theme_rgb + (255,), font_path=font_to_use,
-                size=(800, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 255), border_width=5
+                opt_text, fontsize=52, txt_color=opt_color, bg_color=(15, 15, 15, 180), font_path=font_to_use,
+                size=(800, None), align='West', padding=30, radius=-1, border_color=theme_rgb + (255,), border_width=4
             ).set_position(('center', y)).set_start(0.5).set_duration(reveal_time - 0.5).crossfadein(0.3)
             
             # Active green card after reveal with thick white border
@@ -679,16 +710,16 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
             
             option_clips.extend([normal_before, green_after])
         else:
-            # Normal card before reveal with thick white border
+            # Normal card before reveal with theme color outline and colorful text
             normal_before = create_rounded_text(
-                opt_text, fontsize=52, txt_color='white', bg_color=theme_rgb + (255,), font_path=font_to_use,
-                size=(800, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 255), border_width=5
+                opt_text, fontsize=52, txt_color=opt_color, bg_color=(15, 15, 15, 180), font_path=font_to_use,
+                size=(800, None), align='West', padding=30, radius=-1, border_color=theme_rgb + (255,), border_width=4
             ).set_position(('center', y)).set_start(0.5).set_duration(reveal_time - 0.5).crossfadein(0.3)
             
             # Dimmed card after reveal (to highlight the correct answer) - keeps theme color but with transparency
             dimmed_after = create_rounded_text(
-                opt_text, fontsize=52, txt_color='#d0d0d0', bg_color=theme_rgb + (100,), font_path=font_to_use,
-                size=(800, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 100), border_width=5
+                opt_text, fontsize=52, txt_color='#808080', bg_color=(15, 15, 15, 80), font_path=font_to_use,
+                size=(800, None), align='West', padding=30, radius=-1, border_color=(255, 255, 255, 80), border_width=4
             ).set_position(('center', y)).set_start(reveal_time).set_duration(total_duration - reveal_time).crossfadein(0.2)
             
             option_clips.extend([normal_before, dimmed_after])
@@ -764,6 +795,11 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
                 txt_q.txt_clip.close()
             except Exception:
                 pass
+        if hasattr(txt_q, "shadow_clip") and txt_q.shadow_clip:
+            try:
+                txt_q.shadow_clip.close()
+            except Exception:
+                pass
         if hasattr(txt_q, "bg_clip") and txt_q.bg_clip:
             try:
                 txt_q.bg_clip.close()
@@ -781,6 +817,11 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
                         o_clip.txt_clip.close()
                     except Exception:
                         pass
+                if hasattr(o_clip, "shadow_clip") and o_clip.shadow_clip:
+                    try:
+                        o_clip.shadow_clip.close()
+                    except Exception:
+                        pass
                 if hasattr(o_clip, "bg_clip") and o_clip.bg_clip:
                     try:
                         o_clip.bg_clip.close()
@@ -796,6 +837,11 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
         if hasattr(txt_ans, "txt_clip") and txt_ans.txt_clip:
             try:
                 txt_ans.txt_clip.close()
+            except Exception:
+                pass
+        if hasattr(txt_ans, "shadow_clip") and txt_ans.shadow_clip:
+            try:
+                txt_ans.shadow_clip.close()
             except Exception:
                 pass
         if hasattr(txt_ans, "bg_clip") and txt_ans.bg_clip:

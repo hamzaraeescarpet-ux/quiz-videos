@@ -53,8 +53,24 @@ BLOG_BASE_URL = os.environ.get("BLOG_BASE_URL", "https://quizviral-nine.vercel.a
 PUBLISH_STATUS = os.environ.get("PUBLISH_STATUS", "draft") # Use "draft" to review first
 GSC_PROPERTY = os.environ.get("GSC_PROPERTY", "https://quizviral-nine.vercel.app/")
 
-# ==================== HYBRID TOPIC & SAFE SCALING CONFIG ====================
 import difflib
+
+# Content Safety Filter for Topic Selection
+SAFETY_KEYWORDS = [
+    "senator", "congressman", "congresswoman", "election", "politician", 
+    "governor", "president", "white house", "court", "lawsuit", 
+    "sued", "indicted", "arrested", "cancer", "illness", "disease", 
+    "diagnosis", "died", "death", "tragedy", "killing", "murder", 
+    "accident", "hospital", "funeral", "trial", "guilty", "verdict",
+    "senate", "congress", "republican", "democrat", "biden", "trump"
+]
+
+def is_safe_topic(topic):
+    topic_lower = topic.lower()
+    for kw in SAFETY_KEYWORDS:
+        if re.search(rf"\b{re.escape(kw)}\b", topic_lower) or kw in topic_lower:
+            return False
+    return True
 
 DAILY_POST_TARGET = 3
 
@@ -326,18 +342,41 @@ def request_gsc_indexing_playwright(context, post_url):
         time.sleep(10) # Wait for page load
         
         print("Waiting for initial index retrieval status to finish...")
+        timed_out = False
         try:
             page.wait_for_selector("text=on Google, text=not on Google, text=not in the index", timeout=45000)
         except Exception as te:
-            print(f"Status retrieval wait timed out or text was not found: {te}. Proceeding anyway...")
+            print(f"Status retrieval wait timed out or text was not found: {te}.")
+            timed_out = True
             
         time.sleep(5)
         
         page_text = page.locator("body").inner_text()
-        is_not_on_google = any(x in page_text for x in ["URL is not on Google", "URL is not in the index", "URL is not on", "not in the index"])
         
-        if is_not_on_google or "Request indexing" in page_text:
-            print("URL is not on Google. Requesting indexing...")
+        # Check if URL is positively confirmed as already indexed on Google
+        is_confirmed_indexed = any(x in page_text for x in ["URL is on Google", "URL is in the Google index"])
+        
+        should_request = False
+        if timed_out:
+            print("Index status could not be determined (selector timeout) — treating as NOT confirmed indexed.")
+            # Capture screenshot for debugging GSC UI
+            screenshot_path = os.path.join(SCRIPT_DIR, "assets", f"gsc_timeout_{int(time.time())}.png")
+            try:
+                os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
+                page.screenshot(path=screenshot_path)
+                print(f"Saved GSC timeout screenshot to: {screenshot_path}")
+            except Exception as se:
+                print(f"Could not capture GSC timeout screenshot: {se}")
+            should_request = True
+        elif not is_confirmed_indexed:
+            print("URL is not confirmed indexed on Google.")
+            should_request = True
+        else:
+            print("URL is positively confirmed as already indexed on Google. Skipping indexing request.")
+            should_request = False
+            
+        if should_request:
+            print("Requesting indexing...")
             
             selectors = [
                 "text=Request indexing",
@@ -411,8 +450,6 @@ def request_gsc_indexing_playwright(context, post_url):
                     print("Warning: Inspection dialog finished, but no explicit confirmation text was matched.")
             else:
                 print("Request Indexing button was not clicked.")
-        else:
-            print("URL is already indexed on Google. No indexing request needed.")
             
         page.close()
     except Exception as e:
@@ -428,7 +465,15 @@ def resubmit_sitemap_gsc_playwright(context):
         print(f"Navigating to GSC Sitemaps page: {sitemaps_url}")
         
         page.goto(sitemaps_url, timeout=60000)
-        time.sleep(8)
+        
+        # Explicitly wait up to 30 seconds for any input elements to load
+        print("Waiting up to 30 seconds for the sitemap input field to render...")
+        try:
+            page.wait_for_selector("input[type='text'], input[aria-label*='sitemap' i], input[placeholder*='sitemap' i]", state="visible", timeout=30000)
+        except Exception as te:
+            print(f"Sitemap input selector wait timed out: {te}")
+            
+        time.sleep(5)
         
         input_selectors = [
             "input[aria-label*='sitemap' i]",
@@ -448,7 +493,12 @@ def resubmit_sitemap_gsc_playwright(context):
                 pass
                 
         if not input_element:
-            input_element = page.get_by_role("textbox").first
+            try:
+                elem = page.get_by_role("textbox").first
+                if elem.is_visible():
+                    input_element = elem
+            except Exception:
+                pass
             
         if input_element and input_element.is_visible():
             print("Entering 'sitemap.xml' into sitemap text box...")
@@ -494,6 +544,25 @@ def resubmit_sitemap_gsc_playwright(context):
                 print("Warning: Could not submit the sitemap.")
         else:
             print("Warning: Could not locate sitemap input field.")
+            # Log the page state for debugging
+            current_url = page.url
+            page_title = page.title()
+            page_text = page.locator("body").inner_text()
+            print(f"DEBUG INFO - Current URL: {current_url}")
+            print(f"DEBUG INFO - Page Title: {page_title}")
+            if "Sign in" in page_text or "google.com/accounts" in current_url:
+                print("WARNING: Google Search Console is redirecting to a Google Account login screen. Chrome profile session may have expired.")
+            else:
+                print(f"DEBUG INFO - Visible Page Text Snippet (1000 chars):\n{page_text[:1000]}")
+                
+            # Capture debugging screenshot
+            screenshot_path = os.path.join(SCRIPT_DIR, "assets", f"gsc_sitemap_failed_{int(time.time())}.png")
+            try:
+                os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
+                page.screenshot(path=screenshot_path)
+                print(f"Saved GSC sitemap error screenshot to: {screenshot_path}")
+            except Exception as se:
+                print(f"Could not capture sitemap error screenshot: {se}")
             
         page.close()
     except Exception as e:
@@ -1465,20 +1534,52 @@ def run_blog_generator_playwright():
                     pass
                 time.sleep(5)
                 
-                filter_prompt = (
-                    f"Out of these 5 trending topics: {json.dumps(top_trends)}. "
-                    "Which one is the easiest and most interesting to write a trivia/quiz blog post about? "
-                    "Choose exactly one. Respond with ONLY the chosen topic name, and absolutely nothing else."
-                )
+                remaining_trends = list(top_trends)
+                selected_topic = ""
                 
-                selected_topic = submit_and_wait_for_response(gemini_page, filter_prompt, max_wait_seconds=120)
-                # Clean possible markdown or quote wrappers by ChatGPT
-                selected_topic = selected_topic.strip('"\'`').replace('\n', '').strip()
-                print(f"ChatGPT selected topic: '{selected_topic}'")
-                
-                if not selected_topic or len(selected_topic) > 80:
-                    print("Invalid topic selected by ChatGPT. Defaulting to first trend.")
-                    selected_topic = top_trends[0]
+                while remaining_trends:
+                    filter_prompt = (
+                        f"Out of these trending topics: {json.dumps(remaining_trends)}. "
+                        "Which one is the easiest and most interesting to write a trivia/quiz blog post about? "
+                        "Choose exactly one. Respond with ONLY the chosen topic name, and absolutely nothing else. "
+                        "Do NOT select any topic about: active politicians or government officials, "
+                        "ongoing legal proceedings or court cases involving named individuals, anyone's illness, death, "
+                        "tragedy, or personal hardship, or any other topic that could be seen as insensitive, exploitative, "
+                        "or politically divisive for a lighthearted trivia/quiz brand."
+                    )
+                    
+                    candidate = submit_and_wait_for_response(gemini_page, filter_prompt, max_wait_seconds=120)
+                    candidate = candidate.strip('"\'`').replace('\n', '').strip()
+                    print(f"ChatGPT candidate topic: '{candidate}'")
+                    
+                    if not candidate or len(candidate) > 80:
+                        print("Invalid topic selected by ChatGPT.")
+                        if remaining_trends:
+                            val = remaining_trends.pop(0)
+                            if is_safe_topic(val):
+                                selected_topic = val
+                                break
+                        continue
+                        
+                    # Check safety filter
+                    if is_safe_topic(candidate):
+                        selected_topic = candidate
+                        print(f"Selected topic '{selected_topic}' passed safety checks.")
+                        break
+                    else:
+                        print(f"Safety Violation: Candidate topic '{candidate}' contains blacklisted keywords. Rejecting and re-picking...")
+                        # Remove from pool and retry
+                        if candidate in remaining_trends:
+                            remaining_trends.remove(candidate)
+                        else:
+                            # Re-filter pool to remove any matching keywords
+                            remaining_trends = [t for t in remaining_trends if is_safe_topic(t)]
+                            if not remaining_trends:
+                                break
+                                
+                if not selected_topic:
+                    print("No safe trending topics found. Falling back to a default lighthearted topic.")
+                    selected_topic = "General Knowledge Trivia"
                     
                 # --- 3. Google Search Autocomplete Suggestions ---
                 # We use a temporary page for autocomplete so gemini_page doesn't navigate away
@@ -1982,19 +2083,59 @@ def ping_indexnow(slug):
 def git_push_changes(title):
     print("Staging and pushing changes to GitHub...")
     try:
+        # Get active branch name
+        branch_res = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=SCRIPT_DIR, capture_output=True, text=True, check=True)
+        active_branch = branch_res.stdout.strip()
+        print(f"Detected active git branch: '{active_branch}'")
+        
+        # Stage and commit on current active branch
         subprocess.run(["git", "add", "."], cwd=SCRIPT_DIR, check=True)
-        subprocess.run(["git", "commit", "-m", f"chore(blog): auto-publish post '{title}'"], cwd=SCRIPT_DIR, check=True)
-        print("Pushing to GitHub (Vercel)...")
-        subprocess.run(["git", "push", "github", "main"], cwd=SCRIPT_DIR, check=True)
+        # Check if there are changes to commit
+        status_res = subprocess.run(["git", "status", "--porcelain"], cwd=SCRIPT_DIR, capture_output=True, text=True, check=True)
+        if status_res.stdout.strip():
+            subprocess.run(["git", "commit", "-m", f"chore(blog): auto-publish post '{title}'"], cwd=SCRIPT_DIR, check=True)
+        else:
+            print("No changes to commit.")
+            
+        print("Pushing to GitHub...")
+        subprocess.run(["git", "push", "github", f"{active_branch}:main"], cwd=SCRIPT_DIR, check=True)
+        
+        # Deploy to Hugging Face Space by creating a temporary branch without blog assets
         try:
+            print("Creating temporary branch 'hf-deploy' for Hugging Face deployment...")
+            # Clean up old hf-deploy branch if it exists
+            subprocess.run(["git", "branch", "-D", "hf-deploy"], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            # Checkout to new branch hf-deploy
+            subprocess.run(["git", "checkout", "-b", "hf-deploy"], cwd=SCRIPT_DIR, check=True)
+            
+            # Exclude blog assets from index
+            print("Excluding blog images from Hugging Face deployment index...")
+            check_assets = subprocess.run(["git", "ls-files", "frontend/public/assets/blog/"], cwd=SCRIPT_DIR, capture_output=True, text=True)
+            if check_assets.stdout.strip():
+                subprocess.run(["git", "rm", "-r", "--cached", "frontend/public/assets/blog/"], cwd=SCRIPT_DIR, check=True)
+                
+            # Commit the removal on hf-deploy
+            subprocess.run(["git", "commit", "-m", "chore(deploy): exclude blog assets for Hugging Face Space"], cwd=SCRIPT_DIR, check=True)
+            
+            # Push clean code to Hugging Face Space (origin) main branch
             print("Pushing to Hugging Face Space (origin)...")
-            subprocess.run(["git", "push", "origin", "main"], cwd=SCRIPT_DIR, check=True)
+            subprocess.run(["git", "push", "origin", "hf-deploy:main", "--force"], cwd=SCRIPT_DIR, check=True)
+            print("Hugging Face Space deployment completed successfully!")
+            
         except Exception as he:
-            print(f"Warning: Push to Hugging Face (origin) failed or was rejected: {he}.")
-            print("This is expected because Hugging Face rejects non-LFS images. Your Vercel deployment on GitHub will still succeed!")
-        print("Git Push Completed!")
+            print(f"\nCRITICAL ERROR: Hugging Face push failed! Backend changes may not be deployed. Error: {he}")
+            raise he
+        finally:
+            # Always switch back to the original active branch and delete hf-deploy
+            print(f"Restoring original active branch '{active_branch}'...")
+            subprocess.run(["git", "checkout", active_branch], cwd=SCRIPT_DIR, check=True)
+            subprocess.run(["git", "branch", "-D", "hf-deploy"], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+        print("Git Push Completed Successfully!")
     except Exception as e:
-        print(f"Git push failed: {e}")
+        print(f"\nCRITICAL ERROR: Git push pipeline failed: {e}")
+        raise e
 
 def cleanup_old_blog_data():
     print("Initiating old blog data cleanup to free up space...")
