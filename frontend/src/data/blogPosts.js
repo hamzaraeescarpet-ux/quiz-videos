@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to dodgers vs yankees",
+  slug: "dodgers-vs-yankees",
+  excerpt: "Discover how to create viral quiz videos about dodgers vs yankees automatically.",
+  date: "July 18, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/dodgers-vs-yankees-landscape.png",
+  pinterest_image: "/assets/blog/dodgers-vs-yankees-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about dodgers vs yankees to grow your channel. Build viral automated quiz channels easily.....",
+  seoKeywords: [
+    "dodgers vs yankees",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to dodgers vs yankees](/assets/blog/dodgers-vs-yankees-landscape.png)\n\n# The Ultimate Guide to dodgers vs yankees\n\ndodgers vs yankees\ndodgers vs yankees\ndodgers vs yankees",
+  trendingKeyword: "dodgers vs yankees",
+  topicSource: "trend"
+},
+  {
   title: "Taylor Farms: Fresh Produce Innovation, Salad Kits, and Industry Facts",
   slug: "taylor-farms-fresh-produce-innovation-salad-kits-industry-facts",
   excerpt: "Discover how Taylor Farms became one of North America's leading fresh produce companies, from its popular salad kits to its role in modern agriculture and food distribution. Explore its history, product innovation, supply chain, and fascinating facts that make it an engaging educational topic.",

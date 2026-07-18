@@ -2102,12 +2102,13 @@ def git_push_changes(title):
         
         # Deploy to Hugging Face Space by creating a temporary branch without blog assets
         try:
-            print("Creating temporary branch 'hf-deploy' for Hugging Face deployment...")
-            # Clean up old hf-deploy branch if it exists
-            subprocess.run(["git", "branch", "-D", "hf-deploy"], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            temp_branch = "hf-deploy-temp" if active_branch != "hf-deploy-temp" else "hf-deploy-temp-alt"
+            print(f"Creating temporary branch '{temp_branch}' for Hugging Face deployment...")
+            # Clean up old temporary branch if it exists
+            subprocess.run(["git", "branch", "-D", temp_branch], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
-            # Checkout to new branch hf-deploy
-            subprocess.run(["git", "checkout", "-b", "hf-deploy"], cwd=SCRIPT_DIR, check=True)
+            # Checkout to new branch
+            subprocess.run(["git", "checkout", "-b", temp_branch], cwd=SCRIPT_DIR, check=True)
             
             # Exclude blog assets from index
             print("Excluding blog images from Hugging Face deployment index...")
@@ -2115,22 +2116,22 @@ def git_push_changes(title):
             if check_assets.stdout.strip():
                 subprocess.run(["git", "rm", "-r", "--cached", "frontend/public/assets/blog/"], cwd=SCRIPT_DIR, check=True)
                 
-            # Commit the removal on hf-deploy
+            # Commit the removal on temp_branch
             subprocess.run(["git", "commit", "-m", "chore(deploy): exclude blog assets for Hugging Face Space"], cwd=SCRIPT_DIR, check=True)
             
             # Push clean code to Hugging Face Space (origin) main branch
             print("Pushing to Hugging Face Space (origin)...")
-            subprocess.run(["git", "push", "origin", "hf-deploy:main", "--force"], cwd=SCRIPT_DIR, check=True)
+            subprocess.run(["git", "push", "origin", f"{temp_branch}:main", "--force"], cwd=SCRIPT_DIR, check=True)
             print("Hugging Face Space deployment completed successfully!")
             
         except Exception as he:
             print(f"\nCRITICAL ERROR: Hugging Face push failed! Backend changes may not be deployed. Error: {he}")
             raise he
         finally:
-            # Always switch back to the original active branch and delete hf-deploy
+            # Always switch back to the original active branch and delete the temporary branch
             print(f"Restoring original active branch '{active_branch}'...")
             subprocess.run(["git", "checkout", active_branch], cwd=SCRIPT_DIR, check=True)
-            subprocess.run(["git", "branch", "-D", "hf-deploy"], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["git", "branch", "-D", temp_branch], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
         print("Git Push Completed Successfully!")
     except Exception as e:
