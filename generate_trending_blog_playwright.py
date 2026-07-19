@@ -2103,35 +2103,65 @@ def git_push_changes(title):
         # Deploy to Hugging Face Space by creating a temporary branch without blog assets
         try:
             temp_branch = "hf-deploy-temp" if active_branch != "hf-deploy-temp" else "hf-deploy-temp-alt"
-            print(f"Creating temporary branch '{temp_branch}' for Hugging Face deployment...")
-            # Clean up old temporary branch if it exists
-            subprocess.run(["git", "branch", "-D", temp_branch], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-            # Checkout to new branch
-            subprocess.run(["git", "checkout", "-b", temp_branch], cwd=SCRIPT_DIR, check=True)
-            
+            print(f"Preparing temporary branch '{temp_branch}' for Hugging Face deployment via a git worktree...")
+
+            import shutil
+            worktree_path = os.path.join(SCRIPT_DIR, ".hf-deploy-worktree")
+            # Clean any previous worktree dir/branches first
+            try:
+                subprocess.run(["git", "worktree", "remove", worktree_path, "--force"], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+            try:
+                subprocess.run(["git", "worktree", "prune"], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+            if os.path.exists(worktree_path):
+                try:
+                    shutil.rmtree(worktree_path)
+                except Exception:
+                    pass
+
+            # Create a separate worktree so we don't modify the main working tree and avoid checkout conflicts
+            subprocess.run(["git", "worktree", "add", "--detach", worktree_path], cwd=SCRIPT_DIR, check=True)
+
+            # In the worktree, create the orphan temp branch and clean it
+            subprocess.run(["git", "checkout", "--orphan", temp_branch], cwd=worktree_path, check=True)
+            subprocess.run(["git", "rm", "-rf", "."], cwd=worktree_path, check=True)
+
+            # Checkout files from active branch
+            subprocess.run(["git", "checkout", active_branch, "--", "."], cwd=worktree_path, check=True)
+
             # Exclude blog assets from index
             print("Excluding blog images from Hugging Face deployment index...")
-            check_assets = subprocess.run(["git", "ls-files", "frontend/public/assets/blog/"], cwd=SCRIPT_DIR, capture_output=True, text=True)
-            if check_assets.stdout.strip():
-                subprocess.run(["git", "rm", "-r", "--cached", "frontend/public/assets/blog/"], cwd=SCRIPT_DIR, check=True)
-                
-            # Commit the removal on temp_branch
-            subprocess.run(["git", "commit", "-m", "chore(deploy): exclude blog assets for Hugging Face Space"], cwd=SCRIPT_DIR, check=True)
+            subprocess.run(["git", "rm", "-r", "--cached", "frontend/public/assets/blog/"], cwd=worktree_path, check=False)
             
+            # Delete them from disk in the worktree
+            wt_blog_dir = os.path.join(worktree_path, "frontend", "public", "assets", "blog")
+            if os.path.exists(wt_blog_dir):
+                shutil.rmtree(wt_blog_dir)
+
+            # Commit clean code
+            subprocess.run(["git", "commit", "-m", "deploy: update clean code for Hugging Face"], cwd=worktree_path, check=True)
+
             # Push clean code to Hugging Face Space (origin) main branch
             print("Pushing to Hugging Face Space (origin)...")
-            subprocess.run(["git", "push", "origin", f"{temp_branch}:main", "--force"], cwd=SCRIPT_DIR, check=True)
+            subprocess.run(["git", "push", "origin", f"{temp_branch}:main", "--force"], cwd=worktree_path, check=True)
             print("Hugging Face Space deployment completed successfully!")
             
         except Exception as he:
             print(f"\nCRITICAL ERROR: Hugging Face push failed! Backend changes may not be deployed. Error: {he}")
             raise he
         finally:
-            # Always switch back to the original active branch and delete the temporary branch
-            print(f"Restoring original active branch '{active_branch}'...")
-            subprocess.run(["git", "checkout", active_branch], cwd=SCRIPT_DIR, check=True)
-            subprocess.run(["git", "branch", "-D", temp_branch], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Clean up the temporary worktree and delete the temp branch reference locally
+            try:
+                subprocess.run(["git", "worktree", "remove", worktree_path, "--force"], cwd=SCRIPT_DIR, check=False)
+            except Exception:
+                pass
+            try:
+                subprocess.run(["git", "branch", "-D", temp_branch], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
             
         print("Git Push Completed Successfully!")
     except Exception as e:
