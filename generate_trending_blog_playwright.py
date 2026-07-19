@@ -2116,6 +2116,10 @@ def git_push_changes(title):
                 subprocess.run(["git", "worktree", "prune"], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except Exception:
                 pass
+            try:
+                subprocess.run(["git", "branch", "-D", temp_branch], cwd=SCRIPT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
             if os.path.exists(worktree_path):
                 try:
                     shutil.rmtree(worktree_path)
