@@ -4,7 +4,7 @@ import time
 from playwright.sync_api import sync_playwright
 
 SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CHROME_PROFILE_PATH = r"C:\Users\hamza\Downloads\python development\browser automation\gemini video points\bulk scheduling fb videos\chrome_profile_2"
+CHROME_PROFILE_PATH = r"C:\Users\hamza\Downloads\python development\browser automation\gemini video points\bulk scheduling fb videos\chrome_profile"
 
 sys.path.append(SCRIPT_DIR)
 from generate_trending_blog_playwright import launch_chrome_if_needed, kill_chrome_on_port_9222

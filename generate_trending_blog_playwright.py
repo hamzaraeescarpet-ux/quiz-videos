@@ -40,7 +40,7 @@ except Exception:
     pass
 
 # ==================== CONFIGURATION ====================
-CHROME_PROFILE_PATH = r"C:\Users\hamza\Downloads\python development\browser automation\gemini video points\bulk scheduling fb videos\chrome_profile_2"
+CHROME_PROFILE_PATH = r"C:\Users\hamza\Downloads\python development\browser automation\gemini video points\bulk scheduling fb videos\chrome_profile"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BLOG_POSTS_FILE = os.path.join(SCRIPT_DIR, "frontend", "src", "data", "blogPosts.js")
 
@@ -50,7 +50,7 @@ GHOST_ADMIN_API_KEY = os.environ.get("GHOST_ADMIN_API_KEY", "")
 GHOST_API_VERSION = os.environ.get("GHOST_API_VERSION", "v2")
 CTA_URL = os.environ.get("CTA_URL", "https://quizviral-nine.vercel.app")
 BLOG_BASE_URL = os.environ.get("BLOG_BASE_URL", "https://quizviral-nine.vercel.app/blog")
-PUBLISH_STATUS = os.environ.get("PUBLISH_STATUS", "draft") # Use "draft" to review first
+PUBLISH_STATUS = os.environ.get("PUBLISH_STATUS", "published") # Default to "published"
 GSC_PROPERTY = os.environ.get("GSC_PROPERTY", "https://quizviral-nine.vercel.app/")
 
 import difflib
@@ -2154,8 +2154,7 @@ def git_push_changes(title):
             print("Hugging Face Space deployment completed successfully!")
             
         except Exception as he:
-            print(f"\nCRITICAL ERROR: Hugging Face push failed! Backend changes may not be deployed. Error: {he}")
-            raise he
+            print(f"\nWARNING: Hugging Face push failed: {he}. Continuing pipeline...")
         finally:
             # Clean up the temporary worktree and delete the temp branch reference locally
             try:

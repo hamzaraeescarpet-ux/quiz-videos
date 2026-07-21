@@ -330,3 +330,12 @@ To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
 [2026-07-20 15:39:31] ============================================================
 [2026-07-20 15:39:31] Aaj (2026-07-20) ab tak 2/3 blogs publish hue hain.
 [2026-07-20 15:39:31] Blog #3 generation shuru ho raha hai...
+[2026-07-21 10:40:45] ============================================================
+[2026-07-21 10:40:45] Blog Automation Worker START
+[2026-07-21 10:40:45] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-07-21 10:40:45] Daily target: 3 blogs, gap: 2h
+[2026-07-21 10:40:45] ============================================================
+[2026-07-21 10:40:45] Naya din (2026-07-21) - daily counter reset ho raha hai.
+[2026-07-21 10:40:45] Aaj (2026-07-21) ab tak 0/3 blogs publish hue hain.
+[2026-07-21 10:40:45] Blog #1 generation shuru ho raha hai...
+[2026-07-21 10:42:59] Blog #1 fail hua (return code: 3221225786).
