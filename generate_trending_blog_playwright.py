@@ -325,59 +325,65 @@ def extract_monetization_text(markdown_content):
     content_len = len(markdown_content)
     return markdown_content[int(content_len * 0.7):]
 
-# ==================== GOOGLE SEARCH CONSOLE INTEGRATION ====================
+## ==================== GOOGLE SEARCH CONSOLE INTEGRATION ====================
 
 def request_gsc_indexing_playwright(context, post_url):
     print(f"\n--- Google Search Console URL Inspection for: '{post_url}' ---")
     try:
         page = context.new_page()
         
-        gsc_property_encoded = urllib.parse.quote_plus(GSC_PROPERTY)
-        post_url_encoded = urllib.parse.quote_plus(post_url)
+        gsc_home_url = f"https://search.google.com/search-console?resource_id={GSC_PROPERTY.rstrip('/')}/"
+        print(f"Navigating to GSC Property Home: {gsc_home_url}")
         
-        inspection_url = f"https://search.google.com/search-console/inspect?resource_id={gsc_property_encoded}&id={post_url_encoded}"
-        print(f"Navigating to GSC URL Inspection: {inspection_url}")
+        page.goto(gsc_home_url, timeout=60000)
+        time.sleep(4)
         
-        page.goto(inspection_url, timeout=60000)
-        time.sleep(10) # Wait for page load
+        page_title = page.title()
+        current_url = page.url
         
-        print("Waiting for initial index retrieval status to finish...")
-        timed_out = False
+        # Detect 404 Error or Welcome Page (occurs when Chrome account does not have GSC property access)
+        is_404_or_welcome = (
+            "404" in page_title or
+            "welcome" in current_url.lower()
+        )
+        
+        if is_404_or_welcome:
+            print(f"[GSC Notice] Google Search Console property '{GSC_PROPERTY}' is not added or verified in the active Chrome Google account.")
+            print("[GSC Notice] Skipping URL indexing request cleanly. (To enable GSC automation, add 'https://quizviral-nine.vercel.app/' to your Google Search Console account in Chrome).")
+            page.close()
+            return
+
+        # Trigger URL Inspection via the top search bar
+        input_box = page.locator("input[aria-label*='Inspect any URL' i], input[placeholder*='Inspect any URL' i], input[type='text']").first
+        if input_box.is_visible():
+            print("Entering URL into GSC top inspection search bar...")
+            input_box.click()
+            input_box.fill(post_url)
+            time.sleep(1)
+            input_box.press("Enter")
+            print("Submitted URL inspection request via GSC search bar.")
+            time.sleep(8)
+        else:
+            # Direct fallback navigation
+            post_url_encoded = urllib.parse.quote(post_url, safe="")
+            direct_url = f"https://search.google.com/search-console/inspect?resource_id={GSC_PROPERTY.rstrip('/')}/&id={post_url_encoded}"
+            page.goto(direct_url, timeout=60000)
+            time.sleep(6)
+
+        # Wait for retrieval status
         try:
-            page.wait_for_selector("text=on Google, text=not on Google, text=not in the index", timeout=45000)
-        except Exception as te:
-            print(f"Status retrieval wait timed out or text was not found: {te}.")
-            timed_out = True
+            page.wait_for_selector("text=URL is on Google, text=URL is not on Google, text=Request indexing, text=Retrieving data", timeout=20000)
+        except Exception:
+            pass
             
-        time.sleep(5)
-        
+        time.sleep(2)
         page_text = page.locator("body").inner_text()
         
         # Check if URL is positively confirmed as already indexed on Google
         is_confirmed_indexed = any(x in page_text for x in ["URL is on Google", "URL is in the Google index"])
         
-        should_request = False
-        if timed_out:
-            print("Index status could not be determined (selector timeout) — treating as NOT confirmed indexed.")
-            # Capture screenshot for debugging GSC UI
-            screenshot_path = os.path.join(SCRIPT_DIR, "assets", f"gsc_timeout_{int(time.time())}.png")
-            try:
-                os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
-                page.screenshot(path=screenshot_path)
-                print(f"Saved GSC timeout screenshot to: {screenshot_path}")
-            except Exception as se:
-                print(f"Could not capture GSC timeout screenshot: {se}")
-            should_request = True
-        elif not is_confirmed_indexed:
-            print("URL is not confirmed indexed on Google.")
-            should_request = True
-        else:
-            print("URL is positively confirmed as already indexed on Google. Skipping indexing request.")
-            should_request = False
-            
-        if should_request:
+        if not is_confirmed_indexed:
             print("Requesting indexing...")
-            
             selectors = [
                 "text=Request indexing",
                 "text=REQUEST INDEXING",
@@ -400,21 +406,21 @@ def request_gsc_indexing_playwright(context, post_url):
             
             if not clicked:
                 try:
-                    page.get_by_text("Request indexing", exact=False).first.click(timeout=5000)
+                    page.get_by_text("Request indexing", exact=False).first.click(timeout=3000)
                     clicked = True
                     print("Clicked Request Indexing using get_by_text fallback.")
-                except Exception as ce:
-                    print(f"Failed to click Request Indexing button: {ce}")
+                except Exception:
+                    print("Request Indexing button was not found or already requested.")
             
             if clicked:
-                print("Waiting for GSC to test if live URL can be indexed (this can take up to 2-3 minutes)...")
+                print("Waiting for GSC to test if live URL can be indexed (up to 2 minutes)...")
                 time.sleep(5)
                 
                 start_time = time.time()
                 success_detected = False
                 quota_exceeded_detected = False
                 
-                while time.time() - start_time < 180:
+                while time.time() - start_time < 120:
                     dialog_text = ""
                     try:
                         dialog = page.locator("div[role='dialog'], mwc-dialog, .modal-dialog").first
@@ -423,33 +429,27 @@ def request_gsc_indexing_playwright(context, post_url):
                     except Exception:
                         pass
                         
-                    body_text = page.locator("body").inner_text()
+                    curr_body = page.locator("body").inner_text()
                     
-                    if any(x in dialog_text or x in body_text for x in ["Indexing requested", "added to a priority crawl", "Priority crawl queue"]):
+                    if any(x in dialog_text or x in curr_body for x in ["Indexing requested", "added to a priority crawl", "Priority crawl queue"]):
                         print("SUCCESS: Google Search Console confirmed 'Indexing requested'!")
                         success_detected = True
                         break
-                    elif any(x in dialog_text or x in body_text for x in ["Quota exceeded", "Daily quota reached", "limit reached", "try again tomorrow"]):
+                    elif any(x in dialog_text or x in curr_body for x in ["Quota exceeded", "Daily quota reached", "limit reached", "try again tomorrow"]):
                         print("WARNING: Google Search Console indexing request quota exceeded for today.")
                         quota_exceeded_detected = True
                         break
-                    elif "Testing if live" in body_text or "Testing if live" in dialog_text:
-                        pass
                     
-                    time.sleep(5)
+                    time.sleep(4)
                 
                 try:
                     close_btn = page.locator("div[role='dialog'] button:has-text('Got it'), button:has-text('Got it'), button:has-text('OK'), button:has-text('Dismiss')").first
                     if close_btn.is_visible():
                         close_btn.click()
-                        time.sleep(1)
                 except Exception:
                     pass
-                    
-                if not success_detected and not quota_exceeded_detected:
-                    print("Warning: Inspection dialog finished, but no explicit confirmation text was matched.")
-            else:
-                print("Request Indexing button was not clicked.")
+        else:
+            print("URL is positively confirmed as already indexed on Google. Skipping indexing request.")
             
         page.close()
     except Exception as e:
@@ -465,16 +465,29 @@ def resubmit_sitemap_gsc_playwright(context):
         print(f"Navigating to GSC Sitemaps page: {sitemaps_url}")
         
         page.goto(sitemaps_url, timeout=60000)
+        time.sleep(4)
         
-        # Explicitly wait up to 30 seconds for any input elements to load
-        print("Waiting up to 30 seconds for the sitemap input field to render...")
+        page_title = page.title()
+        current_url = page.url
+        body_text = page.locator("body").inner_text()
+        
+        is_404_or_welcome = (
+            "404" in page_title or
+            "welcome" in current_url.lower() or
+            any(err in body_text for err in ["404. That's an error", "404. That’s an error", "Error 404", "Welcome to Google Search Console", "To start, select property type"])
+        )
+        
+        if is_404_or_welcome:
+            print(f"[GSC Notice] GSC returned 404 / Welcome page for sitemaps. Property '{GSC_PROPERTY}' is not added/verified in Chrome Google account.")
+            page.close()
+            return
+
+        print("Waiting for the sitemap input field to render...")
         try:
-            page.wait_for_selector("input[type='text'], input[aria-label*='sitemap' i], input[placeholder*='sitemap' i]", state="visible", timeout=30000)
-        except Exception as te:
-            print(f"Sitemap input selector wait timed out: {te}")
+            page.wait_for_selector("input[type='text'], input[aria-label*='sitemap' i], input[placeholder*='sitemap' i]", state="visible", timeout=10000)
+        except Exception:
+            pass
             
-        time.sleep(5)
-        
         input_selectors = [
             "input[aria-label*='sitemap' i]",
             "input[placeholder*='sitemap' i]",
@@ -492,14 +505,6 @@ def resubmit_sitemap_gsc_playwright(context):
             except Exception:
                 pass
                 
-        if not input_element:
-            try:
-                elem = page.get_by_role("textbox").first
-                if elem.is_visible():
-                    input_element = elem
-            except Exception:
-                pass
-            
         if input_element and input_element.is_visible():
             print("Entering 'sitemap.xml' into sitemap text box...")
             input_element.click()
@@ -1891,9 +1896,8 @@ def run_blog_generator_playwright():
             
 
 def get_latest_fb_video():
-    # Facebook page video scraping logic (preserved from original code)
-    print("Scraping Facebook page for latest video...")
-    fb_page_url = "https://www.facebook.com/profile.php?id=61585764748589"
+    print("Scraping Facebook page for latest video/reel...")
+    fb_videos_url = "https://www.facebook.com/profile.php?id=61585764748589&sk=videos"
     latest_video_url = "https://www.facebook.com/watch/?v=892872416450589"
     
     if check_port_open(9222):
@@ -1903,32 +1907,52 @@ def get_latest_fb_video():
                 context = browser.contexts[0]
                 context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
                 page = context.new_page()
-                page.goto(fb_page_url)
+                
+                print(f"Navigating to Facebook Videos page: {fb_videos_url}")
+                page.goto(fb_videos_url, timeout=45000)
                 time.sleep(5)
-                page.evaluate("window.scrollBy(0, 1000);")
-                time.sleep(4)
+                page.evaluate("window.scrollBy(0, 800);")
+                time.sleep(3)
                 
-                scripts = page.locator("script").evaluate_all("elements => elements.map(el => el.textContent || '')")
-                video_ids = []
-                for script in scripts:
-                    if not script: continue
-                    for m in re.finditer(r'"video_id"\s*:\s*"(\d+)"', script):
-                        video_ids.append(m.group(1))
+                # Scrape all <a> links for video/reel paths
+                anchors = page.locator("a").all()
+                found_urls = []
+                for a in anchors:
+                    try:
+                        href = a.get_attribute("href") or ""
+                        # Exclude navigation tab links like /reel/?s=tab
+                        if any(k in href for k in ["/reel/", "/videos/", "/watch/"]) and not href.endswith("?s=tab"):
+                            if href.startswith("/"):
+                                href = f"https://www.facebook.com{href}"
+                            if href not in found_urls:
+                                found_urls.append(href)
+                    except Exception:
+                        pass
                 
-                if video_ids:
-                    latest_video_url = f"https://www.facebook.com/watch/?v={video_ids[0]}"
+                if found_urls:
+                    latest_video_url = found_urls[0]
+                    print(f"Successfully scraped latest Facebook video/reel: '{latest_video_url}'")
+                else:
+                    # Try regex fallback on HTML
+                    html_content = page.content()
+                    video_matches = re.findall(r'(?:facebook\.com\/watch\/\?v=|facebook\.com\/.*?\/videos\/|\/reel\/|v=)(\d{10,18})', html_content)
+                    if video_matches:
+                        latest_video_url = f"https://www.facebook.com/watch/?v={video_matches[0]}"
+                        print(f"Scraped latest Facebook video via regex: '{latest_video_url}'")
+                
                 page.close()
-                browser.close()
+                # DO NOT call browser.close() so Chrome port 9222 stays open for subsequent steps!
         except Exception as e:
-            print(f"Facebook scrape failed: {e}")
+            print(f"Facebook video scrape exception: {e}")
             
     dest_path = os.path.join(SCRIPT_DIR, "frontend", "src", "data", "latestFbVideo.js")
     try:
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
         with open(dest_path, "w", encoding="utf-8") as f:
             f.write(f'export const latestFbVideoUrl = "{latest_video_url}";\n')
-    except Exception:
-        pass
+        print(f"Saved latest Facebook video URL to {dest_path}")
+    except Exception as e:
+        print(f"Failed to update latestFbVideo.js: {e}")
 
 def update_blog_posts_file(new_post):
     print(f"Adding new blog post to {BLOG_POSTS_FILE}...")
