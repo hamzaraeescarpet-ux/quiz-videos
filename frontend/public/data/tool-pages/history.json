@@ -1,0 +1,37 @@
+{
+  "slug": "history",
+  "niche": "History",
+  "hero_headline": "Turn History Facts Into Viral Quiz Videos",
+  "example_questions": [
+    {
+      "question": "In which year did the Berlin Wall fall?",
+      "options": ["1987", "1989", "1991", "1985"],
+      "answer": "1989"
+    },
+    {
+      "question": "Which ancient wonder was located in Alexandria, Egypt?",
+      "options": ["Colossus of Rhodes", "Hanging Gardens of Babylon", "Lighthouse of Alexandria", "Temple of Artemis"],
+      "answer": "Lighthouse of Alexandria"
+    },
+    {
+      "question": "Who was the first Emperor of China?",
+      "options": ["Kublai Khan", "Qin Shi Huang", "Sun Tzu", "Confucius"],
+      "answer": "Qin Shi Huang"
+    }
+  ],
+  "faq": [
+    {
+      "question": "Which historical periods get the most views on quiz channels?",
+      "answer": "World War II, Ancient Egypt, and Medieval history consistently dominate quiz channel metrics. These periods have broad recognition and dramatic events that translate well into bite-sized trivia questions that capture viewer curiosity."
+    },
+    {
+      "question": "How do I make history trivia engaging for a younger audience?",
+      "answer": "Focus on surprising facts, gory details, and human-interest stories rather than dry dates. For example, instead of asking 'When did WWII end?', ask 'Which WWII general was known for riding a tank into battle?' — QuizViral AI helps format these as snappy video questions."
+    },
+    {
+      "question": "Should I fact-check history quiz questions before publishing?",
+      "answer": "Absolutely. Historical inaccuracies can damage credibility and trigger negative comments. Always cross-reference with reputable sources like Britannica or peer-reviewed journals before using historical content in your quiz videos."
+    }
+  ],
+  "cta": "Create your history quiz now"
+}

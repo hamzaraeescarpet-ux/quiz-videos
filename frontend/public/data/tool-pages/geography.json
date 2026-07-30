@@ -1,0 +1,37 @@
+{
+  "slug": "geography",
+  "niche": "Geography",
+  "hero_headline": "Create Geography Quizzes That Explore the World",
+  "example_questions": [
+    {
+      "question": "Which country has the most number of time zones?",
+      "options": ["Russia", "United States", "France", "China"],
+      "answer": "France"
+    },
+    {
+      "question": "What is the smallest country in the world by land area?",
+      "options": ["Monaco", "Vatican City", "San Marino", "Liechtenstein"],
+      "answer": "Vatican City"
+    },
+    {
+      "question": "Lake Baikal in Russia is the world's deepest lake. Approximately how deep is it?",
+      "options": ["1,200 meters", "1,642 meters", "800 meters", "2,100 meters"],
+      "answer": "1,642 meters"
+    }
+  ],
+  "faq": [
+    {
+      "question": "What geography quiz formats drive the most engagement?",
+      "answer": "Flag identification, capital city challenges, and 'guess the country by outline' formats consistently drive high engagement. These visual formats work exceptionally well on YouTube Shorts because viewers can test their knowledge within seconds."
+    },
+    {
+      "question": "How can I make geography quizzes without using maps?",
+      "answer": "Focus on text-based questions about population, landmarks, cultural facts, and record-breakers. QuizViral AI's template system lets you create animated text cards that reveal facts one by one, eliminating the need for visual map elements entirely."
+    },
+    {
+      "question": "Which geography quiz topics are trending on TikTok?",
+      "answer": "Country size comparisons, obscure capital cities, and 'borders that will surprise you' content are trending heavily on TikTok geography channels. These topics leverage the platform's love for mind-blowing facts and comparative data."
+    }
+  ],
+  "cta": "Create your geography quiz now"
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "science",
+  "niche": "Science",
+  "hero_headline": "Build Science Quiz Videos That Educate and Entertain",
+  "example_questions": [
+    {
+      "question": "What is the speed of light in a vacuum, approximately?",
+      "options": ["300,000 km/s", "150,000 km/s", "500,000 km/s", "1,000,000 km/s"],
+      "answer": "300,000 km/s"
+    },
+    {
+      "question": "Which element has the chemical symbol 'Hg'?",
+      "options": ["Helium", "Hydrogen", "Mercury", "Magnesium"],
+      "answer": "Mercury"
+    },
+    {
+      "question": "How many bones are in the adult human body?",
+      "options": ["206", "186", "226", "196"],
+      "answer": "206"
+    }
+  ],
+  "faq": [
+    {
+      "question": "Do science quiz videos actually perform well on social media?",
+      "answer": "Yes — science quizzes consistently achieve high engagement rates because they trigger curiosity and the 'did you know' effect. Channels like 'Daily Facts' and 'Science Is Fun' regularly get millions of views on short-form science trivia content."
+    },
+    {
+      "question": "How do I verify the scientific accuracy of my quiz questions?",
+      "answer": "Always cite primary sources like NASA, peer-reviewed journals, or educational institutions (.edu domains). Misinformation in science content can harm credibility and trigger platform fact-checking algorithms that may demonetize your channel."
+    },
+    {
+      "question": "What science topics are trending for quiz videos in 2026?",
+      "answer": "Space exploration (Artemis missions, Mars colonization), AI and machine learning basics, climate science facts, and human biology 'did you know' content are the top-performing science niches for short-form quiz videos right now."
+    }
+  ],
+  "cta": "Create your science quiz now"
+}

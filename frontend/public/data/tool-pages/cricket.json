@@ -1,0 +1,37 @@
+{
+  "slug": "cricket",
+  "niche": "Cricket",
+  "hero_headline": "Hit a Six with Cricket Trivia Quiz Videos",
+  "example_questions": [
+    {
+      "question": "Who holds the record for the most centuries in international cricket?",
+      "options": ["Sachin Tendulkar", "Virat Kohli", "Ricky Ponting", "Jacques Kallis"],
+      "answer": "Sachin Tendulkar"
+    },
+    {
+      "question": "In which year did the first T20 World Cup take place?",
+      "options": ["2005", "2007", "2009", "2010"],
+      "answer": "2007"
+    },
+    {
+      "question": "Which bowler has taken the most wickets in Test cricket history?",
+      "options": ["Shane Warne", "Muttiah Muralitharan", "Anil Kumble", "James Anderson"],
+      "answer": "Muttiah Muralitharan"
+    }
+  ],
+  "faq": [
+    {
+      "question": "What cricket quiz content works best during the IPL season?",
+      "answer": "IPL-themed quizzes dominate during tournament season — most sixes, best bowling figures, auction prices, and team head-to-head stats. Posting daily during IPL can grow a channel 5x faster thanks to the massive search volume and fan engagement."
+    },
+    {
+      "question": "How do I make cricket quizzes that both casual fans and experts enjoy?",
+      "answer": "Mix basic questions (simple rules, famous players) with advanced stats (record details, historical milestones). A good formula is 2 easy, 2 medium, and 2 hard questions per video. This keeps beginners engaged while satisfying hardcore cricket enthusiasts."
+    },
+    {
+      "question": "Which cricket format generates the most quiz interest?",
+      "answer": "T20 cricket generates the most quiz engagement, especially IPL content. The fast-paced format appeals to younger audiences who are also the primary consumers of short-form video content. However, Test cricket records and history quizzes have dedicated niche audiences too."
+    }
+  ],
+  "cta": "Create your cricket quiz now"
+}

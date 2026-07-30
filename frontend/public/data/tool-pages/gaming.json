@@ -1,0 +1,37 @@
+{
+  "slug": "gaming",
+  "niche": "Gaming",
+  "hero_headline": "Create Addictive Gaming Quiz Videos in One Click",
+  "example_questions": [
+    {
+      "question": "In Minecraft, what material is required to craft a Beacon?",
+      "options": ["Diamond Block", "Netherite Ingot", "Glass", "Iron Block"],
+      "answer": "Glass"
+    },
+    {
+      "question": "Which 2023 game won The Game Awards' Game of the Year?",
+      "options": ["Hogwarts Legacy", "Baldur's Gate 3", "The Legend of Zelda: Tears of the Kingdom", "Resident Evil 4 Remake"],
+      "answer": "Baldur's Gate 3"
+    },
+    {
+      "question": "What is the default player health in Counter-Strike 2?",
+      "options": ["50 HP", "100 HP", "150 HP", "200 HP"],
+      "answer": "100 HP"
+    }
+  ],
+  "faq": [
+    {
+      "question": "What gaming quiz niches perform best on YouTube Shorts?",
+      "answer": "Minecraft facts and trivia, Call of Duty weapon stats, and retro gaming nostalgia quizzes consistently perform well. Short-form gaming trivia leverages existing fan engagement and tends to have high shareability among gaming communities."
+    },
+    {
+      "question": "How long should a gaming trivia video be for TikTok?",
+      "answer": "The sweet spot for gaming trivia on TikTok is 15 to 30 seconds. This length keeps viewers engaged through quick, punchy questions and answers without overwhelming them, which improves completion rates."
+    },
+    {
+      "question": "Can I use gameplay footage in my quiz videos without copyright issues?",
+      "answer": "Most game publishers allow monetization of gameplay footage under fair use policies. However, you should always check individual publisher guidelines. Using the QuizViral AI video generator avoids this entirely since it creates animated text-based videos without requiring gameplay clips."
+    }
+  ],
+  "cta": "Create your gaming quiz now"
+}

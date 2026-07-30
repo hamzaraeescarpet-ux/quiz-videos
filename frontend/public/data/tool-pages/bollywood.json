@@ -1,0 +1,37 @@
+{
+  "slug": "bollywood",
+  "niche": "Bollywood",
+  "hero_headline": "Make Bollywood Quiz Videos That Fans Devour",
+  "example_questions": [
+    {
+      "question": "Which Bollywood film was India's official entry to the Oscars in 2022?",
+      "options": ["RRR", "The Disciple", "Sardar Udham", "Jallikattu"],
+      "answer": "The Disciple"
+    },
+    {
+      "question": "Who directed the 2016 film 'Dangal'?",
+      "options": ["Sanjay Leela Bhansali", "Nitesh Tiwari", "Rajkumar Hirani", "Aamir Khan"],
+      "answer": "Nitesh Tiwari"
+    },
+    {
+      "question": "Which actor has won the most Filmfare Best Actor awards?",
+      "options": ["Amitabh Bachchan", "Shah Rukh Khan", "Dilip Kumar", "Aamir Khan"],
+      "answer": "Dilip Kumar"
+    }
+  ],
+  "faq": [
+    {
+      "question": "What Bollywood quiz topics get the most views on YouTube?",
+      "answer": "Box office comparisons, iconic dialogue identification, and 'guess the movie from the song' quizzes are the highest-performing Bollywood quiz categories. The emotional connection fans have with songs and dialogues drives incredible engagement and sharing."
+    },
+    {
+      "question": "Can I use Bollywood song clips in my quiz videos?",
+      "answer": "Bollywood music labels like T-Series and Sony Music strictly enforce copyright. Using even a few seconds of a song can result in takedowns. QuizViral AI's text-based format lets you describe songs through lyrics and trivia without any audio, keeping your channel safe."
+    },
+    {
+      "question": "Which Bollywood era generates the most quiz engagement?",
+      "answer": "2000s Bollywood (KKHH to Jab Tak Hai Jaan) generates the highest engagement across age groups. Millennials who grew up with these films are active social media users who love nostalgia-driven content, making this era a goldmine for quiz creators."
+    }
+  ],
+  "cta": "Create your bollywood quiz now"
+}

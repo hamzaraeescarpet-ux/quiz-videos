@@ -1,0 +1,37 @@
+{
+  "slug": "anime",
+  "niche": "Anime",
+  "hero_headline": "Generate Anime Quiz Videos Your Fans Will Love",
+  "example_questions": [
+    {
+      "question": "In Naruto Shippuden, what is the name of the Nine-Tailed Fox sealed inside Naruto?",
+      "options": ["Kurama", "Shukaku", "Matatabi", "Gyuki"],
+      "answer": "Kurama"
+    },
+    {
+      "question": "Which anime movie holds the record for the highest-grossing film globally?",
+      "options": ["Spirited Away", "Your Name", "Demon Slayer: Mugen Train", "Howl's Moving Castle"],
+      "answer": "Demon Slayer: Mugen Train"
+    },
+    {
+      "question": "In Attack on Titan, what is Eren Yeager's Titan form called?",
+      "options": ["Colossal Titan", "Attack Titan", "Armored Titan", "Beast Titan"],
+      "answer": "Attack Titan"
+    }
+  ],
+  "faq": [
+    {
+      "question": "Which anime series generate the most quiz engagement?",
+      "answer": "Naruto, Demon Slayer, Attack on Titan, One Piece, and Jujutsu Kaisen dominate anime quiz content. These series have massive global fanbases and enough lore depth to create hundreds of unique questions that dedicated fans will eagerly test themselves on."
+    },
+    {
+      "question": "How do I avoid spoilers in anime quiz videos?",
+      "answer": "Clearly label videos with the arcs or seasons they cover, and avoid major character deaths or final-battle reveals in your questions. Stick to character origins, abilities, and pre-time-skip content to keep quizzes spoiler-free and accessible to new fans."
+    },
+    {
+      "question": "Can anime quiz content be monetized on YouTube?",
+      "answer": "Yes — anime quizzes fall under fair use as transformative content. However, using actual anime clips may trigger Content ID claims. QuizViral AI's text-based video format generates original animated content without any copyrighted footage, keeping your channel monetization-safe."
+    }
+  ],
+  "cta": "Create your anime quiz now"
+}

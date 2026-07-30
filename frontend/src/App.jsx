@@ -10,6 +10,7 @@ import RefundPolicy from './pages/RefundPolicy';
 import Success from './pages/Success';
 import Blog from './pages/Blog';
 import BlogPostDetail from './pages/BlogPostDetail';
+import ToolLandingPage from './pages/ToolLandingPage';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import { AuthProvider } from './AuthContext';
@@ -33,6 +34,7 @@ function App() {
               <Route path="/success" element={<Success />} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<BlogPostDetail />} />
+              <Route path="/tools/:slug" element={<ToolLandingPage />} />
             </Routes>
           </main>
           <Footer />

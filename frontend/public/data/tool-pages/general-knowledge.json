@@ -1,0 +1,37 @@
+{
+  "slug": "general-knowledge",
+  "niche": "General Knowledge",
+  "hero_headline": "Build General Knowledge Quizzes That Challenge Everyone",
+  "example_questions": [
+    {
+      "question": "What is the chemical symbol for gold?",
+      "options": ["Go", "Gd", "Au", "Ag"],
+      "answer": "Au"
+    },
+    {
+      "question": "Which ocean is the largest by surface area?",
+      "options": ["Atlantic Ocean", "Indian Ocean", "Arctic Ocean", "Pacific Ocean"],
+      "answer": "Pacific Ocean"
+    },
+    {
+      "question": "What year was the United Nations founded?",
+      "options": ["1942", "1945", "1948", "1950"],
+      "answer": "1945"
+    }
+  ],
+  "faq": [
+    {
+      "question": "Why do general knowledge quizzes perform well on all platforms?",
+      "answer": "General knowledge content has the widest potential audience because it isn't limited to a specific fanbase. Everyone wants to test how smart they are. This universal appeal drives high view counts and makes GK quiz channels easier to grow from zero subscribers."
+    },
+    {
+      "question": "How do I keep general knowledge quizzes from being too easy or too hard?",
+      "answer": "Mix difficulty levels within each video — start with an easy question to hook viewers, include a medium question in the middle, and finish with a harder one to challenge regulars. QuizViral AI's bulk generator lets you easily organize questions by difficulty tier."
+    },
+    {
+      "question": "What's the ideal posting frequency for a general knowledge quiz channel?",
+      "answer": "Posting 2 to 3 times daily on Shorts/Reels is the sweet spot for growth. General knowledge content has evergreen appeal — questions about science, history, and geography don't expire, so your library compounds in value over time as each video accumulates views."
+    }
+  ],
+  "cta": "Create your general knowledge quiz now"
+}

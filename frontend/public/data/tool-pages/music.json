@@ -1,0 +1,37 @@
+{
+  "slug": "music",
+  "niche": "Music",
+  "hero_headline": "Hit the Right Note with Music Quiz Videos",
+  "example_questions": [
+    {
+      "question": "Which band released the album 'Abbey Road'?",
+      "options": ["The Rolling Stones", "The Beatles", "Led Zeppelin", "Queen"],
+      "answer": "The Beatles"
+    },
+    {
+      "question": "What instrument does Yo-Yo Ma play?",
+      "options": ["Violin", "Cello", "Piano", "Double Bass"],
+      "answer": "Cello"
+    },
+    {
+      "question": "Which artist has the most monthly listeners on Spotify as of 2025?",
+      "options": ["Taylor Swift", "The Weeknd", "Bad Bunny", "Ed Sheeran"],
+      "answer": "The Weeknd"
+    }
+  ],
+  "faq": [
+    {
+      "question": "What music trivia formats work best for short-form video?",
+      "answer": "'Guess the song from the lyrics,' 'name the artist by their first hit,' and 'music theory facts' are top-performing formats. The 'guess the song' format is particularly effective because it creates an interactive challenge that viewers naturally want to participate in."
+    },
+    {
+      "question": "Can I use song clips in my music quiz videos?",
+      "answer": "Using even short song clips can trigger copyright claims and demonetization. QuizViral AI's text-based approach lets you create engaging music trivia using lyrics snippets, artist facts, and chart statistics without any audio clips, keeping your content fully monetizable."
+    },
+    {
+      "question": "Which music genres work best for quiz channels?",
+      "answer": "Pop music (2000s vs. current), hip-hop trivia, rock history, and K-pop fan quizzes generate the highest engagement. K-pop content in particular has a highly engaged fanbase that actively seeks out quiz content to test their knowledge against other fans."
+    }
+  ],
+  "cta": "Create your music quiz now"
+}

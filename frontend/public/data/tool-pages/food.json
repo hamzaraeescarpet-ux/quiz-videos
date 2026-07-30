@@ -1,0 +1,37 @@
+{
+  "slug": "food",
+  "niche": "Food",
+  "hero_headline": "Cook Up Viral Food Trivia Quiz Videos",
+  "example_questions": [
+    {
+      "question": "Which country is the origin of sushi?",
+      "options": ["China", "Korea", "Japan", "Thailand"],
+      "answer": "Japan"
+    },
+    {
+      "question": "What is the main ingredient in guacamole?",
+      "options": ["Tomato", "Avocado", "Lime", "Onion"],
+      "answer": "Avocado"
+    },
+    {
+      "question": "Which spice is derived from the Crocus flower?",
+      "options": ["Turmeric", "Paprika", "Saffron", "Cinnamon"],
+      "answer": "Saffron"
+    }
+  ],
+  "faq": [
+    {
+      "question": "What food quiz topics get the most shares on social media?",
+      "answer": "'Guess the country by its national dish,' ingredient origin stories, and fast food menu trivia are the most-shared food quiz categories. Food content is inherently social — people love debating which pizza topping is best or guessing exotic dishes."
+    },
+    {
+      "question": "How do I make food quizzes without using food images?",
+      "answer": "Focus on text-based format with questions about origins, ingredients, cooking techniques, and record-breaking dishes. QuizViral AI's animated text card system makes food trivia visually appealing using color themes and typography without requiring any food photography."
+    },
+    {
+      "question": "What makes food trivia go viral on TikTok?",
+      "answer": "Controversial food opinions — like pineapple on pizza or the correct way to eat a KitKat — drive massive engagement through comments. 'Which cuisine is better' comparison quizzes also perform exceptionally well by tapping into cultural pride and personal preference debates."
+    }
+  ],
+  "cta": "Create your food quiz now"
+}

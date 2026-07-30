@@ -1,0 +1,37 @@
+{
+  "slug": "kids",
+  "niche": "Kids",
+  "hero_headline": "Create Fun and Safe Quiz Videos for Kids",
+  "example_questions": [
+    {
+      "question": "Which planet is known as the Red Planet?",
+      "options": ["Venus", "Mars", "Jupiter", "Saturn"],
+      "answer": "Mars"
+    },
+    {
+      "question": "What is the largest mammal in the world?",
+      "options": ["Elephant", "Blue Whale", "Giraffe", "Hippopotamus"],
+      "answer": "Blue Whale"
+    },
+    {
+      "question": "How many continents are there on Earth?",
+      "options": ["5", "6", "7", "8"],
+      "answer": "7"
+    }
+  ],
+  "faq": [
+    {
+      "question": "Are quiz videos for kids monetizable on YouTube?",
+      "answer": "Yes, but only if content is marked as 'Made for Kids' and complies with COPPA regulations. This means no personalized ads, no comments, and no data collection. QuizViral AI's template system produces compliant content by avoiding any data tracking features."
+    },
+    {
+      "question": "What age group is best for kids' quiz videos?",
+      "answer": "The sweet spot is ages 6 to 12. At this age, children have enough general knowledge to engage with trivia but still find basic facts exciting. Topics like animals, dinosaurs, space, and simple science produce the highest engagement among this demographic."
+    },
+    {
+      "question": "How long should a kids' quiz video be?",
+      "answer": "Keep kids' quiz videos between 20 to 40 seconds with 3 to 5 questions. Children have shorter attention spans, so quick pacing with bright, colorful visuals and immediate answer reveals works best. QuizViral AI supports custom color themes to make kid-friendly content."
+    }
+  ],
+  "cta": "Create your kids quiz now"
+}

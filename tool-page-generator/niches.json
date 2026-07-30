@@ -1,0 +1,77 @@
+[
+  {
+    "slug": "gaming",
+    "niche": "Gaming",
+    "description": "Video game trivia and quiz content for gaming fans"
+  },
+  {
+    "slug": "history",
+    "niche": "History",
+    "description": "World history trivia and quiz content for history buffs"
+  },
+  {
+    "slug": "movies",
+    "niche": "Movies",
+    "description": "Movie trivia and quiz content for film enthusiasts"
+  },
+  {
+    "slug": "science",
+    "niche": "Science",
+    "description": "Science trivia and quiz content for curious minds"
+  },
+  {
+    "slug": "geography",
+    "niche": "Geography",
+    "description": "World geography trivia and quiz content for explorers"
+  },
+  {
+    "slug": "sports",
+    "niche": "Sports",
+    "description": "Sports trivia and quiz content for fans of all games"
+  },
+  {
+    "slug": "kids",
+    "niche": "Kids",
+    "description": "Fun and educational quiz content for children"
+  },
+  {
+    "slug": "anime",
+    "niche": "Anime",
+    "description": "Anime trivia and quiz content for otaku and fans"
+  },
+  {
+    "slug": "food",
+    "niche": "Food",
+    "description": "Culinary trivia and quiz content for food lovers"
+  },
+  {
+    "slug": "music",
+    "niche": "Music",
+    "description": "Music trivia and quiz content across all genres"
+  },
+  {
+    "slug": "general-knowledge",
+    "niche": "General Knowledge",
+    "description": "General knowledge trivia and quiz content for quiz masters"
+  },
+  {
+    "slug": "bollywood",
+    "niche": "Bollywood",
+    "description": "Bollywood trivia and quiz content for desi cinema fans"
+  },
+  {
+    "slug": "cricket",
+    "niche": "Cricket",
+    "description": "Cricket trivia and quiz content for cricket fans worldwide"
+  },
+  {
+    "slug": "technology",
+    "niche": "Technology",
+    "description": "Tech trivia and quiz content for geeks and innovators"
+  },
+  {
+    "slug": "animals",
+    "niche": "Animals",
+    "description": "Animal trivia and quiz content for wildlife enthusiasts"
+  }
+]

@@ -1,0 +1,37 @@
+{
+  "slug": "animals",
+  "niche": "Animals",
+  "hero_headline": "Create Wild Animal Quiz Videos That Roar",
+  "example_questions": [
+    {
+      "question": "Which bird is known for its ability to mimic human speech?",
+      "options": ["Eagle", "African Grey Parrot", "Penguin", "Peacock"],
+      "answer": "African Grey Parrot"
+    },
+    {
+      "question": "What is the fastest land animal in the world?",
+      "options": ["Lion", "Cheetah", "Pronghorn Antelope", "Greyhound"],
+      "answer": "Cheetah"
+    },
+    {
+      "question": "Which animal has the longest lifespan of any mammal?",
+      "options": ["Elephant", "Blue Whale", "Bowhead Whale", "Human"],
+      "answer": "Bowhead Whale"
+    }
+  ],
+  "faq": [
+    {
+      "question": "What animal quiz topics perform best on YouTube Shorts?",
+      "answer": "Dangerous animal comparisons, speed rankings, size comparisons, and 'guess the animal by its baby name' quizzes are top performers. Animal content has universal appeal — nearly everyone enjoys wildlife facts, making it one of the safest niches for channel growth."
+    },
+    {
+      "question": "Can I use animal footage in my quiz videos?",
+      "answer": "Using copyrighted wildlife footage from BBC, National Geographic, or individual creators can trigger claims. QuizViral AI's text-animation approach avoids this entirely by creating visually appealing quiz cards with themed color schemes that need no video clips."
+    },
+    {
+      "question": "How do I make animal quizzes stand out from existing wildlife content?",
+      "answer": "Focus on surprising and counterintuitive facts — like 'which animal has three hearts' (octopus) or 'which mammal can't jump' (elephant). Mind-blowing facts have the highest shareability on social media and trigger the curiosity gap that keeps viewers watching."
+    }
+  ],
+  "cta": "Create your animals quiz now"
+}

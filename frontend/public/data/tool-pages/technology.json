@@ -1,0 +1,37 @@
+{
+  "slug": "technology",
+  "niche": "Technology",
+  "hero_headline": "Create Tech Quiz Videos That Geeks Love",
+  "example_questions": [
+    {
+      "question": "Who is known as the father of the World Wide Web?",
+      "options": ["Vint Cerf", "Tim Berners-Lee", "Bill Gates", "Steve Jobs"],
+      "answer": "Tim Berners-Lee"
+    },
+    {
+      "question": "What does 'RAM' stand for in computing?",
+      "options": ["Read Access Memory", "Random Access Memory", "Rapid Access Module", "Read And Modify"],
+      "answer": "Random Access Memory"
+    },
+    {
+      "question": "In which year was the first iPhone released?",
+      "options": ["2005", "2006", "2007", "2008"],
+      "answer": "2007"
+    }
+  ],
+  "faq": [
+    {
+      "question": "Which tech quiz topics get the most engagement on Shorts?",
+      "answer": "Apple product history, programming language comparisons, internet history facts, and 'guess the logo' tech brand quizzes consistently generate the highest engagement. Tech enthusiasts love debating specifications and sharing obscure knowledge with their networks."
+    },
+    {
+      "question": "How do I make tech quizzes accessible to non-technical viewers?",
+      "answer": "Avoid jargon-heavy questions and focus on relatable tech topics — smartphone evolution, social media history, gaming console specs, and famous tech founders. If you must use technical terms, keep the answer choices simple. QuizViral AI helps format questions for maximum clarity."
+    },
+    {
+      "question": "What's the best posting strategy for a tech quiz channel?",
+      "answer": "Capitalize on product launch days — Apple events, Google I/O, Samsung Unpacked — by posting related quizzes within hours. Trending tech news quizzes can get 10x more views than evergreen content during launch windows. AI-related quizzes are also consistently high-performing."
+    }
+  ],
+  "cta": "Create your technology quiz now"
+}

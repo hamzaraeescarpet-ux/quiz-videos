@@ -1,0 +1,37 @@
+{
+  "slug": "movies",
+  "niche": "Movies",
+  "hero_headline": "Make Movie Trivia Quizzes That Go Viral Fast",
+  "example_questions": [
+    {
+      "question": "Which movie holds the record for the highest-grossing film of all time (not adjusted for inflation)?",
+      "options": ["Avengers: Endgame", "Avatar", "Titanic", "Star Wars: The Force Awakens"],
+      "answer": "Avatar"
+    },
+    {
+      "question": "In The Shawshank Redemption, what is Andy Dufresne's prison number?",
+      "options": ["24601", "37927", "52812", "10495"],
+      "answer": "37927"
+    },
+    {
+      "question": "Which director is known for his signature use of tracking shots, as seen in films like Children of Men and Gravity?",
+      "options": ["Christopher Nolan", "Alfonso Cuaron", "Denis Villeneuve", "David Fincher"],
+      "answer": "Alfonso Cuaron"
+    }
+  ],
+  "faq": [
+    {
+      "question": "What movie trivia categories work best for short-form video?",
+      "answer": "Box office records, actor age reveals, and 'bloopers you missed' categories outperform generic movie facts. These topics trigger curiosity gaps — viewers stay to see if they already know the answer, driving watch time and repeat views."
+    },
+    {
+      "question": "Can I use movie stills in my quiz videos?",
+      "answer": "Using movie screenshots may trigger copyright claims on platforms like YouTube. QuizViral AI's text-based video format bypasses this issue entirely by rendering questions and answers as animated text cards with background effects rather than copyrighted media."
+    },
+    {
+      "question": "How many movie quiz questions should I include per video?",
+      "answer": "For Shorts and Reels, 4 to 6 questions per video is ideal. This gives viewers enough content to feel engaged without being overwhelming. Each question should take 3 to 5 seconds to read, keeping the total video length under 40 seconds."
+    }
+  ],
+  "cta": "Create your movie quiz now"
+}
