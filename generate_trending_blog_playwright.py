@@ -2121,6 +2121,12 @@ def git_push_changes(title):
         else:
             print("No changes to commit.")
             
+        print("Pulling latest remote changes from GitHub...")
+        try:
+            subprocess.run(["git", "pull", "--rebase", "github", "main"], cwd=SCRIPT_DIR, check=True)
+        except Exception as pull_err:
+            print(f"Warning: git pull --rebase failed: {pull_err}")
+
         print("Pushing to GitHub...")
         subprocess.run(["git", "push", "github", f"{active_branch}:main"], cwd=SCRIPT_DIR, check=True)
         

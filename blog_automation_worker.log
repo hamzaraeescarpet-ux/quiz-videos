@@ -686,3 +686,6 @@ To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
 [2026-07-31 09:19:49] Naya din (2026-07-31) - daily counter reset ho raha hai.
 [2026-07-31 09:19:49] Aaj (2026-07-31) ab tak 0/3 blogs publish hue hain.
 [2026-07-31 09:19:49] Blog #1 generation shuru ho raha hai...
+[2026-07-31 09:33:51] Blog #1 fail hua (return code: 1).
+[2026-07-31 09:33:51] Progress: 1/3 blogs aaj k liye.
+[2026-07-31 09:33:51] Wait: Blog #2 k liye 2 ghante ka gap (120 min 0 sec)
