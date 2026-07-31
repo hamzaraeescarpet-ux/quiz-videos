@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to seattle raccoon jimothy viral video",
+  slug: "seattle-raccoon-jimothy-viral-video",
+  excerpt: "Discover how to create viral quiz videos about seattle raccoon jimothy viral video automatically.",
+  date: "July 31, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/seattle-raccoon-jimothy-viral-video-landscape.png",
+  pinterest_image: "/assets/blog/seattle-raccoon-jimothy-viral-video-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about seattle raccoon jimothy viral video to grow your channel. Build viral automated quiz....",
+  seoKeywords: [
+    "seattle raccoon jimothy viral video",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to seattle raccoon jimothy viral video](/assets/blog/seattle-raccoon-jimothy-viral-video-landscape.png)\n\n# The Ultimate Guide to seattle raccoon jimothy viral video\n\nseattle raccoon jimothy viral video\nseattle raccoon jimothy viral video\nseattle raccoon jimothy viral video",
+  trendingKeyword: "seattle raccoon jimothy viral video",
+  topicSource: "trend"
+},
+  {
   title: "Automated Faceless Channel Mistakes to Avoid: Proven Strategies for Sustainable Growth",
   slug: "automated-faceless-channel-mistakes-to-avoid",
   excerpt: "Discover the most common automated faceless channel mistakes that limit growth and learn practical strategies to build a high-quality, sustainable content workflow. From improving retention to avoiding repetitive automation, this guide explains how to scale responsibly while keeping viewers engaged.",
