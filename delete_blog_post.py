@@ -79,9 +79,14 @@ def git_push_changes(title):
         # Push to GitHub
         subprocess.run(["git", "add", "."], cwd=SCRIPT_DIR, check=True)
         subprocess.run(["git", "commit", "-m", f"chore(blog): delete blog post: {title}"], cwd=SCRIPT_DIR, check=True)
+        print("Pulling latest remote changes from GitHub...")
+        try:
+            subprocess.run(["git", "pull", "--rebase", "github", "main"], cwd=SCRIPT_DIR, check=True)
+        except Exception as pull_err:
+            print(f"Warning: git pull --rebase failed: {pull_err}")
+
         print("Pushing to GitHub...")
         subprocess.run(["git", "push", "github", "main"], cwd=SCRIPT_DIR, check=True)
-        subprocess.run(["git", "push", "github", "main:master"], cwd=SCRIPT_DIR, check=True)
         
         # Push to Hugging Face
         try:
