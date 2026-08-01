@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to samara weaving",
+  slug: "samara-weaving",
+  excerpt: "Discover how to create viral quiz videos about samara weaving automatically.",
+  date: "August 01, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/samara-weaving-landscape.png",
+  pinterest_image: "/assets/blog/samara-weaving-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about samara weaving to grow your channel. Build viral automated quiz channels easily.........",
+  seoKeywords: [
+    "samara weaving",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to samara weaving](/assets/blog/samara-weaving-landscape.png)\n\n# The Ultimate Guide to samara weaving\n\nsamara weaving\nsamara weaving\nsamara weaving",
+  trendingKeyword: "samara weaving",
+  topicSource: "trend"
+},
+  {
   title: "The Ultimate Guide to seattle raccoon jimothy viral video",
   slug: "seattle-raccoon-jimothy-viral-video",
   excerpt: "Discover how to create viral quiz videos about seattle raccoon jimothy viral video automatically.",
