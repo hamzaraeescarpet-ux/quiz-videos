@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to vincent pastore",
+  slug: "vincent-pastore",
+  excerpt: "Discover how to create viral quiz videos about vincent pastore automatically.",
+  date: "August 02, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/vincent-pastore-landscape.png",
+  pinterest_image: "/assets/blog/vincent-pastore-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about vincent pastore to grow your channel. Build viral automated quiz channels easily........",
+  seoKeywords: [
+    "vincent pastore",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to vincent pastore](/assets/blog/vincent-pastore-landscape.png)\n\n# The Ultimate Guide to vincent pastore\n\nvincent pastore\nvincent pastore\nvincent pastore",
+  trendingKeyword: "vincent pastore",
+  topicSource: "trend"
+},
+  {
   title: "Red Sox vs Dodgers: History, Biggest Games, Records & Memorable Moments",
   slug: "red-sox-vs-dodgers-history-biggest-games-records",
   excerpt: "Red Sox vs Dodgers is one of baseball's most recognizable interleague matchups, combining championship history, legendary performances, and unforgettable moments. Explore the rivalry, key facts, memorable games, and test your knowledge with 10 baseball trivia questions.",
