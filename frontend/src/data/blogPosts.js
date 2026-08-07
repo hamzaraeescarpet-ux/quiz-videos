@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to kit connor",
+  slug: "kit-connor",
+  excerpt: "Discover how to create viral quiz videos about kit connor automatically.",
+  date: "August 07, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/kit-connor-landscape.png",
+  pinterest_image: "/assets/blog/kit-connor-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about kit connor to grow your channel. Build viral automated quiz channels easily.............",
+  seoKeywords: [
+    "kit connor",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to kit connor](/assets/blog/kit-connor-landscape.png)\n\n# The Ultimate Guide to kit connor\n\nkit connor\nkit connor\nkit connor",
+  trendingKeyword: "kit connor",
+  topicSource: "trend"
+},
+  {
   title: "Leveraging Trending News for Quiz Videos: Strategies to Turn Breaking Stories into Viral Content",
   slug: "leveraging-trending-news-for-quiz-videos",
   excerpt: "Learn how creators can transform breaking sports, entertainment, and pop culture stories into engaging interactive quiz content that attracts viewers quickly. Discover proven workflows, automation strategies, and scalable production techniques for consistent channel growth.",
