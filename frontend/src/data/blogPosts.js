@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to dodgers vs diamondbacks",
+  slug: "dodgers-vs-diamondbacks",
+  excerpt: "Discover how to create viral quiz videos about dodgers vs diamondbacks automatically.",
+  date: "August 08, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/dodgers-vs-diamondbacks-landscape.png",
+  pinterest_image: "/assets/blog/dodgers-vs-diamondbacks-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about dodgers vs diamondbacks to grow your channel. Build viral automated quiz channels easily.",
+  seoKeywords: [
+    "dodgers vs diamondbacks",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to dodgers vs diamondbacks](/assets/blog/dodgers-vs-diamondbacks-landscape.png)\n\n# The Ultimate Guide to dodgers vs diamondbacks\n\ndodgers vs diamondbacks\ndodgers vs diamondbacks\ndodgers vs diamondbacks",
+  trendingKeyword: "dodgers vs diamondbacks",
+  topicSource: "trend"
+},
+  {
   title: "The Ultimate Guide to kit connor",
   slug: "kit-connor",
   excerpt: "Discover how to create viral quiz videos about kit connor automatically.",
