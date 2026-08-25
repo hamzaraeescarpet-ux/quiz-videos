@@ -1602,3 +1602,83 @@ To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
 [2026-08-24 12:41:43]   ... abhi bhi wait kar raha hoon (9 min baaki)
 [2026-08-24 12:46:43]   ... abhi bhi wait kar raha hoon (4 min baaki)
 [2026-08-24 12:51:43] Blog #2 generation shuru ho raha hai...
+[2026-08-24 13:05:31] Blog #2 successfully publish ho gaya!
+[2026-08-24 13:05:31] Progress: 2/3 blogs aaj k liye.
+[2026-08-24 13:05:31] Wait: Blog #3 k liye 2 ghante ka gap (120 min 0 sec)
+[2026-08-24 13:10:31]   ... abhi bhi wait kar raha hoon (114 min baaki)
+[2026-08-24 13:15:31]   ... abhi bhi wait kar raha hoon (109 min baaki)
+[2026-08-24 13:20:31]   ... abhi bhi wait kar raha hoon (104 min baaki)
+[2026-08-24 13:25:31]   ... abhi bhi wait kar raha hoon (99 min baaki)
+[2026-08-24 13:30:31]   ... abhi bhi wait kar raha hoon (94 min baaki)
+[2026-08-24 13:35:31]   ... abhi bhi wait kar raha hoon (89 min baaki)
+[2026-08-24 13:40:31]   ... abhi bhi wait kar raha hoon (84 min baaki)
+[2026-08-24 13:45:31]   ... abhi bhi wait kar raha hoon (79 min baaki)
+[2026-08-24 13:50:31]   ... abhi bhi wait kar raha hoon (74 min baaki)
+[2026-08-24 13:55:31]   ... abhi bhi wait kar raha hoon (69 min baaki)
+[2026-08-24 14:00:31]   ... abhi bhi wait kar raha hoon (64 min baaki)
+[2026-08-24 14:05:31]   ... abhi bhi wait kar raha hoon (59 min baaki)
+[2026-08-24 14:10:31]   ... abhi bhi wait kar raha hoon (54 min baaki)
+[2026-08-24 14:15:31]   ... abhi bhi wait kar raha hoon (49 min baaki)
+[2026-08-24 14:20:31]   ... abhi bhi wait kar raha hoon (44 min baaki)
+[2026-08-24 14:25:31]   ... abhi bhi wait kar raha hoon (39 min baaki)
+[2026-08-24 14:30:31]   ... abhi bhi wait kar raha hoon (34 min baaki)
+[2026-08-24 14:35:31]   ... abhi bhi wait kar raha hoon (29 min baaki)
+[2026-08-24 14:40:31]   ... abhi bhi wait kar raha hoon (24 min baaki)
+[2026-08-24 14:45:31]   ... abhi bhi wait kar raha hoon (19 min baaki)
+[2026-08-24 14:50:31]   ... abhi bhi wait kar raha hoon (14 min baaki)
+[2026-08-24 14:55:31]   ... abhi bhi wait kar raha hoon (9 min baaki)
+[2026-08-24 15:00:31]   ... abhi bhi wait kar raha hoon (4 min baaki)
+[2026-08-24 15:05:31] Blog #3 generation shuru ho raha hai...
+[2026-08-24 15:05:39] Blog #3 successfully publish ho gaya!
+[2026-08-24 15:05:39] Progress: 3/3 blogs aaj k liye.
+[2026-08-24 15:05:39] Aaj ka target pura! Kal 08:00 AM tak so raha hoon...
+[2026-08-24 15:05:39] Wait: Next day (1014 min 20 sec)
+[2026-08-24 17:37:51] ============================================================
+[2026-08-24 17:37:51] Blog Automation Worker START
+[2026-08-24 17:37:51] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-08-24 17:37:51] Daily target: 3 blogs, gap: 2h
+[2026-08-24 17:37:51] ============================================================
+[2026-08-24 17:37:51] Aaj (2026-08-24) ab tak 3/3 blogs publish hue hain.
+[2026-08-24 17:37:51] Aaj ka target (3 blogs) pura! Kal 08:00 AM tak so raha hoon...
+[2026-08-24 17:37:51] Wait: Next day start (08:00 AM) (862 min 8 sec)
+[2026-08-24 17:42:51]   ... abhi bhi wait kar raha hoon (857 min baaki)
+[2026-08-24 17:47:51]   ... abhi bhi wait kar raha hoon (852 min baaki)
+[2026-08-24 17:52:51]   ... abhi bhi wait kar raha hoon (847 min baaki)
+[2026-08-24 17:57:51]   ... abhi bhi wait kar raha hoon (842 min baaki)
+[2026-08-24 18:02:51]   ... abhi bhi wait kar raha hoon (837 min baaki)
+[2026-08-24 18:14:42]   ... abhi bhi wait kar raha hoon (825 min baaki)
+[2026-08-25 10:33:47] ============================================================
+[2026-08-25 10:33:47] Blog Automation Worker START
+[2026-08-25 10:33:47] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-08-25 10:33:47] Daily target: 3 blogs, gap: 2h
+[2026-08-25 10:33:47] ============================================================
+[2026-08-25 10:33:47] Naya din (2026-08-25) - daily counter reset ho raha hai.
+[2026-08-25 10:33:47] Aaj (2026-08-25) ab tak 0/3 blogs publish hue hain.
+[2026-08-25 10:33:47] Blog #1 generation shuru ho raha hai...
+[2026-08-25 10:34:07] Blog #1 successfully publish ho gaya!
+[2026-08-25 10:34:07] Progress: 1/3 blogs aaj k liye.
+[2026-08-25 10:34:07] Wait: Blog #2 k liye 2 ghante ka gap (120 min 0 sec)
+[2026-08-25 10:39:07]   ... abhi bhi wait kar raha hoon (114 min baaki)
+[2026-08-25 10:44:07]   ... abhi bhi wait kar raha hoon (109 min baaki)
+[2026-08-25 10:49:07]   ... abhi bhi wait kar raha hoon (104 min baaki)
+[2026-08-25 10:54:07]   ... abhi bhi wait kar raha hoon (99 min baaki)
+[2026-08-25 10:59:07]   ... abhi bhi wait kar raha hoon (94 min baaki)
+[2026-08-25 11:04:07]   ... abhi bhi wait kar raha hoon (89 min baaki)
+[2026-08-25 11:09:07]   ... abhi bhi wait kar raha hoon (84 min baaki)
+[2026-08-25 11:14:07]   ... abhi bhi wait kar raha hoon (79 min baaki)
+[2026-08-25 11:19:07]   ... abhi bhi wait kar raha hoon (74 min baaki)
+[2026-08-25 11:24:07]   ... abhi bhi wait kar raha hoon (69 min baaki)
+[2026-08-25 11:29:07]   ... abhi bhi wait kar raha hoon (64 min baaki)
+[2026-08-25 11:34:07]   ... abhi bhi wait kar raha hoon (59 min baaki)
+[2026-08-25 11:39:07]   ... abhi bhi wait kar raha hoon (54 min baaki)
+[2026-08-25 11:44:07]   ... abhi bhi wait kar raha hoon (49 min baaki)
+[2026-08-25 11:49:07]   ... abhi bhi wait kar raha hoon (44 min baaki)
+[2026-08-25 11:54:07]   ... abhi bhi wait kar raha hoon (39 min baaki)
+[2026-08-25 11:59:07]   ... abhi bhi wait kar raha hoon (34 min baaki)
+[2026-08-25 12:04:07]   ... abhi bhi wait kar raha hoon (29 min baaki)
+[2026-08-25 12:09:07]   ... abhi bhi wait kar raha hoon (24 min baaki)
+[2026-08-25 12:14:07]   ... abhi bhi wait kar raha hoon (19 min baaki)
+[2026-08-25 12:19:07]   ... abhi bhi wait kar raha hoon (14 min baaki)
+[2026-08-25 12:24:07]   ... abhi bhi wait kar raha hoon (9 min baaki)
+[2026-08-25 12:29:07]   ... abhi bhi wait kar raha hoon (4 min baaki)
+[2026-08-25 12:34:07] Blog #2 generation shuru ho raha hai...
