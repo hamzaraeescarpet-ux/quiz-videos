@@ -1787,3 +1787,29 @@ To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
 [2026-08-26 13:38:14] ============================================================
 [2026-08-26 13:38:14] Aaj (2026-08-26) ab tak 1/3 blogs publish hue hain.
 [2026-08-26 13:38:14] Blog #2 generation shuru ho raha hai...
+[2026-08-26 13:53:55] Blog #2 successfully publish ho gaya!
+[2026-08-26 13:53:55] Progress: 2/3 blogs aaj k liye.
+[2026-08-26 13:53:55] Wait: Blog #3 k liye 2 ghante ka gap (120 min 0 sec)
+[2026-08-26 13:58:55]   ... abhi bhi wait kar raha hoon (114 min baaki)
+[2026-08-26 14:03:55]   ... abhi bhi wait kar raha hoon (109 min baaki)
+[2026-08-26 14:08:55]   ... abhi bhi wait kar raha hoon (104 min baaki)
+[2026-08-26 14:13:55]   ... abhi bhi wait kar raha hoon (99 min baaki)
+[2026-08-26 14:18:55]   ... abhi bhi wait kar raha hoon (94 min baaki)
+[2026-08-26 14:23:55]   ... abhi bhi wait kar raha hoon (89 min baaki)
+[2026-08-26 14:28:55]   ... abhi bhi wait kar raha hoon (84 min baaki)
+[2026-08-26 14:33:55]   ... abhi bhi wait kar raha hoon (79 min baaki)
+[2026-08-26 14:38:55]   ... abhi bhi wait kar raha hoon (74 min baaki)
+[2026-08-26 14:43:55]   ... abhi bhi wait kar raha hoon (69 min baaki)
+[2026-08-26 14:48:55]   ... abhi bhi wait kar raha hoon (64 min baaki)
+[2026-08-26 14:53:55]   ... abhi bhi wait kar raha hoon (59 min baaki)
+[2026-08-26 14:58:55]   ... abhi bhi wait kar raha hoon (54 min baaki)
+[2026-08-26 15:03:55]   ... abhi bhi wait kar raha hoon (49 min baaki)
+[2026-08-26 15:08:55]   ... abhi bhi wait kar raha hoon (44 min baaki)
+[2026-08-26 15:13:55]   ... abhi bhi wait kar raha hoon (39 min baaki)
+[2026-08-26 22:41:21] ============================================================
+[2026-08-26 22:41:21] Blog Automation Worker START
+[2026-08-26 22:41:21] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-08-26 22:41:21] Daily target: 3 blogs, gap: 2h
+[2026-08-26 22:41:21] ============================================================
+[2026-08-26 22:41:21] Aaj (2026-08-26) ab tak 2/3 blogs publish hue hain.
+[2026-08-26 22:41:21] Blog #3 generation shuru ho raha hai...
