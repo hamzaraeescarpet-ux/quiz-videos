@@ -2079,3 +2079,85 @@ To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
 [2026-09-01 14:29:31]   ... abhi bhi wait kar raha hoon (9 min baaki)
 [2026-09-01 14:34:31]   ... abhi bhi wait kar raha hoon (4 min baaki)
 [2026-09-01 14:39:31] Blog #2 generation shuru ho raha hai...
+[2026-09-01 14:52:15] Blog #2 successfully publish ho gaya!
+[2026-09-01 14:52:15] Progress: 2/3 blogs aaj k liye.
+[2026-09-01 14:52:15] Wait: Blog #3 k liye 2 ghante ka gap (120 min 0 sec)
+[2026-09-01 14:57:15]   ... abhi bhi wait kar raha hoon (114 min baaki)
+[2026-09-01 15:02:15]   ... abhi bhi wait kar raha hoon (109 min baaki)
+[2026-09-01 15:07:15]   ... abhi bhi wait kar raha hoon (104 min baaki)
+[2026-09-01 17:54:37] ============================================================
+[2026-09-01 17:54:37] Blog Automation Worker START
+[2026-09-01 17:54:37] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-09-01 17:54:37] Daily target: 3 blogs, gap: 2h
+[2026-09-01 17:54:37] ============================================================
+[2026-09-01 17:54:37] Aaj (2026-09-01) ab tak 2/3 blogs publish hue hain.
+[2026-09-01 17:54:37] Blog #3 generation shuru ho raha hai...
+[2026-09-01 17:55:17] Blog #3 successfully publish ho gaya!
+[2026-09-01 17:55:17] Progress: 3/3 blogs aaj k liye.
+[2026-09-01 17:55:17] Aaj ka target pura! Kal 08:00 AM tak so raha hoon...
+[2026-09-01 17:55:17] Wait: Next day (844 min 42 sec)
+[2026-09-01 18:00:17]   ... abhi bhi wait kar raha hoon (839 min baaki)
+[2026-09-01 18:05:17]   ... abhi bhi wait kar raha hoon (834 min baaki)
+[2026-09-01 18:10:17]   ... abhi bhi wait kar raha hoon (829 min baaki)
+[2026-09-01 18:15:17]   ... abhi bhi wait kar raha hoon (824 min baaki)
+[2026-09-01 18:20:17]   ... abhi bhi wait kar raha hoon (819 min baaki)
+[2026-09-01 18:25:17]   ... abhi bhi wait kar raha hoon (814 min baaki)
+[2026-09-01 18:30:17]   ... abhi bhi wait kar raha hoon (809 min baaki)
+[2026-09-01 18:35:17]   ... abhi bhi wait kar raha hoon (804 min baaki)
+[2026-09-01 18:40:17]   ... abhi bhi wait kar raha hoon (799 min baaki)
+[2026-09-01 18:45:17]   ... abhi bhi wait kar raha hoon (794 min baaki)
+[2026-09-01 18:50:17]   ... abhi bhi wait kar raha hoon (789 min baaki)
+[2026-09-01 18:55:17]   ... abhi bhi wait kar raha hoon (784 min baaki)
+[2026-09-01 19:00:17]   ... abhi bhi wait kar raha hoon (779 min baaki)
+[2026-09-01 19:05:17]   ... abhi bhi wait kar raha hoon (774 min baaki)
+[2026-09-01 19:10:17]   ... abhi bhi wait kar raha hoon (769 min baaki)
+[2026-09-01 19:15:17]   ... abhi bhi wait kar raha hoon (764 min baaki)
+[2026-09-01 19:20:17]   ... abhi bhi wait kar raha hoon (759 min baaki)
+[2026-09-01 19:25:17]   ... abhi bhi wait kar raha hoon (754 min baaki)
+[2026-09-02 13:07:25] ============================================================
+[2026-09-02 13:07:25] Blog Automation Worker START
+[2026-09-02 13:07:25] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-09-02 13:07:25] Daily target: 3 blogs, gap: 2h
+[2026-09-02 13:07:25] ============================================================
+[2026-09-02 13:07:25] Naya din (2026-09-02) - daily counter reset ho raha hai.
+[2026-09-02 13:07:25] Aaj (2026-09-02) ab tak 0/3 blogs publish hue hain.
+[2026-09-02 13:07:25] Blog #1 generation shuru ho raha hai...
+[2026-09-02 13:07:35] Blog #1 successfully publish ho gaya!
+[2026-09-02 13:07:35] Progress: 1/3 blogs aaj k liye.
+[2026-09-02 13:07:35] Wait: Blog #2 k liye 2 ghante ka gap (120 min 0 sec)
+[2026-09-02 13:12:30]   ... abhi bhi wait kar raha hoon (115 min baaki)
+[2026-09-02 13:17:30]   ... abhi bhi wait kar raha hoon (110 min baaki)
+[2026-09-02 13:22:30]   ... abhi bhi wait kar raha hoon (105 min baaki)
+[2026-09-02 13:27:30]   ... abhi bhi wait kar raha hoon (100 min baaki)
+[2026-09-02 13:32:30]   ... abhi bhi wait kar raha hoon (95 min baaki)
+[2026-09-02 13:37:30]   ... abhi bhi wait kar raha hoon (90 min baaki)
+[2026-09-02 13:42:30]   ... abhi bhi wait kar raha hoon (85 min baaki)
+[2026-09-02 13:47:30]   ... abhi bhi wait kar raha hoon (80 min baaki)
+[2026-09-02 13:52:30]   ... abhi bhi wait kar raha hoon (75 min baaki)
+[2026-09-02 13:57:30]   ... abhi bhi wait kar raha hoon (70 min baaki)
+[2026-09-02 14:02:30]   ... abhi bhi wait kar raha hoon (65 min baaki)
+[2026-09-02 14:07:30]   ... abhi bhi wait kar raha hoon (60 min baaki)
+[2026-09-02 14:12:30]   ... abhi bhi wait kar raha hoon (55 min baaki)
+[2026-09-02 14:17:30]   ... abhi bhi wait kar raha hoon (50 min baaki)
+[2026-09-02 14:22:30]   ... abhi bhi wait kar raha hoon (45 min baaki)
+[2026-09-02 14:27:30]   ... abhi bhi wait kar raha hoon (40 min baaki)
+[2026-09-02 14:32:30]   ... abhi bhi wait kar raha hoon (35 min baaki)
+[2026-09-02 14:37:30]   ... abhi bhi wait kar raha hoon (30 min baaki)
+[2026-09-02 14:42:30]   ... abhi bhi wait kar raha hoon (25 min baaki)
+[2026-09-02 14:47:30]   ... abhi bhi wait kar raha hoon (20 min baaki)
+[2026-09-02 14:52:30]   ... abhi bhi wait kar raha hoon (15 min baaki)
+[2026-09-02 14:57:30]   ... abhi bhi wait kar raha hoon (10 min baaki)
+[2026-09-02 15:02:30]   ... abhi bhi wait kar raha hoon (5 min baaki)
+[2026-09-02 15:07:30]   ... abhi bhi wait kar raha hoon (0 min baaki)
+[2026-09-02 15:07:35] Blog #2 generation shuru ho raha hai...
+[2026-09-02 15:08:01] Blog #2 successfully publish ho gaya!
+[2026-09-02 15:08:01] Progress: 2/3 blogs aaj k liye.
+[2026-09-02 15:08:01] Wait: Blog #3 k liye 2 ghante ka gap (120 min 0 sec)
+[2026-09-03 11:22:18] ============================================================
+[2026-09-03 11:22:18] Blog Automation Worker START
+[2026-09-03 11:22:18] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-09-03 11:22:18] Daily target: 3 blogs, gap: 2h
+[2026-09-03 11:22:18] ============================================================
+[2026-09-03 11:22:18] Naya din (2026-09-03) - daily counter reset ho raha hai.
+[2026-09-03 11:22:18] Aaj (2026-09-03) ab tak 0/3 blogs publish hue hain.
+[2026-09-03 11:22:18] Blog #1 generation shuru ho raha hai...
