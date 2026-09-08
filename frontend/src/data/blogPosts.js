@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to faceless YouTube quiz channel ideas",
+  slug: "faceless-youtube-quiz-channel-ideas",
+  excerpt: "Discover how to create viral quiz videos about faceless YouTube quiz channel ideas automatically.",
+  date: "September 08, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/faceless-youtube-quiz-channel-ideas-landscape.png",
+  pinterest_image: "/assets/blog/faceless-youtube-quiz-channel-ideas-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about faceless YouTube quiz channel ideas to grow your channel. Build viral automated quiz....",
+  seoKeywords: [
+    "faceless YouTube quiz channel ideas",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to faceless YouTube quiz channel ideas](/assets/blog/faceless-youtube-quiz-channel-ideas-landscape.png)\n\n# The Ultimate Guide to faceless YouTube quiz channel ideas\n\n",
+  trendingKeyword: "faceless YouTube quiz channel ideas",
+  topicSource: "product"
+},
+  {
   title: "Labor Day 2026: History, Traditions, and Key Facts",
   slug: "labor-day-history-traditions-key-facts",
   excerpt: "Discover the history and significance of Labor Day, from its roots in the American labor movement to the traditions that define the holiday today. Learn why Labor Day remains an important cultural milestone in the United States and what makes its history especially fascinating.",
