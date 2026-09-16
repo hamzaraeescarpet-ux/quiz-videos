@@ -2753,3 +2753,24 @@ To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
 [2026-09-16 11:10:52] Naya din (2026-09-16) - daily counter reset ho raha hai.
 [2026-09-16 11:10:52] Aaj (2026-09-16) ab tak 0/3 blogs publish hue hain.
 [2026-09-16 11:10:52] Blog #1 generation shuru ho raha hai...
+[2026-09-16 11:28:57] Blog #1 successfully publish ho gaya!
+[2026-09-16 11:28:57] Progress: 1/3 blogs aaj k liye.
+[2026-09-16 11:28:57] Wait: Blog #2 k liye 2 ghante ka gap (120 min 0 sec)
+[2026-09-16 11:33:57]   ... abhi bhi wait kar raha hoon (114 min baaki)
+[2026-09-16 11:38:57]   ... abhi bhi wait kar raha hoon (109 min baaki)
+[2026-09-16 11:43:57]   ... abhi bhi wait kar raha hoon (104 min baaki)
+[2026-09-16 11:48:57]   ... abhi bhi wait kar raha hoon (99 min baaki)
+[2026-09-16 11:53:57]   ... abhi bhi wait kar raha hoon (94 min baaki)
+[2026-09-16 11:58:57]   ... abhi bhi wait kar raha hoon (89 min baaki)
+[2026-09-16 12:03:57]   ... abhi bhi wait kar raha hoon (84 min baaki)
+[2026-09-16 12:08:57]   ... abhi bhi wait kar raha hoon (79 min baaki)
+[2026-09-16 12:13:57]   ... abhi bhi wait kar raha hoon (74 min baaki)
+[2026-09-16 12:18:57]   ... abhi bhi wait kar raha hoon (69 min baaki)
+[2026-09-16 12:23:57]   ... abhi bhi wait kar raha hoon (64 min baaki)
+[2026-09-16 17:16:45] ============================================================
+[2026-09-16 17:16:45] Blog Automation Worker START
+[2026-09-16 17:16:45] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-09-16 17:16:45] Daily target: 3 blogs, gap: 2h
+[2026-09-16 17:16:45] ============================================================
+[2026-09-16 17:16:45] Aaj (2026-09-16) ab tak 1/3 blogs publish hue hain.
+[2026-09-16 17:16:45] Blog #2 generation shuru ho raha hai...
