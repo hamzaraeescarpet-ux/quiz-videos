@@ -1529,7 +1529,7 @@ def run_blog_generator_playwright():
                 
                 # --- 2. Navigate to ChatGPT to filter trend ---
                 print("\n--- STEP 2: Connecting to ChatGPT for topic filtering ---")
-                gemini_page.goto("https://chatgpt.com/c/6a47d525-af3c-83e8-9b33-a5c2b2669d17")
+                gemini_page.goto("https://chatgpt.com/c/6a47d525-af3c-83e8-9b33-a5c2b2669d17")  # Persistent chat URL
                 
                 # Wait for text box to load in ChatGPT
                 textbox = gemini_page.locator("#prompt-textarea, textarea[id='prompt-textarea']").first
@@ -1607,7 +1607,7 @@ def run_blog_generator_playwright():
                 
                 # Navigate to ChatGPT for subsequent turns
                 print("\n--- STEP 2: Connecting to ChatGPT for content generation ---")
-                gemini_page.goto("https://chatgpt.com/c/6a47d525-af3c-83e8-9b33-a5c2b2669d17")
+                gemini_page.goto("https://chatgpt.com/c/6a47d525-af3c-83e8-9b33-a5c2b2669d17")  # Persistent chat URL
                 textbox = gemini_page.locator("#prompt-textarea, textarea[id='prompt-textarea']").first
                 try:
                     textbox.wait_for(state="visible", timeout=30000)

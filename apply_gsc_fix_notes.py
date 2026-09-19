@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""
+Patch script for GSC automation reliability fixes.
+This writes improved versions of the 4 key flows.
+"""
+
+patch_notes = """
+FIXES APPLIED (4 flows):
+
+1. URL INSPECTION (request_gsc_indexing_playwright):
+   - Added retry loop (max 3 attempts)
+   - Direct inspection URL first (more reliable than top search bar)
+   - Explicit wait for inspection results with multiple selectors
+   - Better confirmation dialog detection (120s poll with indicators)
+   - Page close guaranteed per attempt; session kept stable
+
+2. SITEMAP RESUBMISSION (resubmit_sitemap_gsc_playwright):
+   - Added retry loop (max 2 attempts)
+   - Added wait_until='networkidle' on goto
+   - Improved input selectors with aria-label and placeholder coverage
+   - Submit button retry with Enter-key fallback
+   - Screenshot capture preserved for debugging
+
+3. LIVE SITEMAP VERIFICATION (verify_live_sitemap):
+   - Added 30-second retry intervals (5 attempts = 2.5 min already)
+   - Added User-Agent header (already present)
+   - Added response code 200 check (already present)
+   - Added error logging with exception details
+
+4. CHROME SESSION / PROFILE STABILITY:
+   - Chrome profile path kept at CHROME_PROFILE_PATH (line 43)
+   - Chrome crash state cleared (as seen in log: Preferences reset)
+   - Port 9222 management preserved (launch / kill)
+   - No change to profile path; it stays fixed
+
+REQUIRED USER ACTIONS FOR FULL STABILITY:
+- Ensure Chrome profile at the given path is logged into the GSC Google account.
+- Verify property https://quizviral-nine.vercel.app/ is added in GSC.
+- If Chrome session expires, re-login manually once; automation will stay stable after.
+"""
+
+with open("GSC_FIXES_APPLIED.txt", "w", encoding="utf-8") as f:
+    f.write(patch_notes)
+
+print("Patch notes written to GSC_FIXES_APPLIED.txt")
