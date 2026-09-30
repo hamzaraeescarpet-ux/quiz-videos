@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to cubs vs padres",
+  slug: "cubs-vs-padres",
+  excerpt: "Discover how to create viral quiz videos about cubs vs padres automatically.",
+  date: "September 30, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/cubs-vs-padres-landscape.png",
+  pinterest_image: "/assets/blog/cubs-vs-padres-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about cubs vs padres to grow your channel. Build viral automated quiz channels easily.........",
+  seoKeywords: [
+    "cubs vs padres",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to cubs vs padres](/assets/blog/cubs-vs-padres-landscape.png)\n\n# The Ultimate Guide to cubs vs padres\n\n",
+  trendingKeyword: "cubs vs padres",
+  topicSource: "trend"
+},
+  {
   title: "Best Quiz Niches for Shorts: Categories, Ideas, and Growth Strategies",
   slug: "best-quiz-niches-for-shorts",
   excerpt: "Discover the strongest quiz categories for Shorts, from general knowledge and geography to sports, science, history, and brain teasers. Learn how to choose a sustainable niche, create engaging question formats, and build a scalable content strategy around topics audiences naturally enjoy.",
