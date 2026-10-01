@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to argentina vs bolivia",
+  slug: "argentina-vs-bolivia",
+  excerpt: "Discover how to create viral quiz videos about argentina vs bolivia automatically.",
+  date: "October 01, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/argentina-vs-bolivia-landscape.png",
+  pinterest_image: "/assets/blog/argentina-vs-bolivia-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about argentina vs bolivia to grow your channel. Build viral automated quiz channels easily...",
+  seoKeywords: [
+    "argentina vs bolivia",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to argentina vs bolivia](/assets/blog/argentina-vs-bolivia-landscape.png)\n\n# The Ultimate Guide to argentina vs bolivia\n\n",
+  trendingKeyword: "argentina vs bolivia",
+  topicSource: "trend"
+},
+  {
   title: "The Ultimate Guide to cubs vs padres",
   slug: "cubs-vs-padres",
   excerpt: "Discover how to create viral quiz videos about cubs vs padres automatically.",
