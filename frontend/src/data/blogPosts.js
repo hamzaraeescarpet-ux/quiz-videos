@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to quiz video monetization breakdown",
+  slug: "quiz-video-monetization-breakdown",
+  excerpt: "Discover how to create viral quiz videos about quiz video monetization breakdown automatically.",
+  date: "October 03, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/quiz-video-monetization-breakdown-landscape.png",
+  pinterest_image: "/assets/blog/quiz-video-monetization-breakdown-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about quiz video monetization breakdown to grow your channel. Build viral automated quiz......",
+  seoKeywords: [
+    "quiz video monetization breakdown",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to quiz video monetization breakdown](/assets/blog/quiz-video-monetization-breakdown-landscape.png)\n\n# The Ultimate Guide to quiz video monetization breakdown\n\n",
+  trendingKeyword: "quiz video monetization breakdown",
+  topicSource: "product"
+},
+  {
   title: "The Ultimate Guide to argentina vs bolivia",
   slug: "argentina-vs-bolivia",
   excerpt: "Discover how to create viral quiz videos about argentina vs bolivia automatically.",

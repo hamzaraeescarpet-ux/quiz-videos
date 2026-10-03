@@ -3655,3 +3655,76 @@ To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
 [2026-10-01 15:02:09] ============================================================
 [2026-10-01 15:02:09] Aaj (2026-10-01) ab tak 1/3 blogs publish hue hain.
 [2026-10-01 15:02:09] Blog #2 generation shuru ho raha hai...
+[2026-10-01 15:47:56] Blog #2 successfully publish ho gaya!
+[2026-10-01 15:47:56] Progress: 2/3 blogs aaj k liye.
+[2026-10-01 15:47:56] Wait: Blog #3 k liye 2 ghante ka gap (120 min 0 sec)
+[2026-10-01 15:52:56]   ... abhi bhi wait kar raha hoon (114 min baaki)
+[2026-10-01 15:57:56]   ... abhi bhi wait kar raha hoon (109 min baaki)
+[2026-10-01 16:09:44]   ... abhi bhi wait kar raha hoon (98 min baaki)
+[2026-10-01 16:14:44]   ... abhi bhi wait kar raha hoon (93 min baaki)
+[2026-10-01 16:19:44]   ... abhi bhi wait kar raha hoon (88 min baaki)
+[2026-10-01 16:24:44]   ... abhi bhi wait kar raha hoon (83 min baaki)
+[2026-10-01 16:29:44]   ... abhi bhi wait kar raha hoon (78 min baaki)
+[2026-10-01 16:34:44]   ... abhi bhi wait kar raha hoon (73 min baaki)
+[2026-10-01 16:39:44]   ... abhi bhi wait kar raha hoon (68 min baaki)
+[2026-10-01 16:44:44]   ... abhi bhi wait kar raha hoon (63 min baaki)
+[2026-10-01 16:49:44]   ... abhi bhi wait kar raha hoon (58 min baaki)
+[2026-10-01 16:54:44]   ... abhi bhi wait kar raha hoon (53 min baaki)
+[2026-10-01 16:59:44]   ... abhi bhi wait kar raha hoon (48 min baaki)
+[2026-10-01 17:04:44]   ... abhi bhi wait kar raha hoon (43 min baaki)
+[2026-10-01 17:09:44]   ... abhi bhi wait kar raha hoon (38 min baaki)
+[2026-10-01 17:14:44]   ... abhi bhi wait kar raha hoon (33 min baaki)
+[2026-10-01 17:19:44]   ... abhi bhi wait kar raha hoon (28 min baaki)
+[2026-10-01 17:24:44]   ... abhi bhi wait kar raha hoon (23 min baaki)
+[2026-10-01 17:29:44]   ... abhi bhi wait kar raha hoon (18 min baaki)
+[2026-10-01 17:34:44]   ... abhi bhi wait kar raha hoon (13 min baaki)
+[2026-10-01 17:39:44]   ... abhi bhi wait kar raha hoon (8 min baaki)
+[2026-10-01 17:44:44]   ... abhi bhi wait kar raha hoon (3 min baaki)
+[2026-10-01 17:47:56] Blog #3 generation shuru ho raha hai...
+[2026-10-01 17:53:18] Blog #3 successfully publish ho gaya!
+[2026-10-01 17:53:18] Progress: 3/3 blogs aaj k liye.
+[2026-10-01 17:53:18] Aaj ka target pura! Kal 08:00 AM tak so raha hoon...
+[2026-10-01 17:53:18] Wait: Next day (846 min 41 sec)
+[2026-10-01 17:58:18]   ... abhi bhi wait kar raha hoon (841 min baaki)
+[2026-10-01 18:03:18]   ... abhi bhi wait kar raha hoon (836 min baaki)
+[2026-10-01 21:03:09] ============================================================
+[2026-10-01 21:03:09] Blog Automation Worker START
+[2026-10-01 21:03:09] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-10-01 21:03:09] Daily target: 3 blogs, gap: 2h
+[2026-10-01 21:03:09] ============================================================
+[2026-10-01 21:03:09] Aaj (2026-10-01) ab tak 3/3 blogs publish hue hain.
+[2026-10-01 21:03:09] Aaj ka target (3 blogs) pura! Kal 08:00 AM tak so raha hoon...
+[2026-10-01 21:03:09] Wait: Next day start (08:00 AM) (656 min 50 sec)
+[2026-10-01 21:08:09]   ... abhi bhi wait kar raha hoon (651 min baaki)
+[2026-10-01 21:13:09]   ... abhi bhi wait kar raha hoon (646 min baaki)
+[2026-10-01 21:18:09]   ... abhi bhi wait kar raha hoon (641 min baaki)
+[2026-10-01 21:23:09]   ... abhi bhi wait kar raha hoon (636 min baaki)
+[2026-10-01 21:28:09]   ... abhi bhi wait kar raha hoon (631 min baaki)
+[2026-10-02 16:15:04] ============================================================
+[2026-10-02 16:15:04] Blog Automation Worker START
+[2026-10-02 16:15:04] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-10-02 16:15:04] Daily target: 3 blogs, gap: 2h
+[2026-10-02 16:15:04] ============================================================
+[2026-10-02 16:15:04] Naya din (2026-10-02) - daily counter reset ho raha hai.
+[2026-10-02 16:15:04] Aaj (2026-10-02) ab tak 0/3 blogs publish hue hain.
+[2026-10-02 16:15:04] Blog #1 generation shuru ho raha hai...
+[2026-10-02 16:18:05] Blog #1 successfully publish ho gaya!
+[2026-10-02 16:18:05] Progress: 1/3 blogs aaj k liye.
+[2026-10-02 16:18:05] Wait: Blog #2 k liye 2 ghante ka gap (120 min 0 sec)
+[2026-10-02 16:23:05]   ... abhi bhi wait kar raha hoon (114 min baaki)
+[2026-10-02 16:28:05]   ... abhi bhi wait kar raha hoon (109 min baaki)
+[2026-10-02 16:33:05]   ... abhi bhi wait kar raha hoon (104 min baaki)
+[2026-10-02 16:38:05]   ... abhi bhi wait kar raha hoon (99 min baaki)
+[2026-10-02 16:43:05]   ... abhi bhi wait kar raha hoon (94 min baaki)
+[2026-10-02 16:48:05]   ... abhi bhi wait kar raha hoon (89 min baaki)
+[2026-10-02 16:53:05]   ... abhi bhi wait kar raha hoon (84 min baaki)
+[2026-10-02 16:58:05]   ... abhi bhi wait kar raha hoon (79 min baaki)
+[2026-10-02 17:03:05]   ... abhi bhi wait kar raha hoon (74 min baaki)
+[2026-10-03 11:28:44] ============================================================
+[2026-10-03 11:28:44] Blog Automation Worker START
+[2026-10-03 11:28:44] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-10-03 11:28:44] Daily target: 3 blogs, gap: 2h
+[2026-10-03 11:28:44] ============================================================
+[2026-10-03 11:28:44] Naya din (2026-10-03) - daily counter reset ho raha hai.
+[2026-10-03 11:28:44] Aaj (2026-10-03) ab tak 0/3 blogs publish hue hain.
+[2026-10-03 11:28:44] Blog #1 generation shuru ho raha hai...
