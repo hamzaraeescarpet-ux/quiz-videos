@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to pittsburgh vs virginia tech",
+  slug: "pittsburgh-vs-virginia-tech",
+  excerpt: "Discover how to create viral quiz videos about pittsburgh vs virginia tech automatically.",
+  date: "October 03, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/pittsburgh-vs-virginia-tech-landscape.png",
+  pinterest_image: "/assets/blog/pittsburgh-vs-virginia-tech-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about pittsburgh vs virginia tech to grow your channel. Build viral automated quiz channels easily.",
+  seoKeywords: [
+    "pittsburgh vs virginia tech",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to pittsburgh vs virginia tech](/assets/blog/pittsburgh-vs-virginia-tech-landscape.png)\n\n# The Ultimate Guide to pittsburgh vs virginia tech\n\n",
+  trendingKeyword: "pittsburgh vs virginia tech",
+  topicSource: "trend"
+},
+  {
   title: "The Ultimate Guide to penn state vs northwestern",
   slug: "penn-state-vs-northwestern",
   excerpt: "Discover how to create viral quiz videos about penn state vs northwestern automatically.",
