@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to penn state vs northwestern",
+  slug: "penn-state-vs-northwestern",
+  excerpt: "Discover how to create viral quiz videos about penn state vs northwestern automatically.",
+  date: "October 03, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/penn-state-vs-northwestern-landscape.png",
+  pinterest_image: "/assets/blog/penn-state-vs-northwestern-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about penn state vs northwestern to grow your channel. Build viral automated quiz channels easily.",
+  seoKeywords: [
+    "penn state vs northwestern",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to penn state vs northwestern](/assets/blog/penn-state-vs-northwestern-landscape.png)\n\n# The Ultimate Guide to penn state vs northwestern\n\n",
+  trendingKeyword: "penn state vs northwestern",
+  topicSource: "trend"
+},
+  {
   title: "The Ultimate Guide to quiz video monetization breakdown",
   slug: "quiz-video-monetization-breakdown",
   excerpt: "Discover how to create viral quiz videos about quiz video monetization breakdown automatically.",
