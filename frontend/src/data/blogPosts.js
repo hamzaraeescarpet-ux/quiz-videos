@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to argentina vs burkina faso",
+  slug: "argentina-vs-burkina-faso",
+  excerpt: "Discover how to create viral quiz videos about argentina vs burkina faso automatically.",
+  date: "October 04, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/argentina-vs-burkina-faso-landscape.png",
+  pinterest_image: "/assets/blog/argentina-vs-burkina-faso-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about argentina vs burkina faso to grow your channel. Build viral automated quiz channels easily.",
+  seoKeywords: [
+    "argentina vs burkina faso",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to argentina vs burkina faso](/assets/blog/argentina-vs-burkina-faso-landscape.png)\n\n# The Ultimate Guide to argentina vs burkina faso\n\n",
+  trendingKeyword: "argentina vs burkina faso",
+  topicSource: "trend"
+},
+  {
   title: "The Ultimate Guide to CSV bulk video workflow tips",
   slug: "csv-bulk-video-workflow-tips",
   excerpt: "Discover how to create viral quiz videos about CSV bulk video workflow tips automatically.",
