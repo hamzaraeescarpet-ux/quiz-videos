@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to CSV bulk video workflow tips",
+  slug: "csv-bulk-video-workflow-tips",
+  excerpt: "Discover how to create viral quiz videos about CSV bulk video workflow tips automatically.",
+  date: "October 04, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/csv-bulk-video-workflow-tips-landscape.png",
+  pinterest_image: "/assets/blog/csv-bulk-video-workflow-tips-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about CSV bulk video workflow tips to grow your channel. Build viral automated quiz channels...",
+  seoKeywords: [
+    "CSV bulk video workflow tips",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to CSV bulk video workflow tips](/assets/blog/csv-bulk-video-workflow-tips-landscape.png)\n\n# The Ultimate Guide to CSV bulk video workflow tips\n\n",
+  trendingKeyword: "CSV bulk video workflow tips",
+  topicSource: "product"
+},
+  {
   title: "The Ultimate Guide to pittsburgh vs virginia tech",
   slug: "pittsburgh-vs-virginia-tech",
   excerpt: "Discover how to create viral quiz videos about pittsburgh vs virginia tech automatically.",
