@@ -1,5 +1,59 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to world space week 2026",
+  slug: "world-space-week-2026",
+  excerpt: "Discover how to create viral quiz videos about world space week 2026 automatically.",
+  date: "October 06, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/world-space-week-2026-landscape.png",
+  pinterest_image: "/assets/blog/world-space-week-2026-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about world space week 2026 to grow your channel. Build viral automated quiz channels easily..",
+  seoKeywords: [
+    "world space week 2026",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to world space week 2026](/assets/blog/world-space-week-2026-landscape.png)\n\n# The Ultimate Guide to world space week 2026\n\n",
+  trendingKeyword: "world space week 2026",
+  topicSource: "trend"
+},
+  {
+  title: "The Ultimate Guide to how to build a viral trivia brand",
+  slug: "how-to-build-a-viral-trivia-brand",
+  excerpt: "Discover how to create viral quiz videos about how to build a viral trivia brand automatically.",
+  date: "October 05, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/how-to-build-a-viral-trivia-brand-landscape.png",
+  pinterest_image: "/assets/blog/how-to-build-a-viral-trivia-brand-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about how to build a viral trivia brand to grow your channel. Build viral automated quiz......",
+  seoKeywords: [
+    "how to build a viral trivia brand",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to how to build a viral trivia brand](/assets/blog/how-to-build-a-viral-trivia-brand-landscape.png)\n\n# The Ultimate Guide to how to build a viral trivia brand\n\n",
+  trendingKeyword: "how to build a viral trivia brand",
+  topicSource: "product"
+},
+  {
+  title: "The Ultimate Guide to lions vs panthers",
+  slug: "lions-vs-panthers",
+  excerpt: "Discover how to create viral quiz videos about lions vs panthers automatically.",
+  date: "October 05, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/lions-vs-panthers-landscape.png",
+  pinterest_image: "/assets/blog/lions-vs-panthers-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about lions vs panthers to grow your channel. Build viral automated quiz channels easily......",
+  seoKeywords: [
+    "lions vs panthers",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to lions vs panthers](/assets/blog/lions-vs-panthers-landscape.png)\n\n# The Ultimate Guide to lions vs panthers\n\n",
+  trendingKeyword: "lions vs panthers",
+  topicSource: "trend"
+},
+  {
   title: "The Ultimate Guide to argentina vs burkina faso",
   slug: "argentina-vs-burkina-faso",
   excerpt: "Discover how to create viral quiz videos about argentina vs burkina faso automatically.",
