@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to freddie jackson",
+  slug: "freddie-jackson",
+  excerpt: "Discover how to create viral quiz videos about freddie jackson automatically.",
+  date: "October 07, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/freddie-jackson-landscape.png",
+  pinterest_image: "/assets/blog/freddie-jackson-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about freddie jackson to grow your channel. Build viral automated quiz channels easily........",
+  seoKeywords: [
+    "freddie jackson",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to freddie jackson](/assets/blog/freddie-jackson-landscape.png)\n\n# The Ultimate Guide to freddie jackson\n\n",
+  trendingKeyword: "freddie jackson",
+  topicSource: "trend"
+},
+  {
   title: "The Ultimate Guide to automated faceless channel mistakes to avoid",
   slug: "automated-faceless-channel-mistakes-to-avoid",
   excerpt: "Discover how to create viral quiz videos about automated faceless channel mistakes to avoid automatically.",
