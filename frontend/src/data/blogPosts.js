@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to automated faceless channel mistakes to avoid",
+  slug: "automated-faceless-channel-mistakes-to-avoid",
+  excerpt: "Discover how to create viral quiz videos about automated faceless channel mistakes to avoid automatically.",
+  date: "October 07, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/automated-faceless-channel-mistakes-to-avoid-landscape.png",
+  pinterest_image: "/assets/blog/automated-faceless-channel-mistakes-to-avoid-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about automated faceless channel mistakes to avoid to grow your channel.......................",
+  seoKeywords: [
+    "automated faceless channel mistakes to avoid",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to automated faceless channel mistakes to avoid](/assets/blog/automated-faceless-channel-mistakes-to-avoid-landscape.png)\n\n# The Ultimate Guide to automated faceless channel mistakes to avoid\n\n",
+  trendingKeyword: "automated faceless channel mistakes to avoid",
+  topicSource: "product"
+},
+  {
   title: "The Ultimate Guide to world space week 2026",
   slug: "world-space-week-2026",
   excerpt: "Discover how to create viral quiz videos about world space week 2026 automatically.",
