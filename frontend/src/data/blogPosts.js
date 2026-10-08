@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to how to write engaging trivia questions",
+  slug: "how-to-write-engaging-trivia-questions",
+  excerpt: "Discover how to create viral quiz videos about how to write engaging trivia questions automatically.",
+  date: "October 08, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/how-to-write-engaging-trivia-questions-landscape.png",
+  pinterest_image: "/assets/blog/how-to-write-engaging-trivia-questions-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about how to write engaging trivia questions to grow your channel. Build viral automated quiz...",
+  seoKeywords: [
+    "how to write engaging trivia questions",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to how to write engaging trivia questions](/assets/blog/how-to-write-engaging-trivia-questions-landscape.png)\n\n# The Ultimate Guide to how to write engaging trivia questions\n\n",
+  trendingKeyword: "how to write engaging trivia questions",
+  topicSource: "product"
+},
+  {
   title: "The Ultimate Guide to susan dell",
   slug: "susan-dell",
   excerpt: "Discover how to create viral quiz videos about susan dell automatically.",
