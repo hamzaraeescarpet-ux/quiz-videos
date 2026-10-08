@@ -1,5 +1,23 @@
 export const blogPosts = [
   {
+  title: "The Ultimate Guide to susan dell",
+  slug: "susan-dell",
+  excerpt: "Discover how to create viral quiz videos about susan dell automatically.",
+  date: "October 08, 2026",
+  readTime: "5 min read",
+  author: "QuizViral AI Team",
+  image: "/assets/blog/susan-dell-landscape.png",
+  pinterest_image: "/assets/blog/susan-dell-pinterest.png",
+  metaDescription: "Learn how to create automated faceless quiz videos about susan dell to grow your channel. Build viral automated quiz channels easily.............",
+  seoKeywords: [
+    "susan dell",
+    "QuizViral AI"
+  ],
+  content: "![The Ultimate Guide to susan dell](/assets/blog/susan-dell-landscape.png)\n\n# The Ultimate Guide to susan dell\n\n",
+  trendingKeyword: "susan dell",
+  topicSource: "trend"
+},
+  {
   title: "The Ultimate Guide to freddie jackson",
   slug: "freddie-jackson",
   excerpt: "Discover how to create viral quiz videos about freddie jackson automatically.",
