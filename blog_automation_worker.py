@@ -156,24 +156,32 @@ def main():
             if state.get("last_date") != today_str:
                 # Din badal gaya to bahar nikal jao
                 break
-            state["blogs_published_today"] = state.get("blogs_published_today", 0) + 1
-            state["last_date"] = today_str
-            state["status"] = "running"
-            save_state(state)
+            if success:
+                state["blogs_published_today"] = state.get("blogs_published_today", 0) + 1
+                state["last_date"] = today_str
+                state["status"] = "running"
+                save_state(state)
 
-            log(f"Progress: {state['blogs_published_today']}/{BLOGS_PER_DAY} blogs aaj k liye.")
+                log(f"Progress: {state['blogs_published_today']}/{BLOGS_PER_DAY} blogs aaj k liye.")
 
-            # Agar ye aakhri blog nahi hai to gap lo
-            if blog_num < BLOGS_PER_DAY:
-                sleep_with_heartbeat(
-                    GAP_BETWEEN_BLOGS,
-                    reason=f"Blog #{blog_num+1} k liye 2 ghante ka gap"
-                )
+                # Agar ye aakhri blog nahi hai to gap lo
+                if state["blogs_published_today"] < BLOGS_PER_DAY:
+                    sleep_with_heartbeat(
+                        GAP_BETWEEN_BLOGS,
+                        reason=f"Blog #{state['blogs_published_today']+1} k liye 2 ghante ka gap"
+                    )
 
-                # Gap k baad check karo: kya aaj ka din wahi hai?
-                if date.today().isoformat() != today_str:
-                    log("Gap k dauran din badal gaya. Nayi cycle shuru hogi.")
-                    break
+                    # Gap k baad check karo: kya aaj ka din wahi hai?
+                    if date.today().isoformat() != today_str:
+                        log("Gap k dauran din badal gaya. Nayi cycle shuru hogi.")
+                        break
+            else:
+                log(f"Blog #{blog_num} generation fail ho gaya. Counter increment nahi kiya gaya.")
+                state["status"] = "retrying"
+                save_state(state)
+                # Retry in 5 minutes
+                sleep_with_heartbeat(300, reason=f"Blog #{blog_num} retry wait (5 min)")
+                break
 
         # Sab blogs ho gaye? Kal tak wait karo
         state = load_state()

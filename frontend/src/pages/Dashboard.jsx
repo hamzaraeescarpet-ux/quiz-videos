@@ -383,14 +383,22 @@ export default function Dashboard() {
         }
       } catch (err) {
         console.error(err);
-        alert("Failed to stop generation.");
+        if (err.response?.status !== 404) {
+          alert("Failed to stop generation.");
+        }
         setIsStopping(false);
       }
     }
   };
 
   const downloadZip = () => {
-    window.location.href = `/api/hf/download/${sessionId}`;
+    if (!sessionId) return;
+    const link = document.createElement('a');
+    link.href = `/api/hf/download/${sessionId}`;
+    link.setAttribute('download', `QuizViral_Videos_${sessionId}.zip`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const resetState = () => {
@@ -637,6 +645,13 @@ export default function Dashboard() {
                     Your bulk generation is rendering. Just minimize this tab and come back after some time; your bulk videos will be generated.
                   </p>
                 )}
+                {status === 'Interrupted' && (
+                  <p className="text-amber-400 text-xs mt-2 font-medium">
+                    {progress.current > 0
+                      ? `Generation stopped. ${progress.current} video${progress.current > 1 ? 's' : ''} saved and ready for download!`
+                      : 'Generation stopped before the first video finished.'}
+                  </p>
+                )}
               </div>
               {status === 'Processing' && (
                 <button 
@@ -750,17 +765,23 @@ export default function Dashboard() {
 
             {(status === 'Completed' || status === 'Interrupted') && (
               <div className="space-y-6 pt-2 md:pt-4">
-                <div className="flex flex-col sm:flex-row justify-center gap-4">
-                  <button
-                    onClick={downloadZip}
-                    className="w-full sm:w-auto bg-green-600 hover:bg-green-500 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-base md:text-lg transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
-                  >
-                    <Download className="w-5 h-5" />
-                    Download ZIP
-                  </button>
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+                  {progress.current > 0 ? (
+                    <button
+                      onClick={downloadZip}
+                      className="w-full sm:w-auto bg-green-600 hover:bg-green-500 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-base md:text-lg transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Download className="w-5 h-5" />
+                      Download ZIP ({progress.current} Video{progress.current > 1 ? 's' : ''})
+                    </button>
+                  ) : (
+                    <div className="text-amber-400 text-sm font-semibold flex items-center gap-2 py-2">
+                      <span>⚠️ No videos finished before generation was stopped.</span>
+                    </div>
+                  )}
                   <button
                     onClick={resetState}
-                    className="w-full sm:w-auto bg-dark-700 hover:bg-dark-600 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-base md:text-lg transition-all flex items-center justify-center gap-2"
+                    className="w-full sm:w-auto bg-dark-700 hover:bg-dark-600 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-base md:text-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Plus className="w-5 h-5" />
                     Start New Bulk

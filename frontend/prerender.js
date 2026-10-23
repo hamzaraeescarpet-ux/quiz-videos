@@ -25,6 +25,37 @@ try {
   console.log("Could not read latestFbVideo.js, using default fallback:", e);
 }
 
+// SEO Structured Data Helpers
+function parseIsoDate(dateStr) {
+  if (!dateStr) return new Date().toISOString();
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return d.toISOString();
+  } catch (e) {}
+  return new Date().toISOString();
+}
+
+function extractFaqsFromMarkdown(markdown) {
+  if (!markdown) return [];
+  const faqs = [];
+  const faqSectionMatch = markdown.match(/##\s*(?:.*?(?:FAQ|Frequently Asked Questions|Answers to Common Questions|Common Questions).*?)\n+([\s\S]*?)(?=\n##\s|$)/i);
+  const targetText = faqSectionMatch ? faqSectionMatch[1] : markdown;
+  
+  const questionMatches = targetText.matchAll(/###\s*([^\n\?]+\??)\n+([\s\S]*?)(?=\n###|\n##|$)/g);
+  for (const match of questionMatches) {
+    const q = match[1].trim();
+    let a = match[2].trim().replace(/\n+/g, ' ').replace(/<[^>]+>/g, '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
+    if (q && a && (q.includes('?') || /^(how|what|why|can|should|is|do|where|who)/i.test(q))) {
+      faqs.push({
+        question: q,
+        answer: a.slice(0, 500)
+      });
+    }
+  }
+  return faqs.slice(0, 6);
+}
+
+
 // Markdown parser helper for pre-rendering
 function parseInlineStyles(text) {
   if (!text) return '';
@@ -165,6 +196,25 @@ function runPrerender() {
     .replace('<title>QuizViral AI - Create 100+ Viral Quiz Videos in 1-Click</title>', '<title>QuizViral AI Creator Blog - Expert Growth Tips & SEO Guides</title>')
     .replace('<div id="root"></div>', `<div id="root">${blogListingContent}</div>`);
 
+  const listMetaTags = `
+    <link rel="canonical" href="https://quizviral-nine.vercel.app/blog" />
+    <meta name="description" content="Expert growth tips, ChatGPT prompts, and SEO tutorials to scale your viral faceless quiz channels and drive traffic." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="QuizViral AI Creator Blog - Expert Growth Tips & SEO Guides" />
+    <meta property="og:description" content="Expert growth tips, ChatGPT prompts, and SEO tutorials to scale your viral faceless quiz channels and drive traffic." />
+    <meta property="og:url" content="https://quizviral-nine.vercel.app/blog" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": "QuizViral AI Creator Blog",
+        "url": "https://quizviral-nine.vercel.app/blog",
+        "description": "Expert growth tips, ChatGPT prompts, and SEO tutorials to scale your viral faceless quiz channels and drive traffic."
+      }
+    </script>
+  `;
+  listHtml = listHtml.replace('</head>', `${listMetaTags}\n</head>`);
+
   // Ensure robots allow crawlers to find this index too
   fs.writeFileSync(path.join(blogListDir, 'index.html'), listHtml, 'utf-8');
   console.log(`Generated pre-rendered blog index page at dist/blog/index.html`);
@@ -234,21 +284,104 @@ function runPrerender() {
       `<div id="root">${postContentHtml}</div>`
     );
 
+    // Absolute URLs for SEO & Social Cards
+    const postUrl = `https://quizviral-nine.vercel.app/blog/${post.slug}`;
+    const absImage = post.image ? (post.image.startsWith('http') ? post.image : `https://quizviral-nine.vercel.app${post.image}`) : 'https://quizviral-nine.vercel.app/favicon.svg';
+    const isoDate = parseIsoDate(post.date);
+    const postFaqs = extractFaqsFromMarkdown(post.content);
+
+    // JSON-LD Schemas: BlogPosting, BreadcrumbList, and optional FAQPage
+    const schemaBlogPosting = {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": post.title,
+      "description": post.metaDescription || post.excerpt,
+      "image": [absImage],
+      "datePublished": isoDate,
+      "dateModified": isoDate,
+      "author": {
+        "@type": "Organization",
+        "name": post.author || "QuizViral AI Team",
+        "url": "https://quizviral-nine.vercel.app"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "QuizViral AI",
+        "url": "https://quizviral-nine.vercel.app",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://quizviral-nine.vercel.app/favicon.svg"
+        }
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": postUrl
+      },
+      "keywords": (post.seoKeywords || []).join(", ")
+    };
+
+    const schemaBreadcrumbs = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://quizviral-nine.vercel.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Blog",
+          "item": "https://quizviral-nine.vercel.app/blog"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": post.title,
+          "item": postUrl
+        }
+      ]
+    };
+
+    let schemaFaqScript = '';
+    if (postFaqs.length > 0) {
+      const schemaFaq = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": postFaqs.map(f => ({
+          "@type": "Question",
+          "name": f.question,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": f.answer
+          }
+        }))
+      };
+      schemaFaqScript = `<script type="application/ld+json">${JSON.stringify(schemaFaq)}</script>`;
+    }
+
     // Inject Search Engine and Social Media Meta Tags
     const metaTags = `
+    <link rel="canonical" href="${postUrl}" />
     <meta name="description" content="${post.metaDescription || post.excerpt}" />
     <meta name="keywords" content="${(post.seoKeywords || []).join(', ')}" />
     <!-- Open Graph / Facebook Meta Tags -->
     <meta property="og:type" content="article" />
     <meta property="og:title" content="${post.title}" />
     <meta property="og:description" content="${post.metaDescription || post.excerpt}" />
-    <meta property="og:image" content="${post.image}" />
-    <meta property="og:url" content="https://quizviral-nine.vercel.app/blog/${post.slug}" />
+    <meta property="og:image" content="${absImage}" />
+    <meta property="og:url" content="${postUrl}" />
     <!-- Twitter Meta Tags -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${post.title}" />
     <meta name="twitter:description" content="${post.metaDescription || post.excerpt}" />
-    <meta name="twitter:image" content="${post.image}" />
+    <meta name="twitter:image" content="${absImage}" />
+    <!-- Structured Data Schemas -->
+    <script type="application/ld+json">${JSON.stringify(schemaBlogPosting)}</script>
+    <script type="application/ld+json">${JSON.stringify(schemaBreadcrumbs)}</script>
+    ${schemaFaqScript}
     `;
 
     postHtml = postHtml.replace('</head>', `${metaTags}\n</head>`);

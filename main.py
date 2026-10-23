@@ -246,7 +246,7 @@ def finalize_job_and_user_credits(session_id: str, user_email: str, default_stat
         if job:
             if job.status == "Processing":
                 if job.completed_so_far == 0:
-                    job.status = "Failed"
+                    job.status = "Interrupted" if default_status == "Interrupted" else "Failed"
                 else:
                     job.status = default_status
             
@@ -474,10 +474,12 @@ def process_video_batch(
             with open("error_logs.txt", "a") as f:
                 f.write(err_load_msg + "\n")
             
+    is_interrupted = False
     try:
         for idx, row in enumerate(questions):
             if session_id in active_sessions and active_sessions[session_id] == "stop":
-                update_job_progress(session_id, status="Interrupted")
+                is_interrupted = True
+                print(f"[{session_id}] Generation stopped by user at question {idx + 1}.", flush=True)
                 break
                 
             row_bg_paths = None
@@ -547,9 +549,12 @@ def process_video_batch(
     finally:
         zip_path = os.path.join(OUTPUT_DIR, f"{session_id}.zip")
         try:
-            print(f"Creating zip file: {zip_path} from folder: {session_output_dir}", flush=True)
-            shutil.make_archive(zip_path.replace('.zip', ''), 'zip', session_output_dir)
-            update_job_progress(session_id, zip_file_path=zip_path)
+            if os.path.isdir(session_output_dir):
+                mp4_files = [f for f in os.listdir(session_output_dir) if f.lower().endswith(".mp4")]
+                if mp4_files:
+                    print(f"Creating zip file: {zip_path} from folder: {session_output_dir} ({len(mp4_files)} videos)", flush=True)
+                    shutil.make_archive(zip_path.replace('.zip', ''), 'zip', session_output_dir)
+                    update_job_progress(session_id, zip_file_path=zip_path)
         except Exception as zip_err:
             import traceback
             zip_err_msg = f"ZIP creation failed: {zip_err}\n{traceback.format_exc()}"
@@ -560,7 +565,8 @@ def process_video_batch(
             except Exception:
                 pass
         
-        final_status, completed_so_far = finalize_job_and_user_credits(session_id, user_email)
+        target_status = "Interrupted" if is_interrupted else "Completed"
+        final_status, completed_so_far = finalize_job_and_user_credits(session_id, user_email, default_status=target_status)
         
         if final_status == "Completed" and user_email:
             print(f"\n[{user_email}] AUTOMATION: Sending email -> 'Sit back and relax, your bulk videos are ready to download!'", flush=True)
@@ -672,8 +678,15 @@ async def generate_bulk(
 def stop_generation(session_id: str):
     if session_id in active_sessions:
         active_sessions[session_id] = "stop"
-        return {"message": "Stop signal sent"}
-    raise HTTPException(status_code=404, detail="Session not found or already stopped")
+        return {"message": "Stop signal sent", "status": "stopping"}
+
+    db = SessionLocal()
+    job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
+    db.close()
+    if job:
+        return {"message": "Session already stopped or completed", "status": job.status}
+
+    raise HTTPException(status_code=404, detail="Session not found")
 
 @app.get("/api/status/{session_id}")
 def get_status(session_id: str):
@@ -695,10 +708,40 @@ def download_zip(session_id: str):
     job = db.query(VideoJob).filter(VideoJob.session_id == session_id).first()
     db.close()
     
-    if not job or not job.zip_file_path or not os.path.exists(job.zip_file_path):
-        raise HTTPException(status_code=404, detail="ZIP file not ready or found")
+    if not job:
+        raise HTTPException(status_code=404, detail="Session not found")
         
-    return FileResponse(job.zip_file_path, media_type="application/zip", filename=f"QuizViral_Videos_{session_id}.zip")
+    session_output_dir = os.path.join(OUTPUT_DIR, session_id)
+    zip_path = job.zip_file_path or os.path.join(OUTPUT_DIR, f"{session_id}.zip")
+
+    # 1. If valid zip file already exists and has size > 0, return it directly
+    if os.path.exists(zip_path) and os.path.getsize(zip_path) > 0:
+        return FileResponse(
+            zip_path, 
+            media_type="application/zip", 
+            filename=f"QuizViral_Videos_{session_id}.zip"
+        )
+
+    # 2. On-demand package: check if generated videos exist in folder
+    if os.path.isdir(session_output_dir):
+        mp4_files = [f for f in os.listdir(session_output_dir) if f.lower().endswith(".mp4")]
+        if mp4_files:
+            try:
+                print(f"Creating on-demand zip file: {zip_path} from folder: {session_output_dir} ({len(mp4_files)} videos)", flush=True)
+                shutil.make_archive(zip_path.replace('.zip', ''), 'zip', session_output_dir)
+                update_job_progress(session_id, zip_file_path=zip_path)
+                return FileResponse(
+                    zip_path, 
+                    media_type="application/zip", 
+                    filename=f"QuizViral_Videos_{session_id}.zip"
+                )
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to create ZIP file: {str(e)}")
+
+    if job.status == "Processing":
+        raise HTTPException(status_code=425, detail="First video is still being generated. Please wait a moment...")
+
+    raise HTTPException(status_code=400, detail="No videos were generated before the process was stopped.")
 
 @app.get("/api/videos/{session_id}")
 def list_generated_videos(session_id: str):

@@ -108,6 +108,7 @@ import urllib.request
 import urllib.parse
 import json
 import threading
+import re
 
 # =============================================================================
 # IMAGE API KEYS — Pixabay & Pexels (3 keys each for rotation + rate-limit bypass)
@@ -143,81 +144,305 @@ def _next_pexels_key():
         return key
 # =============================================================================
 
-def extract_subject(row):
-    answer = str(row.get('answer', '')).strip()
-    question = str(row.get('question', '')).strip()
+# =============================================================================
+# SMART VISUAL QUERY EXTRACTION & MULTI-SOURCE HD IMAGE FETCHING
+# =============================================================================
+
+STOP_PHRASES = [
+    r"which of the following\b",
+    r"which one of the\b",
+    r"which one of these\b",
+    r"which type of\b",
+    r"which kind of\b",
+    r"which major\b",
+    r"which famous\b",
+    r"which popular\b",
+    r"which european\b",
+    r"which us\b",
+    r"which american\b",
+    r"which country is\b",
+    r"which company is\b",
+    r"which company\b",
+    r"which animal\b",
+    r"which planet\b",
+    r"which organ\b",
+    r"what is the name of the\b",
+    r"what is the name of\b",
+    r"what is the term for a\b",
+    r"what is the term for\b",
+    r"what is the primary\b",
+    r"what is the world\'?s\b",
+    r"what is the length of the\b",
+    r"what is the length of\b",
+    r"what is the capital of\b",
+    r"what is the highest\b",
+    r"what is the largest\b",
+    r"what is the fastest\b",
+    r"what is the\b",
+    r"what are the\b",
+    r"what does\b",
+    r"who is the founder of\b",
+    r"who was the first person to\b",
+    r"who was the first\b",
+    r"who was the\b",
+    r"who is the\b",
+    r"who painted the\b",
+    r"who painted\b",
+    r"who directed\b",
+    r"who wrote\b",
+    r"who created\b",
+    r"who discovered\b",
+    r"in which year did the\b",
+    r"in which year did\b",
+    r"in which year was\b",
+    r"in which year\b",
+    r"in what year\b",
+    r"in which country\b",
+    r"in which city\b",
+    r"how much of the\b",
+    r"how many\b",
+    r"where is\b",
+    r"where was\b",
+    r"according to\b",
+    r"stand for in\b",
+    r"stand for\b",
+    r"mean in\b",
+    r"refers to what\b",
+    r"refers to\b",
+    r"is known as\b",
+    r"is called\b",
+    r"is considered\b",
+    r"headquartered where\b",
+]
+
+DOMAIN_KEYWORDS = [
+    ("train", ["railroad", "railway", "train", "locomotive", "rail freight", "rail tracks", "bnsf", "union pacific"]),
+    ("aviation", ["plane", "airplane", "aircraft", "cargo plane", "flight", "airline", "airport", "prime air", "jet"]),
+    ("tech", ["semiconductor", "microchip", "computer", "server", "software", "erp", "coding", "cyber", "hardware", "laptop", "database", "artificial intelligence", "robot"]),
+    ("maritime", ["bulk carrier", "container ship", "cargo ship", "tanker", "shipping container", "freight ship", "ocean cargo", "ship", "vessel", "maritime", "seaport", "harbor", "ocean", "dock", "hapag", "cma cgm", "ro-ro", "lcl"]),
+    ("automotive", ["car", "truck", "automobile", "vehicle", "driving", "race car"]),
+    ("space", ["planet", "space", "galaxy", "mars", "moon", "star", "astronaut", "telescope", "nasa", "orbit", "solar system"]),
+    ("animal", ["animal", "wildlife", "mammal", "bird", "fish", "lion", "tiger", "elephant", "whale", "dog", "cat", "reptile", "safari"]),
+    ("landmark", ["tower", "monument", "pyramid", "statue", "palace", "castle", "bridge", "cathedral", "temple", "colosseum", "wall"]),
+    ("logistics", ["supply chain", "warehouse", "package", "delivery", "barcode", "courier", "logistics", "nearshoring", "freight forwarder"]),
+    ("biology", ["human heart", "brain anatomy", "cell biology", "mitochondria", "dna genetics", "skeleton"])
+]
+
+DISAMBIGUATION = {
+    "apple": "Apple tech computer",
+    "sap": "enterprise software technology",
+    "fedex": "FedEx delivery truck cargo",
+    "amazon": "Amazon delivery warehouse",
+    "meta": "Meta technology virtual reality",
+    "bnsf": "BNSF freight train railroad",
+    "union pacific": "Union Pacific freight train",
+    "cma cgm": "CMA CGM container ship ocean",
+    "hapag-lloyd": "Hapag-Lloyd container ship cargo",
+    "titanic": "Titanic ship ocean",
+    "mona lisa": "Mona Lisa Leonardo da Vinci painting",
+    "mitochondria": "mitochondria cell biology",
+    "heart": "human heart anatomy medical",
+    "mars": "Mars red planet space",
+    "eiffel tower": "Eiffel Tower Paris landmark",
+    "statue of liberty": "Statue of Liberty New York landmark",
+}
+
+def clean_text_for_query(t):
+    return re.sub(r'[^a-zA-Z0-9\s\-]', ' ', t).strip()
+
+def extract_smart_visual_queries(row, category=""):
+    """
+    Intelligently analyzes the quiz question, answer, and options to generate
+    a prioritized list of 3-5 clean, high-precision photographic search queries.
+    """
+    if isinstance(row, str):
+        # Legacy fallback if just a string is passed
+        return [row]
+
+    q = str(row.get('question', '')).strip()
+    a = str(row.get('answer', '')).strip()
+    candidates = []
+    q_lower = q.lower()
+    a_lower = a.lower()
     
-    # Check if answer is a valid entity (not a simple number, date, or percentage)
-    is_number = False
+    # Check custom image query in row if provided
+    for custom_key in ['image_query', 'custom_query', 'search_query', 'subject']:
+        val = str(row.get(custom_key, '')).strip()
+        if val and len(val) > 2 and val not in candidates:
+            candidates.append(val)
+
+    # 1. Answer entity disambiguation (e.g. Apple -> Apple tech computer, SAP -> enterprise software)
+    if a_lower in DISAMBIGUATION:
+        candidates.append(DISAMBIGUATION[a_lower])
+        
+    for key, repl in DISAMBIGUATION.items():
+        if key in q_lower and repl not in candidates:
+            candidates.append(repl)
+            
+    # 2. Extract quoted terms in the question (e.g. 'Prime Air', 'LCL', 'Ro-Ro', 'nearshoring')
+    quotes = re.findall(r'[\x27\x22]([^\x27\x22]+)[\x27\x22]', q)
+    for quote in quotes:
+        clean_q = clean_text_for_query(quote)
+        clean_q_lower = clean_q.lower()
+        if len(clean_q) > 1 and clean_q_lower not in ['a', 'b', 'c', 'd', 'yes', 'no']:
+            if 'prime air' in clean_q_lower:
+                candidates.append('cargo airplane flight')
+            elif 'nearshoring' in clean_q_lower:
+                candidates.append('global supply chain logistics')
+            elif 'lcl' in clean_q_lower:
+                candidates.append('cargo container shipping ocean')
+            elif 'ro-ro' in clean_q_lower:
+                candidates.append('car carrier ship maritime')
+            elif clean_q_lower in DISAMBIGUATION:
+                candidates.append(DISAMBIGUATION[clean_q_lower])
+            elif len(clean_q.split()) <= 3:
+                candidates.append(clean_q)
+
+    # 3. Detect dominant domain keywords in question
+    found_domain = None
+    for dom, kws in DOMAIN_KEYWORDS:
+        for kw in kws:
+            if re.search(r'\b' + re.escape(kw) + r's?\b', q_lower):
+                found_domain = dom
+                break
+        if found_domain:
+            break
+
+    # 4. Strip trivia question stems
+    stripped_q = q
+    for pattern in STOP_PHRASES:
+        stripped_q = re.sub(pattern, ' ', stripped_q, flags=re.IGNORECASE)
+    stripped_q = clean_text_for_query(stripped_q)
+    
+    words = [w for w in stripped_q.split() if len(w) > 2 and w.lower() not in [
+        'the', 'and', 'for', 'with', 'from', 'that', 'this', 'were', 'have', 'been',
+        'some', 'most', 'over', 'around', 'used', 'make', 'such', 'into', 'also',
+        'than', 'more', 'like', 'major', 'world', 'largest', 'standard', 'primary',
+        'commonly', 'specifically', 'designed', 'term', 'name', 'type', 'heavily'
+    ]]
+    
+    if len(words) >= 2:
+        candidates.append(' '.join(words[:3]))
+        
+    # 5. Check if answer is a concrete entity (skip measurements, percentages, booleans, or full sentences)
+    is_num_or_sentence = False
     try:
-        float(answer.replace('%', '').replace('$', '').strip())
-        is_number = True
+        float(a.replace('%', '').replace('$', '').strip())
+        is_num_or_sentence = True
     except ValueError:
         pass
+    if len(a.split()) > 3 or any(w in a_lower for w in ['percent', 'closer to', 'less than', 'moving', 'feet', 'meter', 'dollar', 'year', 'century']):
+        is_num_or_sentence = True
         
-    if len(answer) > 2 and not is_number and answer.lower() not in ["yes", "no", "true", "false", "none"]:
-        return answer
-        
-    # Fallback to proper nouns in the question
-    words = question.split()
-    proper_nouns = []
-    for idx, w in enumerate(words):
-        clean_w = w.strip('?.,!""\'()')
-        if idx > 0 and clean_w and clean_w[0].isupper() and clean_w.lower() not in ["the", "a", "an", "is", "are", "which", "what", "who", "where", "when", "how"]:
-            proper_nouns.append(clean_w)
+    # Check "capital of [Country]" question pattern
+    if 'capital of' in q_lower and not is_num_or_sentence and len(a) > 2:
+        country_match = re.search(r'capital of\s+([A-Za-z\s]+)', q, re.IGNORECASE)
+        country_name = country_match.group(1).strip('?.,!') if country_match else ''
+        if country_name:
+            candidates.insert(0, f"{clean_text_for_query(a)} {clean_text_for_query(country_name)} landmark")
+
+    if not is_num_or_sentence and len(a) > 2 and a_lower not in ['yes', 'no', 'true', 'false', 'none', 'france', 'germany', 'mexico', 'usa', 'china']:
+        clean_a = clean_text_for_query(a)
+        if found_domain == 'maritime' and 'ship' not in clean_a.lower():
+            candidates.append(f'{clean_a} ship')
+        elif found_domain == 'train' and 'train' not in clean_a.lower():
+            candidates.append(f'{clean_a} train')
+        elif found_domain == 'tech' and 'tech' not in clean_a.lower():
+            candidates.append(f'{clean_a} technology')
+        elif found_domain == 'animal' and 'animal' not in clean_a.lower():
+            candidates.append(f'{clean_a} wildlife animal')
+        else:
+            candidates.append(clean_a)
             
-    if proper_nouns:
-        return " ".join(proper_nouns)
-        
-    return answer
+    # 6. High-reliability visual domain fallbacks
+    if found_domain == 'maritime':
+        candidates.append('cargo ship ocean')
+        candidates.append('shipping containers port')
+    elif found_domain == 'train':
+        candidates.append('freight train railroad')
+    elif found_domain == 'aviation':
+        candidates.append('cargo airplane flight')
+    elif found_domain == 'tech':
+        candidates.append('semiconductor chip technology')
+    elif found_domain == 'logistics':
+        candidates.append('shipping warehouse logistics')
+    elif found_domain == 'space':
+        candidates.append('galaxy space planets')
+    elif found_domain == 'animal':
+        candidates.append('wildlife animals safari')
+
+    # Deduplicate while preserving priority order
+    seen = set()
+    final_queries = []
+    for c in candidates:
+        c_clean = ' '.join(c.split())
+        if c_clean.lower() not in seen and len(c_clean) > 2:
+            seen.add(c_clean.lower())
+            final_queries.append(c_clean)
+            
+    return final_queries if final_queries else [q[:50]]
+
+def extract_subject(row):
+    """Backwards-compatibility helper for legacy callers."""
+    queries = extract_smart_visual_queries(row)
+    return queries[0] if queries else str(row.get('answer', ''))
 
 # ---------------------------------------------------------------------------
 # PRIMARY: Pixabay — HD/4K photos, 3 rotating API keys
 # ---------------------------------------------------------------------------
-def fetch_pixabay_image(subject):
+def fetch_pixabay_image(query_text, orientation="vertical"):
     """Search Pixabay for an HD photo. Returns direct image URL or None."""
     import ssl
     ssl_ctx = ssl._create_unverified_context()
-    query = urllib.parse.quote(subject)
-    # Try all 3 keys in rotation before giving up
+    query = urllib.parse.quote(query_text)
+    
+    bad_tags = {"flag", "coat of arms", "map", "vector", "illustration", "clipart", "icon", "isolated"}
+    
     for _ in range(len(_PIXABAY_KEYS)):
         api_key = _next_pixabay_key()
         try:
+            ori_param = f"&orientation={orientation}" if orientation in ["vertical", "horizontal"] else ""
             url = (
                 f"https://pixabay.com/api/?key={api_key}"
-                f"&q={query}&image_type=photo&per_page=5"
-                f"&safesearch=true&min_width=800&order=popular"
+                f"&q={query}&image_type=photo&per_page=6"
+                f"&safesearch=true&min_width=800&order=popular{ori_param}"
             )
             req = urllib.request.Request(url, headers={'User-Agent': 'QuizViralBot/2.0'})
-            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
+            with urllib.request.urlopen(req, timeout=8, context=ssl_ctx) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
                 hits = data.get("hits", [])
-                if hits:
-                    # Prefer fullHDURL > largeImageURL > webformatURL
-                    img = hits[0]
-                    return (
+                for img in hits:
+                    tags = img.get("tags", "").lower()
+                    # Skip flat flags, maps, diagrams
+                    if any(bt in tags for bt in bad_tags):
+                        continue
+                    best_url = (
                         img.get("fullHDURL") or
                         img.get("largeImageURL") or
                         img.get("webformatURL")
                     )
+                    if best_url:
+                        return best_url
         except Exception as e:
-            safe_print(f"Pixabay key attempt failed for '{subject}': {e}")
+            safe_print(f"Pixabay key attempt failed for '{query_text}': {e}")
     return None
 
 # ---------------------------------------------------------------------------
 # SECONDARY: Pexels — HD/4K photos, 3 rotating API keys
 # ---------------------------------------------------------------------------
-def fetch_pexels_image(subject):
+def fetch_pexels_image(query_text, orientation="portrait"):
     """Search Pexels for an HD photo. Returns direct image URL or None."""
     import ssl
     ssl_ctx = ssl._create_unverified_context()
-    query = urllib.parse.quote(subject)
+    query = urllib.parse.quote(query_text)
+    
     for _ in range(len(_PEXELS_KEYS)):
         api_key = _next_pexels_key()
         try:
+            ori_param = f"&orientation={orientation}" if orientation in ["portrait", "landscape"] else ""
             url = (
                 f"https://api.pexels.com/v1/search"
-                f"?query={query}&per_page=5&size=large"
+                f"?query={query}&per_page=5&size=large{ori_param}"
             )
             req = urllib.request.Request(
                 url,
@@ -226,94 +451,123 @@ def fetch_pexels_image(subject):
                     'User-Agent': 'QuizViralBot/2.0'
                 }
             )
-            with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
+            with urllib.request.urlopen(req, timeout=8, context=ssl_ctx) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
                 photos = data.get("photos", [])
                 if photos:
                     src = photos[0].get("src", {})
-                    # Prefer large2x > original > large
-                    return (
+                    # Prefer portrait > large2x > original > large
+                    best_url = (
+                        src.get("portrait") or
                         src.get("large2x") or
                         src.get("original") or
                         src.get("large")
                     )
+                    if best_url:
+                        return best_url
         except Exception as e:
-            safe_print(f"Pexels key attempt failed for '{subject}': {e}")
+            safe_print(f"Pexels key attempt failed for '{query_text}': {e}")
     return None
 
 # ---------------------------------------------------------------------------
-# TERTIARY FALLBACK: Wikipedia (original method, kept as last resort)
+# TERTIARY FALLBACK: Wikipedia (Strict filtering of SVG flags & maps)
 # ---------------------------------------------------------------------------
 def fetch_wikipedia_image(subject):
-    """Search Wikipedia for a topic thumbnail. Last-resort fallback."""
+    """Search Wikipedia for a topic photograph, strictly filtering out flags, maps and SVGs."""
     import ssl
     try:
         context = ssl._create_unverified_context()
         search_url = (
             f"https://en.wikipedia.org/w/api.php?action=query&list=search"
-            f"&srsearch={urllib.parse.quote(subject)}&utf8=&format=json&srlimit=1"
+            f"&srsearch={urllib.parse.quote(subject)}&utf8=&format=json&srlimit=3"
         )
         req = urllib.request.Request(
             search_url,
             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         )
-        with urllib.request.urlopen(req, timeout=10, context=context) as response:
+        with urllib.request.urlopen(req, timeout=8, context=context) as response:
             search_data = json.loads(response.read().decode('utf-8'))
             search_results = search_data.get("query", {}).get("search", [])
             if not search_results:
                 return None
-            best_title = search_results[0]["title"]
-        image_url = (
-            f"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages"
-            f"&format=json&piprop=thumbnail&pithumbsize=1280"
-            f"&titles={urllib.parse.quote(best_title)}&redirects=1"
-        )
-        req = urllib.request.Request(
-            image_url,
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        )
-        with urllib.request.urlopen(req, timeout=10, context=context) as response:
-            img_data = json.loads(response.read().decode('utf-8'))
-            pages = img_data.get("query", {}).get("pages", {})
-            for page_id, page_data in pages.items():
-                if "thumbnail" in page_data:
-                    return page_data["thumbnail"]["source"]
+            
+        bad_patterns = ["flag", "coat_of_arms", "map", "location", "symbol", "icon", ".svg", "diagram"]
+
+        for item in search_results[:3]:
+            title = item.get("title", "")
+            image_url = (
+                f"https://en.wikipedia.org/w/api.php?action=query&prop=pageimages"
+                f"&format=json&piprop=thumbnail&pithumbsize=1280"
+                f"&titles={urllib.parse.quote(title)}&redirects=1"
+            )
+            req2 = urllib.request.Request(
+                image_url,
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            )
+            with urllib.request.urlopen(req2, timeout=8, context=context) as response2:
+                img_data = json.loads(response2.read().decode('utf-8'))
+                pages = img_data.get("query", {}).get("pages", {})
+                for page_id, page_data in pages.items():
+                    if "thumbnail" in page_data:
+                        src = page_data["thumbnail"].get("source", "")
+                        if src and not any(bp in src.lower() for bp in bad_patterns):
+                            return src
     except Exception as e:
         safe_print(f"Wikipedia image fetch failed for '{subject}': {e}")
     return None
 
 # ---------------------------------------------------------------------------
-# MASTER CASCADE: Pixabay → Pexels → Wikipedia
+# MASTER CASCADE: Multi-Candidate Pixabay → Pexels → Wikipedia
 # ---------------------------------------------------------------------------
-def fetch_contextual_image(subject):
+def fetch_contextual_image(row_or_subject, category=""):
     """
-    Tries image sources in order of quality:
-      1. Pixabay  (HD/4K, 3 rotating keys)
-      2. Pexels   (HD/4K, 3 rotating keys)
-      3. Wikipedia (thumbnail, always-free fallback)
-    Returns the first successful image URL, or None if all fail.
+    Evaluates prioritized smart queries for the question across:
+      1. Pixabay (Vertical HD/4K)
+      2. Pexels (Portrait HD/4K)
+      3. Pixabay (All orientations HD/4K)
+      4. Pexels (All orientations HD/4K)
+      5. Wikipedia (Photographic only, no SVG/flags)
+    Returns direct URL of the first high quality match, or None.
     """
-    safe_print(f"[Image] Fetching HD image for: '{subject}'")
+    if isinstance(row_or_subject, dict):
+        queries = extract_smart_visual_queries(row_or_subject, category)
+    else:
+        queries = [str(row_or_subject).strip()]
 
-    url = fetch_pixabay_image(subject)
-    if url:
-        safe_print(f"[Image] Pixabay SUCCESS: {url[:80]}...")
-        return url
-    safe_print(f"[Image] Pixabay returned nothing — trying Pexels...")
+    safe_print(f"[Image] Searching contextual image candidates: {queries}")
 
-    url = fetch_pexels_image(subject)
-    if url:
-        safe_print(f"[Image] Pexels SUCCESS: {url[:80]}...")
-        return url
-    safe_print(f"[Image] Pexels returned nothing — falling back to Wikipedia...")
+    # Pass 1: Try vertical/portrait orientation across all candidates
+    for q in queries:
+        url = fetch_pixabay_image(q, orientation="vertical")
+        if url:
+            safe_print(f"[Image] Pixabay (Vertical) SUCCESS for '{q}': {url[:80]}...")
+            return url
+        url = fetch_pexels_image(q, orientation="portrait")
+        if url:
+            safe_print(f"[Image] Pexels (Portrait) SUCCESS for '{q}': {url[:80]}...")
+            return url
 
-    url = fetch_wikipedia_image(subject)
-    if url:
-        safe_print(f"[Image] Wikipedia SUCCESS: {url[:80]}...")
-        return url
+    # Pass 2: Try any orientation across all candidates
+    for q in queries:
+        url = fetch_pixabay_image(q, orientation="all")
+        if url:
+            safe_print(f"[Image] Pixabay (Any) SUCCESS for '{q}': {url[:80]}...")
+            return url
+        url = fetch_pexels_image(q, orientation="all")
+        if url:
+            safe_print(f"[Image] Pexels (Any) SUCCESS for '{q}': {url[:80]}...")
+            return url
 
-    safe_print(f"[Image] All sources failed for '{subject}'. No image will be used.")
+    # Pass 3: Wikipedia photo fallback
+    for q in queries:
+        url = fetch_wikipedia_image(q)
+        if url:
+            safe_print(f"[Image] Wikipedia SUCCESS for '{q}': {url[:80]}...")
+            return url
+
+    safe_print(f"[Image] All sources exhausted for candidates {queries}. Falling back to default video.")
     return None
+
 
 def create_parallax_background_files(image_path, temp_dir, vid_id):
     img = Image.open(image_path).convert("RGBA")
@@ -555,19 +809,18 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
         tts_future = pool.submit(_run_tts)
         wiki_future = None
         if is_image_category:
-            subject = extract_subject(row)
-            safe_print(f"[Image] Prefetching HD image in parallel (Pixabay→Pexels→Wikipedia) for: '{subject}'")
-            wiki_future = pool.submit(fetch_contextual_image, subject)
+            safe_print(f"[Image] Prefetching HD contextual image in parallel for: '{str(row.get('question', ''))[:60]}...'")
+            wiki_future = pool.submit(fetch_contextual_image, row, category)
 
         # Wait for TTS (mandatory)
         tts_future.result()
 
-        # Collect Wikipedia result if it was fetched
+        # Collect image result if it was fetched
         if wiki_future is not None:
             try:
-                prefetched_image_url = wiki_future.result(timeout=20)
+                prefetched_image_url = wiki_future.result(timeout=25)
             except Exception as wi_err:
-                safe_print(f"Wikipedia prefetch failed: {wi_err}")
+                safe_print(f"[Image] Prefetch failed: {wi_err}")
 
     # Quick existence check — no artificial sleep needed
     if not (os.path.exists(audio_path_1) and os.path.exists(audio_path_2)):
@@ -614,23 +867,23 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
             # Use the cascade-prefetched URL (Pixabay/Pexels/Wikipedia) from parallel fetch above
             image_url = prefetched_image_url
             if image_url:
-                safe_print(f"Using prefetched HD image URL: {image_url}")
-            else:
-                safe_print("Prefetched HD image URL was None. Falling back to video background.")
-            if image_url:
-                safe_print(f"Found Wikipedia image URL: {image_url}")
+                safe_print(f"[Image] Using prefetched HD image URL: {image_url}")
                 parsed_url = urllib.parse.urlparse(image_url)
                 ext = os.path.splitext(parsed_url.path)[1]
                 if not ext or ext.lower() not in [".png", ".jpg", ".jpeg", ".webp"]:
-                    ext = ".png"
+                    ext = ".jpg"
                 raw_filename = f"temp_raw_{vid_id}{ext}"
                 local_img_path = os.path.join(TEMP_FOLDER, raw_filename)
                 
                 import ssl
-                req = urllib.request.Request(image_url, headers={'User-Agent': 'QuizViralBot/1.0'})
+                req = urllib.request.Request(image_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
                 with urllib.request.urlopen(req, timeout=15, context=ssl._create_unverified_context()) as response:
                     with open(local_img_path, "wb") as f:
                         f.write(response.read())
+                
+                # Verify downloaded image is valid
+                with Image.open(local_img_path) as img_check:
+                    img_check.verify()
                 
                 bg_img_path = create_parallax_background_files(local_img_path, TEMP_FOLDER, vid_id)
                 temp_image_paths.extend([local_img_path, bg_img_path])
@@ -638,18 +891,18 @@ def create_video_from_row(row, category, custom_logo_path, output_dir, box_color
                 bg_layer = ImageClip(bg_img_path).set_duration(total_duration)
                 
                 try:
-                    bg_layer = bg_layer.resize(lambda t: 1.0 + 0.1 * (t / total_duration))
+                    bg_layer = bg_layer.resize(lambda t: 1.0 + 0.08 * (t / total_duration))
                 except Exception:
                     pass
                 
                 clip = bg_layer.set_audio(final_audio)
                 temp_image_clips.append(bg_layer)
                 is_image_bg = True
-                safe_print("Successfully built animated contextual image background.")
+                safe_print("[Image] Successfully built animated contextual image background.")
             else:
-                safe_print("Wikipedia image URL not found. Falling back to default video background.")
+                safe_print("[Image] Online image URL not found. Falling back to default video background.")
         except Exception as e:
-            safe_print(f"Failed to create image background: {e}. Falling back to default video background.")
+            safe_print(f"[Image] Failed to create image background: {e}. Falling back to default video background.")
 
     if not is_image_bg:
         clip, resolved_path = load_bg_clip_safely(bg_video_path, category, custom_bg_paths)

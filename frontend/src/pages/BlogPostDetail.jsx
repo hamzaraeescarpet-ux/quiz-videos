@@ -14,12 +14,12 @@ export default function BlogPostDetail() {
     window.scrollTo(0, 0);
   }, [slug]);
 
-  // Set document title and meta description dynamically for SEO
+  // Set document title, canonical, and meta tags dynamically for SEO
   useEffect(() => {
     if (post) {
       document.title = `${post.title} | QuizViral AI Blog`;
       
-      // Update meta description if element exists, or create it
+      // Update meta description
       let metaDesc = document.querySelector('meta[name="description"]');
       if (!metaDesc) {
         metaDesc = document.createElement('meta');
@@ -35,12 +35,53 @@ export default function BlogPostDetail() {
         metaKeywords.setAttribute('name', 'keywords');
         document.head.appendChild(metaKeywords);
       }
-      metaKeywords.setAttribute('content', post.seoKeywords.join(', '));
+      metaKeywords.setAttribute('content', (post.seoKeywords || []).join(', '));
+
+      // Canonical link
+      let canonicalLink = document.querySelector('link[rel="canonical"]');
+      if (!canonicalLink) {
+        canonicalLink = document.createElement('link');
+        canonicalLink.setAttribute('rel', 'canonical');
+        document.head.appendChild(canonicalLink);
+      }
+      canonicalLink.setAttribute('href', `https://quizviral-nine.vercel.app/blog/${post.slug}`);
+
+      // Inject / update JSON-LD schema
+      let schemaScript = document.getElementById('jsonld-blogposting');
+      if (!schemaScript) {
+        schemaScript = document.createElement('script');
+        schemaScript.id = 'jsonld-blogposting';
+        schemaScript.type = 'application/ld+json';
+        document.head.appendChild(schemaScript);
+      }
+      const absImage = post.image ? (post.image.startsWith('http') ? post.image : `https://quizviral-nine.vercel.app${post.image}`) : 'https://quizviral-nine.vercel.app/favicon.svg';
+      schemaScript.textContent = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": post.title,
+        "description": post.metaDescription || post.excerpt,
+        "image": [absImage],
+        "datePublished": post.date,
+        "author": {
+          "@type": "Organization",
+          "name": post.author || "QuizViral AI Team"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "QuizViral AI",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://quizviral-nine.vercel.app/favicon.svg"
+          }
+        },
+        "mainEntityOfPage": `https://quizviral-nine.vercel.app/blog/${post.slug}`
+      });
     }
     
     return () => {
-      // Restore defaults
       document.title = 'QuizViral AI - Create Viral Quiz Videos in 1-Click';
+      const s = document.getElementById('jsonld-blogposting');
+      if (s) s.remove();
     };
   }, [post]);
 

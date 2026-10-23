@@ -43,6 +43,7 @@ except Exception:
 CHROME_PROFILE_PATH = r"C:\Users\hamza\Downloads\python development\browser automation\gemini video points\bulk scheduling fb videos\chrome_profile"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BLOG_POSTS_FILE = os.path.join(SCRIPT_DIR, "frontend", "src", "data", "blogPosts.js")
+CHATGPT_CONFIG_FILE = os.path.join(SCRIPT_DIR, "chatgpt_config.json")
 
 # Ghost CMS Credentials (loaded from environment variables, falls back to local values)
 GHOST_API_URL = os.environ.get("GHOST_API_URL", "")
@@ -193,12 +194,23 @@ def parse_blog_posts():
         with open(BLOG_POSTS_FILE, "r", encoding="utf-8") as f:
             content = f.read()
         
-        match = re.search(r"export const blogPosts = \[(.*)\];\s*$", content, re.DOTALL)
-        if not match:
+        # 1. Try direct JSON parsing
+        match_json = re.search(r"export const blogPosts = (\[.*\]);?\s*$", content, re.DOTALL)
+        if match_json:
+            try:
+                parsed = json.loads(match_json.group(1).strip())
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    return parsed
+            except Exception:
+                pass
+                
+        # 2. Universal regex parser supporting both quoted (\"title\":) and unquoted (title:)
+        match_arr = re.search(r"export const blogPosts = \[(.*)\];\s*$", content, re.DOTALL)
+        if not match_arr:
             return []
             
-        array_content = match.group(1).strip()
-        title_matches = list(re.finditer(r"\btitle:\s*", array_content))
+        array_content = match_arr.group(1).strip()
+        title_matches = list(re.finditer(r'["\']?\btitle["\']?\s*:', array_content))
         blocks = []
         for i, m in enumerate(title_matches):
             start = m.start()
@@ -210,16 +222,16 @@ def parse_blog_posts():
             post = {}
             fields = ["title", "slug", "excerpt", "date", "readTime", "author", "image", "pinterest_image", "metaDescription", "trendingKeyword", "topicSource", "topic_source"]
             for field in fields:
-                pattern = rf"\b{field}:\s*['\"`]([^'\"`]+?)['\"`]"
+                pattern = rf'["\']?\b{field}["\']?\s*:\s*[\'"`]([^\'"`]+?)[\'"`]'
                 f_match = re.search(pattern, block)
                 if f_match:
                     post[field] = f_match.group(1).strip()
             
-            content_match = re.search(r"\bcontent:\s*['\"`](.*?)['\"`],?\s*(?:\b\w+:|}$)", block, re.DOTALL)
+            content_match = re.search(r'["\']?\bcontent["\']?\s*:\s*[\'"`](.*?)[\'"`],?\s*(?:["\']?\b\w+["\']?:|}$)', block, re.DOTALL)
             if content_match:
                 post["content"] = content_match.group(1).strip()
             else:
-                content_match = re.search(r"\bcontent:\s*['\"`](.*?)['\"`]", block, re.DOTALL)
+                content_match = re.search(r'["\']?\bcontent["\']?\s*:\s*[\'"`](.*?)[\'"`]', block, re.DOTALL)
                 if content_match:
                     post["content"] = content_match.group(1).strip()
             posts.append(post)
@@ -327,251 +339,274 @@ def extract_monetization_text(markdown_content):
 
 ## ==================== GOOGLE SEARCH CONSOLE INTEGRATION ====================
 
+def get_gsc_property_identifiers():
+    """
+    Returns valid GSC property variations to check.
+    Supports URL Prefix (https://quizviral-nine.vercel.app/) and Domain Property (sc-domain:quizviral-nine.vercel.app).
+    """
+    prop = GSC_PROPERTY.rstrip('/') + '/'
+    domain = urllib.parse.urlparse(GSC_PROPERTY).netloc
+    variants = [prop]
+    if domain:
+        variants.append(f"sc-domain:{domain}")
+    variants.append(prop.rstrip('/'))
+    return variants
+
 def request_gsc_indexing_playwright(context, post_url):
     print(f"\n--- Google Search Console URL Inspection for: '{post_url}' ---")
+    page = None
     try:
         page = context.new_page()
+        post_url_encoded = urllib.parse.quote(post_url, safe="")
         
-        gsc_home_url = f"https://search.google.com/search-console?resource_id={GSC_PROPERTY.rstrip('/')}/"
-        print(f"Navigating to GSC Property Home: {gsc_home_url}")
+        # Strategy 1: Direct inspection navigation with properly URL-encoded property
+        inspected = False
+        properties_to_try = get_gsc_property_identifiers()
         
-        page.goto(gsc_home_url, timeout=60000)
-        time.sleep(4)
-        
-        page_title = page.title()
-        current_url = page.url
-        
-        # Detect 404 Error or Welcome Page (occurs when Chrome account does not have GSC property access)
-        is_404_or_welcome = (
-            "404" in page_title or
-            "welcome" in current_url.lower()
-        )
-        
-        if is_404_or_welcome:
-            print(f"[GSC Notice] Google Search Console property '{GSC_PROPERTY}' is not added or verified in the active Chrome Google account.")
-            print("[GSC Notice] Skipping URL indexing request cleanly. (To enable GSC automation, add 'https://quizviral-nine.vercel.app/' to your Google Search Console account in Chrome).")
-            page.close()
-            return
-
-        # Trigger URL Inspection via the top search bar
-        input_box = page.locator("input[aria-label*='Inspect any URL' i], input[placeholder*='Inspect any URL' i], input[type='text']").first
-        if input_box.is_visible():
-            print("Entering URL into GSC top inspection search bar...")
-            input_box.click()
-            input_box.fill(post_url)
-            time.sleep(1)
-            input_box.press("Enter")
-            print("Submitted URL inspection request via GSC search bar.")
-            time.sleep(8)
-        else:
-            # Direct fallback navigation
-            post_url_encoded = urllib.parse.quote(post_url, safe="")
-            direct_url = f"https://search.google.com/search-console/inspect?resource_id={GSC_PROPERTY.rstrip('/')}/&id={post_url_encoded}"
-            page.goto(direct_url, timeout=60000)
-            time.sleep(6)
-
-        # Wait for retrieval status
-        try:
-            page.wait_for_selector("text=URL is on Google, text=URL is not on Google, text=Request indexing, text=Retrieving data", timeout=20000)
-        except Exception:
-            pass
-            
-        time.sleep(2)
-        page_text = page.locator("body").inner_text()
-        
-        # Check if URL is positively confirmed as already indexed on Google
-        is_confirmed_indexed = any(x in page_text for x in ["URL is on Google", "URL is in the Google index"])
-        
-        if not is_confirmed_indexed:
-            print("Requesting indexing...")
-            selectors = [
-                "text=Request indexing",
-                "text=REQUEST INDEXING",
-                "button:has-text('Request indexing')",
-                "div[role='button']:has-text('Request indexing')",
-                "div[role='button']:has-text('REQUEST INDEXING')"
-            ]
-            
-            clicked = False
-            for sel in selectors:
-                try:
-                    btn = page.locator(sel).first
-                    if btn.is_visible() and btn.is_enabled():
-                        print(f"Clicking Request Indexing button with selector: {sel}")
-                        btn.click()
-                        clicked = True
-                        break
-                except Exception:
-                    pass
-            
-            if not clicked:
-                try:
-                    page.get_by_text("Request indexing", exact=False).first.click(timeout=3000)
-                    clicked = True
-                    print("Clicked Request Indexing using get_by_text fallback.")
-                except Exception:
-                    print("Request Indexing button was not found or already requested.")
-            
-            if clicked:
-                print("Waiting for GSC to test if live URL can be indexed (up to 2 minutes)...")
+        for prop in properties_to_try:
+            prop_encoded = urllib.parse.quote(prop, safe="")
+            direct_url = f"https://search.google.com/search-console/inspect?resource_id={prop_encoded}&id={post_url_encoded}"
+            print(f"Trying direct inspection with resource_id '{prop}'...")
+            try:
+                page.goto(direct_url, timeout=30000)
                 time.sleep(5)
                 
-                start_time = time.time()
-                success_detected = False
-                quota_exceeded_detected = False
+                page_title = page.title()
+                curr_url = page.url.lower()
+                body_text = page.locator("body").inner_text()
                 
-                while time.time() - start_time < 120:
-                    dialog_text = ""
-                    try:
-                        dialog = page.locator("div[role='dialog'], mwc-dialog, .modal-dialog").first
-                        if dialog.is_visible():
-                            dialog_text = dialog.inner_text()
-                    except Exception:
-                        pass
-                        
-                    curr_body = page.locator("body").inner_text()
+                if "Sign in" in page_title or "accounts.google.com" in curr_url:
+                    print("[GSC Notice] Google session expired. Please sign into Google in Chrome profile.")
+                    page.close()
+                    return
                     
-                    if any(x in dialog_text or x in curr_body for x in ["Indexing requested", "added to a priority crawl", "Priority crawl queue"]):
-                        print("SUCCESS: Google Search Console confirmed 'Indexing requested'!")
-                        success_detected = True
-                        break
-                    elif any(x in dialog_text or x in curr_body for x in ["Quota exceeded", "Daily quota reached", "limit reached", "try again tomorrow"]):
-                        print("WARNING: Google Search Console indexing request quota exceeded for today.")
-                        quota_exceeded_detected = True
-                        break
+                if "404" in page_title or "welcome" in curr_url or "404. That's an error" in body_text:
+                    print(f"[GSC Notice] Property '{prop}' returned 404/welcome. Trying next format...")
+                    continue
                     
-                    time.sleep(4)
+                inspected = True
+                print(f"Direct inspection URL loaded successfully with property '{prop}'!")
+                break
+            except Exception as direct_err:
+                print(f"Direct inspection attempt failed: {direct_err}")
                 
-                try:
-                    close_btn = page.locator("div[role='dialog'] button:has-text('Got it'), button:has-text('Got it'), button:has-text('OK'), button:has-text('Dismiss')").first
-                    if close_btn.is_visible():
-                        close_btn.click()
-                except Exception:
-                    pass
-        else:
-            print("URL is positively confirmed as already indexed on Google. Skipping indexing request.")
+        # Strategy 2: If direct navigation didn't work, go to generic GSC home and use the top universal search bar
+        if not inspected:
+            print("Navigating to GSC Home to use universal search bar...")
+            page.goto("https://search.google.com/search-console", timeout=45000)
+            time.sleep(5)
             
-        page.close()
-    except Exception as e:
-        print(f"Warning: Google Search Console URL inspection failed: {e}. Continuing pipeline...")
+            search_input = page.locator("input[aria-label*='Inspect any URL' i], input[placeholder*='Inspect any URL' i], input[type='search'], header input[type='text'], #input-wrapper input").first
+            try:
+                search_input.wait_for(state="visible", timeout=15000)
+                print("Found GSC universal search bar. Submitting URL...")
+                search_input.click()
+                search_input.fill(post_url)
+                time.sleep(1)
+                search_input.press("Enter")
+                inspected = True
+                time.sleep(8)
+            except Exception as bar_err:
+                print(f"Could not submit via universal search bar: {bar_err}")
 
-def resubmit_sitemap_gsc_playwright(context):
-    print("\n--- Google Search Console Sitemap Resubmission ---")
-    try:
-        page = context.new_page()
-        
-        gsc_property_encoded = urllib.parse.quote_plus(GSC_PROPERTY)
-        sitemaps_url = f"https://search.google.com/search-console/sitemaps?resource_id={gsc_property_encoded}"
-        print(f"Navigating to GSC Sitemaps page: {sitemaps_url}")
-        
-        page.goto(sitemaps_url, timeout=60000)
-        time.sleep(4)
-        
-        page_title = page.title()
-        current_url = page.url
-        body_text = page.locator("body").inner_text()
-        
-        is_404_or_welcome = (
-            "404" in page_title or
-            "welcome" in current_url.lower() or
-            any(err in body_text for err in ["404. That's an error", "404. That’s an error", "Error 404", "Welcome to Google Search Console", "To start, select property type"])
-        )
-        
-        if is_404_or_welcome:
-            print(f"[GSC Notice] GSC returned 404 / Welcome page for sitemaps. Property '{GSC_PROPERTY}' is not added/verified in Chrome Google account.")
-            page.close()
-            return
-
-        print("Waiting for the sitemap input field to render...")
+        # Wait for inspection status to finish retrieving data
+        print("Waiting for inspection retrieval to complete...")
         try:
-            page.wait_for_selector("input[type='text'], input[aria-label*='sitemap' i], input[placeholder*='sitemap' i]", state="visible", timeout=10000)
+            page.wait_for_selector(
+                "button:has-text('Request indexing'), text=Request indexing, text=URL is on Google, text=URL is not on Google, text=Test live URL",
+                timeout=30000
+            )
         except Exception:
             pass
             
-        input_selectors = [
-            "input[aria-label*='sitemap' i]",
-            "input[placeholder*='sitemap' i]",
-            "input[type='text']",
-            "input[name*='sitemap' i]"
+        time.sleep(3)
+        page_text = page.locator("body").inner_text()
+        
+        # Check if already indexed
+        is_confirmed_indexed = any(x in page_text for x in ["URL is on Google", "URL is in the Google index"])
+        
+        # Look for "Request indexing" button
+        req_selectors = [
+            "button:has-text('Request indexing')",
+            "div[role='button']:has-text('Request indexing')",
+            "button:has-text('REQUEST INDEXING')",
+            "div[role='button']:has-text('REQUEST INDEXING')",
+            "[aria-label*='Request indexing' i]"
         ]
         
-        input_element = None
-        for sel in input_selectors:
+        clicked = False
+        for sel in req_selectors:
             try:
-                elem = page.locator(sel).first
-                if elem.is_visible():
-                    input_element = elem
+                btn = page.locator(sel).first
+                if btn.is_visible() and btn.is_enabled():
+                    print(f"Found Request Indexing button ({sel}). Clicking...")
+                    btn.click()
+                    clicked = True
                     break
             except Exception:
                 pass
                 
-        if input_element and input_element.is_visible():
-            print("Entering 'sitemap.xml' into sitemap text box...")
-            input_element.click()
-            input_element.fill("sitemap.xml")
+        if not clicked:
+            try:
+                btn_fallback = page.get_by_text("Request indexing", exact=False).first
+                if btn_fallback.is_visible():
+                    btn_fallback.click(timeout=4000)
+                    clicked = True
+                    print("Clicked Request Indexing via get_by_text.")
+            except Exception:
+                pass
+
+        if clicked:
+            print("Request indexing clicked! Waiting for live test to complete (up to 120 seconds)...")
+            start_wait = time.time()
+            success_detected = False
+            
+            while time.time() - start_wait < 120:
+                body_content = page.locator("body").inner_text()
+                
+                # Check for success
+                if any(k in body_content for k in ["Indexing requested", "added to a priority crawl", "Priority crawl queue"]):
+                    print("SUCCESS: Google Search Console confirmed 'Indexing requested'!")
+                    success_detected = True
+                    break
+                elif any(k in body_content for k in ["Quota exceeded", "Daily quota reached", "limit reached", "try again tomorrow"]):
+                    print("WARNING: Google Search Console indexing quota reached for today.")
+                    break
+                time.sleep(3)
+                
+            # Dismiss confirmation modal
+            try:
+                got_it = page.locator("button:has-text('Got it'), button:has-text('OK'), button:has-text('Dismiss'), button:has-text('GOT IT')").first
+                if got_it.is_visible():
+                    got_it.click()
+                    print("Dismissed confirmation modal.")
+            except Exception:
+                pass
+        else:
+            if is_confirmed_indexed:
+                print("URL is confirmed already indexed on Google.")
+            else:
+                print("Note: 'Request indexing' button was not available or already requested.")
+
+    except Exception as e:
+        print(f"Warning: GSC URL inspection encountered an issue: {e}")
+    finally:
+        if page:
+            try:
+                page.close()
+            except Exception:
+                pass
+
+def resubmit_sitemap_gsc_playwright(context):
+    print("\n--- Google Search Console Sitemap Resubmission ---")
+    page = None
+    try:
+        page = context.new_page()
+        
+        # Navigate to Sitemaps page
+        sitemaps_loaded = False
+        for prop in get_gsc_property_identifiers():
+            prop_encoded = urllib.parse.quote(prop, safe="")
+            sitemaps_url = f"https://search.google.com/search-console/sitemaps?resource_id={prop_encoded}"
+            print(f"Navigating to GSC Sitemaps with resource_id '{prop}'...")
+            try:
+                page.goto(sitemaps_url, timeout=30000)
+                time.sleep(5)
+                
+                page_title = page.title()
+                curr_url = page.url.lower()
+                body_text = page.locator("body").inner_text()
+                
+                if "404" in page_title or "welcome" in curr_url or "404. That's an error" in body_text:
+                    print(f"Property '{prop}' sitemaps returned 404/welcome. Trying next format...")
+                    continue
+                    
+                sitemaps_loaded = True
+                print(f"Sitemaps page loaded successfully with property '{prop}'!")
+                break
+            except Exception as se_err:
+                print(f"Sitemap page load failed for {prop}: {se_err}")
+                
+        if not sitemaps_loaded:
+            print("Navigating to GSC Sitemaps fallback without resource_id...")
+            page.goto("https://search.google.com/search-console/sitemaps", timeout=30000)
+            time.sleep(5)
+            
+        # Locate the 'Add a new sitemap' input field
+        print("Looking for sitemap input field...")
+        input_selectors = [
+            "input[name='sitemapPath']",
+            "input[aria-label*='sitemap' i]",
+            "input[placeholder*='sitemap' i]",
+            "mwc-textfield input",
+            "input[type='text']"
+        ]
+        
+        sitemap_input = None
+        for sel in input_selectors:
+            try:
+                elem = page.locator(sel).first
+                if elem.is_visible():
+                    sitemap_input = elem
+                    break
+            except Exception:
+                pass
+                
+        if sitemap_input:
+            print("Entering 'sitemap.xml' into sitemap field...")
+            sitemap_input.click()
+            sitemap_input.fill("sitemap.xml")
             time.sleep(1)
             
             submit_selectors = [
                 "button:has-text('Submit')",
                 "button:has-text('SUBMIT')",
-                "text=Submit",
-                "text=SUBMIT"
+                "div[role='button']:has-text('Submit')",
+                "div[role='button']:has-text('SUBMIT')"
             ]
-            
             submitted = False
-            for sel in submit_selectors:
+            for s_sel in submit_selectors:
                 try:
-                    btn = page.locator(sel).first
-                    if btn.is_visible() and btn.is_enabled():
-                        print(f"Clicking Submit button with selector: {sel}")
-                        btn.click()
+                    s_btn = page.locator(s_sel).first
+                    if s_btn.is_visible() and s_btn.is_enabled():
+                        s_btn.click()
                         submitted = True
+                        print(f"Clicked Submit button ({s_sel}).")
                         break
                 except Exception:
                     pass
-            
+                    
             if not submitted:
-                print("Submit button not found. Pressing Enter key...")
-                input_element.press("Enter")
+                print("Pressing Enter to submit sitemap...")
+                sitemap_input.press("Enter")
                 submitted = True
                 
-            if submitted:
-                print("Waiting for sitemap submission confirmation...")
-                time.sleep(5)
-                try:
-                    close_btn = page.locator("button:has-text('Got it'), button:has-text('Dismiss'), button:has-text('OK')").first
-                    if close_btn.is_visible():
-                        close_btn.click()
-                except Exception:
-                    pass
-                print("Sitemap submission complete.")
-            else:
-                print("Warning: Could not submit the sitemap.")
+            time.sleep(5)
+            try:
+                dismiss_btn = page.locator("button:has-text('Got it'), button:has-text('Dismiss'), button:has-text('OK'), button:has-text('GOT IT')").first
+                if dismiss_btn.is_visible():
+                    dismiss_btn.click()
+                    print("Dismissed sitemap confirmation dialog.")
+            except Exception:
+                pass
+            print("Sitemap resubmission complete!")
         else:
-            print("Warning: Could not locate sitemap input field.")
-            # Log the page state for debugging
-            current_url = page.url
-            page_title = page.title()
-            page_text = page.locator("body").inner_text()
-            print(f"DEBUG INFO - Current URL: {current_url}")
-            print(f"DEBUG INFO - Page Title: {page_title}")
-            if "Sign in" in page_text or "google.com/accounts" in current_url:
-                print("WARNING: Google Search Console is redirecting to a Google Account login screen. Chrome profile session may have expired.")
-            else:
-                print(f"DEBUG INFO - Visible Page Text Snippet (1000 chars):\n{page_text[:1000]}")
-                
-            # Capture debugging screenshot
+            print("Warning: Could not locate sitemap input field. Saving screenshot for review...")
             screenshot_path = os.path.join(SCRIPT_DIR, "assets", f"gsc_sitemap_failed_{int(time.time())}.png")
             try:
                 os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
                 page.screenshot(path=screenshot_path)
-                print(f"Saved GSC sitemap error screenshot to: {screenshot_path}")
-            except Exception as se:
-                print(f"Could not capture sitemap error screenshot: {se}")
-            
-        page.close()
+            except Exception:
+                pass
     except Exception as e:
-        print(f"Warning: GSC sitemap resubmission failed: {e}. Continuing pipeline...")
+        print(f"Warning: GSC sitemap resubmission failed: {e}")
+    finally:
+        if page:
+            try:
+                page.close()
+            except Exception:
+                pass
+
 
 def verify_live_sitemap(local_count):
     print(f"\n--- Verifying Live Sitemap (Target Count: {local_count}) ---")
@@ -611,54 +646,51 @@ def verify_live_sitemap(local_count):
     return False
 
 def validate_meta_title_robust(title):
-    keywords = ["faceless quiz videos", "AI video generator", "bulk quiz maker"]
     title = title.strip()
-    has_kw = any(kw.lower() in title.lower() for kw in keywords)
-    if not has_kw:
-        phrase = " | AI Video Generator"
-        title = title + phrase
-    if len(title) < 50:
-        padding = " | QuizViral AI Generator"
-        title = title + padding
+    # Remove any existing trailing dots
+    title = re.sub(r'\.{2,}$', '', title).strip()
+    
+    if len(title) < 40:
+        title = f"{title} | QuizViral AI Video Generator"
+    elif len(title) < 50:
+        title = f"{title} | QuizViral AI"
+        
     if len(title) > 60:
         truncated = title[:57]
         last_sep = max(truncated.rfind(' '), truncated.rfind('|'), truncated.rfind('-'))
-        if last_sep > 30:
-            title = title[:last_sep].strip() + "..."
+        if last_sep > 35:
+            title = title[:last_sep].strip()
         else:
-            title = truncated.strip() + "..."
-    if len(title) < 50:
-        title = title.ljust(50, '.')
+            title = truncated.strip()
     return title
 
 def validate_meta_description_robust(desc):
-    keywords = ["faceless quiz videos", "AI video generator", "bulk quiz maker"]
     desc = desc.strip()
-    has_kw = any(kw.lower() in desc.lower() for kw in keywords)
-    if not has_kw:
-        suffix = " Create shorts fast with our bulk quiz maker and AI video generator."
-        desc = desc + suffix
-    if len(desc) < 145:
-        padding = " Build viral automated quiz channels easily. Import questions, select background videos, generate TTS voiceovers, and export vertical clips."
-        desc = desc + padding
-    if len(desc) > 150:
+    # Remove any existing trailing dots
+    desc = re.sub(r'\.{2,}$', '', desc).strip()
+    
+    if len(desc) < 120:
+        desc = f"{desc} Create automated viral quiz videos with QuizViral AI bulk video generator."
+    elif len(desc) < 140:
+        desc = f"{desc} Learn how to turn this topic into viral short-form trivia."
+        
+    if len(desc) > 160:
         sentence_end = -1
-        for match in re.finditer(r'([.!?])(?:\s+|$)', desc[:150]):
+        for match in re.finditer(r'([.!?])(?:\s+|$)', desc[:160]):
             end_idx = match.end(1)
-            if 120 <= end_idx <= 150:
+            if 130 <= end_idx <= 160:
                 sentence_end = end_idx
         if sentence_end != -1:
             desc = desc[:sentence_end].strip()
         else:
-            truncated = desc[:147]
+            truncated = desc[:155]
             last_space = truncated.rfind(' ')
-            if last_space > 100:
-                desc = desc[:last_space].strip() + "..."
+            if last_space > 110:
+                desc = desc[:last_space].strip() + "."
             else:
-                desc = truncated.strip() + "..."
-    if len(desc) < 145:
-        desc = desc.ljust(145, '.')
+                desc = truncated.strip() + "."
     return desc
+
 
 # Imports from helper script for interlinking and alt-tags
 try:
@@ -738,16 +770,20 @@ def launch_chrome_if_needed():
         chrome_path,
         "--remote-debugging-port=9222",
         f"--user-data-dir={CHROME_PROFILE_PATH}",
-        # "--headless=new", # Removed to enable visual (headful) mode
-        "--disable-gpu",
+        "--disable-extensions",
+        "--disable-component-extensions-with-background-pages",
+        "--no-default-browser-check",
         "--no-first-run",
         "--disable-default-apps",
+        "--disable-sync",
         "--disable-session-crashed-bubble",
         "--hide-crash-restore-bubble",
         "--disable-blink-features=AutomationControlled",
+        "--disable-gpu",
         "--window-position=0,0",
         "--window-size=1280,720",
-        "--start-maximized"
+        "--start-maximized",
+        "about:blank"
     ]
     
     try:
@@ -815,20 +851,124 @@ def fallback_json_parser(raw_json):
     except Exception as e:
         print(f"Fallback JSON regex parser failed: {e}")
     return None
+def extract_assistant_text(element_or_text):
+    if not element_or_text:
+        return ""
+    if hasattr(element_or_text, "inner_text"):
+        try:
+            text = element_or_text.inner_text().strip()
+        except Exception:
+            return ""
+    else:
+        text = str(element_or_text).strip()
+    
+    # Strip any leading 'ChatGPT said:\n' or 'ChatGPT said:' prefix from UI turn headers
+    cleaned = re.sub(r"^ChatGPT said:\s*", "", text, flags=re.IGNORECASE)
+    return cleaned.strip()
 
-def wait_for_chatgpt_response(page, max_wait_seconds=600):
+def get_assistant_messages(page):
+    selectors = [
+        "div[class*='MarkdownRoot']",
+        "[data-content-search-unit-key*='assistant']",
+        "[data-content-search-unit-key$=':assistant']",
+        "div[data-message-author-role='assistant'] .markdown",
+        "div[data-message-author-role='assistant']",
+        "article[data-testid^='conversation-turn'] .markdown",
+        "article[data-testid^='conversation-turn']",
+        "div.agent-turn",
+        ".markdown",
+        ".message-content"
+    ]
+    for sel in selectors:
+        try:
+            loc = page.locator(sel)
+            if loc.count() > 0:
+                return loc
+        except Exception:
+            pass
+    return page.locator("div[class*='MarkdownRoot']")
+
+def get_chatgpt_send_button(page):
+    send_button_selectors = [
+        "button[data-testid='send-button']",
+        "button[data-testid='fruitjuice-send-button']",
+        "button[aria-label*='Send' i]",
+        "button[aria-label*='Submit' i]",
+        "#send-button",
+        "button.send-button",
+        "form button[type='submit']",
+        "button:has(svg[data-icon='arrow-up'])",
+        "button:has(svg path[d*='M.5 1.5'])"
+    ]
+    for sel in send_button_selectors:
+        try:
+            loc = page.locator(sel)
+            if loc.count() > 0:
+                for i in range(loc.count()):
+                    btn = loc.nth(i)
+                    if btn.is_visible():
+                        return btn
+        except Exception:
+            pass
+    return None
+
+def is_chatgpt_send_button_enabled(page):
+    btn = get_chatgpt_send_button(page)
+    if btn:
+        try:
+            return btn.is_enabled()
+        except Exception:
+            pass
+    return False
+
+def wait_for_chatgpt_response(page, initial_count=0, initial_last_text="", max_wait_seconds=180):
     print("Waiting for ChatGPT response...")
     start_time = time.time()
     
-    # Wait for the generation to start (give it a few seconds to toggle buttons)
-    time.sleep(4)
-    
+    # 1. Wait for generation to start (up to 15 seconds)
+    generation_started = False
+    for _ in range(15):
+        stop_btns = page.locator("button[data-testid='stop-button'], button[aria-label='Stop generating'], button[aria-label*='Stop' i], button:has(svg rect)").all()
+        if any(b.is_visible() for b in stop_btns):
+            generation_started = True
+            break
+            
+        msgs = get_assistant_messages(page)
+        curr_count = msgs.count()
+        if curr_count > initial_count:
+            generation_started = True
+            break
+        elif curr_count > 0 and curr_count == initial_count:
+            try:
+                curr_text = extract_assistant_text(msgs.last)
+                if curr_text and curr_text != initial_last_text:
+                    generation_started = True
+                    break
+            except Exception:
+                pass
+                
+        time.sleep(1)
+
+    if not generation_started:
+        print("Notice: Generation start not detected yet. Checking buttons and Enter key...")
+        btn = get_chatgpt_send_button(page)
+        if btn and btn.is_visible() and btn.is_enabled():
+            try:
+                btn.click(timeout=2000)
+            except Exception:
+                pass
+        try:
+            page.keyboard.press("Enter")
+        except Exception:
+            pass
+        time.sleep(2)
+
     last_text = ""
     stable_count = 0
     
     while time.time() - start_time < max_wait_seconds:
         # Check Stop button visibility in ChatGPT
-        stop_btns = page.locator("button[data-testid='stop-button'], button[aria-label='Stop generating'], button[aria-label*='Stop' i]").all()
+        stop_btns = page.locator("button[data-testid='stop-button'], button[aria-label='Stop generating'], button[aria-label*='Stop' i], button:has(svg rect)").all()
         is_stop_visible = False
         for btn in stop_btns:
             try:
@@ -838,51 +978,53 @@ def wait_for_chatgpt_response(page, max_wait_seconds=600):
             except Exception:
                 pass
                 
-        # Check Send button visibility/enabled state (when done, the send button is enabled)
-        send_btns = page.locator("button[data-testid='send-button'], button[aria-label*='Send' i], button.send-button").all()
-        is_send_enabled = False
-        for btn in send_btns:
-            try:
-                if btn.is_visible() and btn.is_enabled():
-                    is_send_enabled = True
-                    break
-            except Exception:
-                pass
-                
-        # Get current response text from ChatGPT assistant message block
-        responses = page.locator("div[data-message-author-role='assistant'] .markdown, .markdown, .message-content")
+        # Get latest assistant message text
+        msgs = get_assistant_messages(page)
+        curr_count = msgs.count()
         current_text = ""
-        if responses.count() > 0:
+        if curr_count > 0:
             try:
-                current_text = responses.last.inner_text().strip()
+                current_text = extract_assistant_text(msgs.last)
             except Exception:
                 pass
+
+        # Is this a genuinely NEW response?
+        is_new_message = (curr_count > initial_count) or (current_text != initial_last_text and len(current_text) > 5)
             
-        # STRICT MODEL RESOLUTION RULE:
-        # 1. Stop button must be completely hidden
-        # 2. Send button must be visible & active/enabled
-        # 3. We must have some response content (> 2 chars) loaded
-        if not is_stop_visible and is_send_enabled and len(current_text) > 2:
-            print("Generation complete! (Stop button is hidden, Send button is visible & active).")
-            return current_text
-            
-        # Backup text stability check in case of unexpected DOM changes
-        if len(current_text) > 2:
+        # Completion signals:
+        if is_new_message and len(current_text) > 5 and not is_stop_visible:
+            # Check turn state or action buttons in modern ChatGPT
+            turn_complete = False
+            try:
+                has_action_btn = page.locator("button[aria-label='Copy'], button[aria-label='Regenerate response']").count() > 0
+                has_complete_state = page.locator("[data-talvt-turn-state='complete']").count() > 0
+                if has_action_btn or has_complete_state:
+                    turn_complete = True
+            except Exception:
+                pass
+
             if current_text == last_text:
                 stable_count += 1
-                if stable_count >= 5: # Stable for 10 seconds
-                    print("Generation complete (Text is stable fallback).")
+                if (turn_complete and stable_count >= 1) or stable_count >= 2:
+                    print(f"Generation complete! Response length: {len(current_text)} characters.")
                     return current_text
             else:
                 stable_count = 0
+        elif is_stop_visible:
+            stable_count = 0
                 
         last_text = current_text
         time.sleep(2)
         
-    responses = page.locator("div[data-message-author-role='assistant'] .markdown, .markdown, .message-content")
-    if responses.count() > 0:
-        return responses.last.inner_text()
-    return last_text
+    msgs = get_assistant_messages(page)
+    if msgs.count() > 0:
+        try:
+            final_text = extract_assistant_text(msgs.last)
+            if final_text != initial_last_text and len(final_text) > 5:
+                return final_text
+        except Exception:
+            pass
+    return ""
 
 def is_keyword_already_published(keyword):
     if not os.path.exists(BLOG_POSTS_FILE):
@@ -1390,61 +1532,237 @@ def publish_to_ghost_cms(api_url, api_key, version, post_data, status="draft"):
 
 # ==================== MAIN AUTOMATION FLOW ====================
 
+def load_saved_chatgpt_url():
+    """Reads saved ChatGPT chat URL from config file or environment."""
+    env_url = os.environ.get("CHATGPT_CHAT_URL", "").strip()
+    if env_url and "chatgpt.com/c/" in env_url:
+        return env_url
+    if os.path.exists(CHATGPT_CONFIG_FILE):
+        try:
+            with open(CHATGPT_CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                url = data.get("chat_url", "").strip()
+                if url and "chatgpt.com/c/" in url:
+                    return url
+        except Exception as e:
+            print(f"[ChatGPT Config] Error reading config file: {e}")
+    return None
+
+def save_chatgpt_url(url):
+    """Saves the current active ChatGPT conversation URL for future runs."""
+    try:
+        match = re.search(r"(https://chatgpt\.com/c/[a-zA-Z0-9\-]+)", url)
+        if match:
+            clean_url = match.group(1)
+            current_saved = load_saved_chatgpt_url()
+            if current_saved != clean_url:
+                data = {
+                    "chat_url": clean_url,
+                    "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                with open(CHATGPT_CONFIG_FILE, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                print(f"[ChatGPT Config] Successfully saved persistent chat link for future runs: {clean_url}")
+    except Exception as e:
+        print(f"[ChatGPT Config] Error saving chat URL: {e}")
+
+def is_chatgpt_error(page):
+    """Detects if ChatGPT shows an 'Unable to load conversation' or error state."""
+    try:
+        error_indicators = [
+            "unable to load conversation",
+            "unable to find conversation",
+            "unable to open chat",
+            "conversation not found",
+            "chat not found",
+            "could not load conversation"
+        ]
+        body_text = page.locator("body").inner_text(timeout=3000).lower()
+        for err in error_indicators:
+            if err in body_text:
+                return True
+        # Check if text box exists and is visible
+        for sel in CHATGPT_INPUT_SELECTORS:
+            if page.locator(sel).first.is_visible():
+                return False
+        return True
+    except Exception:
+        pass
+    return False
+
+CHATGPT_INPUT_SELECTORS = [
+    "#prompt-textarea",
+    "div#prompt-textarea",
+    "div[contenteditable='true']#prompt-textarea",
+    "div.ProseMirror[contenteditable='true']",
+    "[contenteditable='true'][data-id='root']",
+    "textarea[id='prompt-textarea']",
+    "textarea[data-id='root']",
+    "div[contenteditable='true']",
+    "textarea",
+]
+
+def _get_chatgpt_textbox(page, timeout=30000):
+    for sel in CHATGPT_INPUT_SELECTORS:
+        try:
+            loc = page.locator(sel).first
+            if loc.is_visible():
+                return loc
+        except Exception:
+            pass
+    combined = ", ".join(CHATGPT_INPUT_SELECTORS)
+    textbox = page.locator(combined).first
+    try:
+        textbox.wait_for(state="visible", timeout=timeout)
+    except Exception as e:
+        print(f"Warning: Input box wait timed out: {e}")
+    return textbox
+
+def navigate_to_chatgpt(page):
+    """
+    Navigates to the saved ChatGPT chat URL. If the saved chat is invalid,
+    deleted, or shows 'Unable to open chat', automatically starts a new chat,
+    and prepares to save the new chat URL once created.
+    """
+    saved_url = load_saved_chatgpt_url()
+    
+    if saved_url:
+        print(f"\n[ChatGPT] Opening saved persistent chat link: {saved_url}")
+        try:
+            page.goto(saved_url, timeout=45000)
+            time.sleep(4)
+            if is_chatgpt_error(page):
+                print("[ChatGPT] Saved chat is inaccessible or deleted ('Unable to open conversation').")
+                print("[ChatGPT] Starting a fresh new chat at https://chatgpt.com/ ...")
+                page.goto("https://chatgpt.com/", timeout=45000)
+                time.sleep(4)
+            else:
+                print(f"[ChatGPT] Successfully connected to persistent chat: {saved_url}")
+        except Exception as e:
+            print(f"[ChatGPT] Error loading saved chat ({e}). Starting a new chat at https://chatgpt.com/ ...")
+            page.goto("https://chatgpt.com/", timeout=45000)
+            time.sleep(4)
+    else:
+        print("\n[ChatGPT] No saved chat URL found. Starting a fresh new chat at https://chatgpt.com/ ...")
+        page.goto("https://chatgpt.com/", timeout=45000)
+        time.sleep(4)
+
+    # Wait for the prompt input box to be visible
+    textbox = _get_chatgpt_textbox(page, timeout=30000)
+    time.sleep(2)
+    return textbox
+
+def enter_text_into_chatgpt(page, textbox, prompt_text):
+    """
+    Inputs text into ChatGPT's contenteditable ProseMirror / textarea reliably
+    so that React / ProseMirror internal doc state updates and the send button is enabled.
+    """
+    try:
+        textbox.click(timeout=5000)
+    except Exception:
+        try:
+            page.keyboard.press("Escape")
+            time.sleep(0.3)
+            textbox.click(timeout=3000)
+        except Exception:
+            pass
+
+    time.sleep(0.3)
+    # Clear any previous draft/junk
+    try:
+        page.keyboard.press("ControlOrMeta+A")
+        time.sleep(0.1)
+        page.keyboard.press("Backspace")
+        time.sleep(0.2)
+    except Exception:
+        pass
+
+    # 1. Primary Method: page.keyboard.insert_text (native CDP Input.insertText)
+    try:
+        page.keyboard.insert_text(prompt_text)
+        time.sleep(0.5)
+    except Exception as e:
+        print(f"keyboard.insert_text notice: {e}")
+
+    if is_chatgpt_send_button_enabled(page):
+        return True
+
+    # 2. Fallback Method: native clipboard paste event
+    try:
+        escaped_prompt = json.dumps(prompt_text)
+        page.evaluate(f"""() => {{
+            const el = document.querySelector('#prompt-textarea') || document.querySelector('div[contenteditable="true"]') || document.querySelector('textarea');
+            if (el) {{
+                el.focus();
+                document.execCommand('selectAll', false, null);
+                const dt = new DataTransfer();
+                dt.setData('text/plain', {escaped_prompt});
+                const pasteEvt = new ClipboardEvent('paste', {{
+                    clipboardData: dt,
+                    bubbles: true,
+                    cancelable: true
+                }});
+                el.dispatchEvent(pasteEvt);
+            }}
+        }}""")
+        time.sleep(0.5)
+    except Exception as e:
+        print(f"Paste fallback notice: {e}")
+
+    if is_chatgpt_send_button_enabled(page):
+        return True
+
+    # 3. Fallback Method: textbox.fill followed by space/backspace
+    try:
+        textbox.fill(prompt_text)
+        time.sleep(0.2)
+        textbox.press(" ")
+        time.sleep(0.1)
+        textbox.press("Backspace")
+        time.sleep(0.5)
+    except Exception:
+        pass
+
+    return is_chatgpt_send_button_enabled(page)
+
 def submit_prompt_to_chatgpt(page, prompt_text):
     """Types a prompt into ChatGPT and submits it using button click or Enter fallback."""
     print("Waiting for ChatGPT input box to be ready...")
-    textbox = page.locator("#prompt-textarea, textarea[id='prompt-textarea']").first
-    try:
-        textbox.wait_for(state="visible", timeout=30000)
-    except Exception as e:
-        print(f"Warning: Input box wait timed out: {e}")
+    textbox = _get_chatgpt_textbox(page, timeout=30000)
         
     print("Typing prompt into ChatGPT...")
-    textbox.click()
-    textbox.fill(prompt_text)
+    enter_text_into_chatgpt(page, textbox, prompt_text)
     time.sleep(0.5)
-    
-    # Trigger input change listeners by typing space and backspace
-    textbox.press(" ")
-    time.sleep(0.2)
-    textbox.press("Backspace")
-    time.sleep(1)
-    
-    # Try clicking the send button using various selectors
+
     clicked = False
-    send_button_selectors = [
-        "button[data-testid='send-button']",
-        "button[aria-label*='Send' i]",
-        "button.send-button"
-    ]
-    
-    for sel in send_button_selectors:
-        loc = page.locator(sel)
-        for i in range(loc.count()):
-            btn = loc.nth(i)
-            if btn.is_visible() and btn.is_enabled():
-                print(f"Clicking submit button with selector: {sel}")
-                try:
-                    btn.click(timeout=3000)
-                    clicked = True
-                    break
-                except Exception:
-                    pass
-        if clicked:
-            break
-            
+    btn = get_chatgpt_send_button(page)
+    if btn and btn.is_visible() and btn.is_enabled():
+        print("Clicking active Send button...")
+        try:
+            btn.click(timeout=3000)
+            clicked = True
+        except Exception as e:
+            print(f"Send button click failed: {e}")
+
     if not clicked:
-        # Fallback: Press Enter inside the textbox to submit in ChatGPT
-        print("Submit button click failed or not found. Attempting fallback: Enter to submit...")
-        textbox.press("Enter")
-        clicked = True
+        print("Attempting fallback: Enter to submit...")
+        try:
+            page.keyboard.press("Enter")
+            clicked = True
+        except Exception:
+            try:
+                textbox.press("Enter")
+                clicked = True
+            except Exception:
+                pass
         
     time.sleep(2)
 
 def submit_and_wait_for_response(page, prompt_text, max_wait_seconds=180, max_retries=2):
     """
     Submits a prompt to ChatGPT and waits for the response.
-    If the response fails, times out, or returns empty, reloads the page (retaining thread history) and retries.
+    If the response fails, times out, or returns empty, reloads with domcontentloaded and retries.
+    Automatically captures and persists the active conversation URL.
     """
     active_url = page.url
     for attempt in range(max_retries + 1):
@@ -1452,37 +1770,61 @@ def submit_and_wait_for_response(page, prompt_text, max_wait_seconds=180, max_re
             print(f"\n--- Retrying Prompt Submission (Attempt {attempt + 1}/{max_retries + 1}) ---")
             print("Reloading the page...")
             try:
-                page.reload()
-                time.sleep(8) # Wait for page reload to stabilize
+                page.reload(wait_until="domcontentloaded", timeout=45000)
+                time.sleep(5)
             except Exception as re:
-                print(f"Page reload failed: {re}. Navigating back to active thread URL...")
+                print(f"Page reload notice: {re}. Navigating back to active thread URL...")
                 try:
-                    page.goto(active_url)
-                    time.sleep(8)
+                    page.goto(active_url, wait_until="domcontentloaded", timeout=45000)
+                    time.sleep(5)
                 except Exception:
                     pass
-                
+
+        # Capture message state before submitting
+        msgs = get_assistant_messages(page)
+        initial_count = msgs.count()
+        initial_last_text = ""
+        if initial_count > 0:
+            try:
+                initial_last_text = extract_assistant_text(msgs.last)
+            except Exception:
+                pass
+
         # Submit the prompt
         try:
             submit_prompt_to_chatgpt(page, prompt_text)
         except Exception as se:
-            print(f"Submission failed: {se}. Retrying reload...")
+            print(f"Submission failed: {se}. Retrying...")
             continue
-            
+
+        # Check if URL updated to a new conversation
+        try:
+            time.sleep(2)
+            if "chatgpt.com/c/" in page.url:
+                save_chatgpt_url(page.url)
+        except Exception:
+            pass
+
         # Wait for the response
-        response_text = wait_for_chatgpt_response(page, max_wait_seconds=max_wait_seconds)
-        
+        response_text = wait_for_chatgpt_response(
+            page, 
+            initial_count=initial_count, 
+            initial_last_text=initial_last_text, 
+            max_wait_seconds=max_wait_seconds
+        )
+
         # If response is valid, return it!
         if response_text and len(response_text.strip()) > 5:
-            # Update the active thread URL in case it changed
             try:
                 active_url = page.url
+                if "chatgpt.com/c/" in active_url:
+                    save_chatgpt_url(active_url)
             except Exception:
                 pass
             return response_text.strip()
-            
+
         print("Warning: Received empty or invalid response. Reloading and retrying...")
-        
+
     return ""
 
 def run_blog_generator_playwright():
@@ -1500,8 +1842,37 @@ def run_blog_generator_playwright():
             # Add stealth script to context to hide Playwright/automation indicators
             context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
-            # Create main Gemini page
-            gemini_page = context.new_page()
+            # Acquire main Gemini/ChatGPT page: reuse existing tab (e.g. the initial about:blank) or create one
+            if context.pages:
+                gemini_page = context.pages[0]
+            else:
+                gemini_page = context.new_page()
+            
+            # Close any other lingering extension or extra tabs from previous session, NEVER closing gemini_page
+            for p_tab in list(context.pages):
+                if p_tab != gemini_page:
+                    tab_url = p_tab.url.lower()
+                    if (tab_url.startswith("chrome-extension://") or 
+                        tab_url.startswith("chrome://") or 
+                        "extension" in tab_url or
+                        tab_url == "about:blank"):
+                        try:
+                            p_tab.close()
+                        except Exception:
+                            pass
+
+            # Auto-close any unwanted extension tabs that might try to open in the background
+            def close_extension_tab(page_obj):
+                try:
+                    time.sleep(0.5)
+                    p_url = page_obj.url.lower()
+                    if (p_url.startswith("chrome-extension://") or "chrome-extension" in p_url) and page_obj != gemini_page:
+                        print(f"[Chrome] Auto-closed unwanted extension tab: {page_obj.url}")
+                        page_obj.close()
+                except Exception:
+                    pass
+            context.on("page", close_extension_tab)
+
             
             # --- Parse existing blog posts to enforce topic split ---
             posts = parse_blog_posts()
@@ -1529,15 +1900,7 @@ def run_blog_generator_playwright():
                 
                 # --- 2. Navigate to ChatGPT to filter trend ---
                 print("\n--- STEP 2: Connecting to ChatGPT for topic filtering ---")
-                gemini_page.goto("https://chatgpt.com/c/6a47d525-af3c-83e8-9b33-a5c2b2669d17")  # Persistent chat URL
-                
-                # Wait for text box to load in ChatGPT
-                textbox = gemini_page.locator("#prompt-textarea, textarea[id='prompt-textarea']").first
-                try:
-                    textbox.wait_for(state="visible", timeout=30000)
-                except Exception:
-                    pass
-                time.sleep(5)
+                textbox = navigate_to_chatgpt(gemini_page)
                 
                 remaining_trends = list(top_trends)
                 selected_topic = ""
@@ -1607,13 +1970,7 @@ def run_blog_generator_playwright():
                 
                 # Navigate to ChatGPT for subsequent turns
                 print("\n--- STEP 2: Connecting to ChatGPT for content generation ---")
-                gemini_page.goto("https://chatgpt.com/c/6a47d525-af3c-83e8-9b33-a5c2b2669d17")  # Persistent chat URL
-                textbox = gemini_page.locator("#prompt-textarea, textarea[id='prompt-textarea']").first
-                try:
-                    textbox.wait_for(state="visible", timeout=30000)
-                except Exception:
-                    pass
-                time.sleep(5)
+                textbox = navigate_to_chatgpt(gemini_page)
                 
             # --- 4. Get Image Prompts from ChatGPT (BEFORE content generation to save quota and verify first) ---
             print("\n--- STEP 4: Requesting Image Prompts from ChatGPT ---")
@@ -1711,6 +2068,11 @@ def run_blog_generator_playwright():
                     "Respond with ONLY raw HTML body content. Do not include <html>, <head>, or <body> wrappers, and do not wrap in markdown code blocks."
                 )
             raw_intro = submit_and_wait_for_response(gemini_page, prompt_turn1, max_wait_seconds=150)
+            if not raw_intro or len(raw_intro.strip()) < 100:
+                print(f"[Error] Turn 1 (Introduction) failed or generated insufficient content (len: {len(raw_intro.strip()) if raw_intro else 0}). Aborting.")
+                gemini_page.close()
+                browser.close()
+                return None
             print("Successfully read Turn 1 (Introduction) response.")
             
             # --- Intro Similarity Check Safeguard ---
@@ -1776,6 +2138,11 @@ def run_blog_generator_playwright():
                     "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
                 )
             raw_tutorial = submit_and_wait_for_response(gemini_page, prompt_turn2, max_wait_seconds=180)
+            if not raw_tutorial or len(raw_tutorial.strip()) < 100:
+                print(f"[Error] Turn 2 (Tutorial) failed or generated insufficient content (len: {len(raw_tutorial.strip()) if raw_tutorial else 0}). Aborting.")
+                gemini_page.close()
+                browser.close()
+                return None
             print("Successfully read Turn 2 (Tutorial & Quiz Questions) response.")
             
             # TURN 3: Write Monetization & FAQs
@@ -1789,6 +2156,11 @@ def run_blog_generator_playwright():
                 "Respond with ONLY raw HTML body content using <h2>, <h3>, <p>, <ul>, <li>, etc. Do not wrap in markdown code blocks."
             )
             raw_monetization = submit_and_wait_for_response(gemini_page, prompt_turn3, max_wait_seconds=150)
+            if not raw_monetization or len(raw_monetization.strip()) < 100:
+                print(f"[Error] Turn 3 (Monetization) failed or generated insufficient content (len: {len(raw_monetization.strip()) if raw_monetization else 0}). Aborting.")
+                gemini_page.close()
+                browser.close()
+                return None
             print("Successfully read Turn 3 (Monetization & FAQs) response.")
             
             # --- Monetization Similarity Check Safeguard ---
@@ -2062,6 +2434,23 @@ def generate_sitemap_from_posts():
         '  </url>'
     ]
     
+    # 15 Niche Tool Landing Pages
+    tool_niches = [
+        "gaming", "history", "movies", "science", "geography", "sports",
+        "kids", "anime", "food", "music", "general-knowledge", "bollywood",
+        "cricket", "technology", "animals"
+    ]
+    for niche_slug in tool_niches:
+        xml_lines.extend([
+            '  <url>',
+            f'    <loc>https://quizviral-nine.vercel.app/tools/{niche_slug}</loc>',
+            f'    <lastmod>{today_str}</lastmod>',
+            '    <changefreq>weekly</changefreq>',
+            '    <priority>0.8</priority>',
+            '  </url>'
+        ])
+    
+    # Blog Posts
     for p in posts:
         slug = p.get("slug")
         if not slug:
@@ -2072,13 +2461,13 @@ def generate_sitemap_from_posts():
             f'    <loc>https://quizviral-nine.vercel.app/blog/{slug}</loc>',
             f'    <lastmod>{p_date}</lastmod>',
             '    <changefreq>monthly</changefreq>',
-            '    <priority>0.6</priority>',
+            '    <priority>0.7</priority>',
             '  </url>'
         ])
         
     xml_lines.append('</urlset>')
     
-    url_count = 3 + len([p for p in posts if p.get("slug")])
+    url_count = 3 + len(tool_niches) + len([p for p in posts if p.get("slug")])
     
     try:
         os.makedirs(os.path.dirname(sitemap_path), exist_ok=True)
@@ -2261,7 +2650,7 @@ def main():
         
         if not blog_data:
             print("Blog automation generation failed.")
-            return
+            sys.exit(1)
             
         # 2. SEO Title & Description Validation and Sanitization
         meta_title = validate_meta_title(blog_data.get("meta_title", ""))
@@ -2346,6 +2735,14 @@ def main():
         else:
             print("Ghost CMS credentials not set. Skipping publishing to Ghost.")
             
+        # CRITICAL SEO QUALITY GUARD: Never publish thin or empty content!
+        content_words = len((blog_data.get("markdown") or "").split())
+        if content_words < 350:
+            print(f"\n[SEO Quality Guard] ERROR: Generated post content has only {content_words} words (< 350).")
+            print("[SEO Quality Guard] Aborting blog publication and deploy to prevent Google thin-content penalty!")
+            sys.exit(1)
+
+
         # 7. Update blogPosts.js for the Vercel React Frontend
         success_js = update_blog_posts_file(blog_data)
         
@@ -2387,8 +2784,15 @@ def main():
                     run_pinterest_syndication(blog_data)
                 except Exception as e:
                     print(f"Pinterest syndication failed: {e}")
+                
+                print(f"\nBlog successfully generated and published: {blog_data['title']}")
+                sys.exit(0)
             else:
                 print("Local build check failed! Aborting Git Push, GSC indexing, & Pinterest pinning to avoid breaking production.")
+                sys.exit(1)
+        else:
+            print("Updating blog posts file failed.")
+            sys.exit(1)
                 
     finally:
         # Always terminate Chrome debug instance

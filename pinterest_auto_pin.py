@@ -134,12 +134,16 @@ def launch_chrome_with_profile(profile_path, headless_mode=False):
         "--remote-debugging-port=9222",
         "--remote-debugging-address=127.0.0.1",
         f"--user-data-dir={profile_path}",
+        "--disable-extensions",
+        "--disable-component-extensions-with-background-pages",
+        "--no-default-browser-check",
         "--no-first-run",
         "--disable-default-apps",
         "--disable-sync",
         "--disable-session-crashed-bubble",
         "--hide-crash-restore-bubble",
-        "--disable-blink-features=AutomationControlled"
+        "--disable-blink-features=AutomationControlled",
+        "about:blank"
     ]
     if headless_mode:
         cmd.extend(["--headless=new"])
@@ -403,7 +407,7 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 print(f"Connecting Playwright (Headless={headless_mode}) to Chrome remote debugger...")
                 browser = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
                 context = browser.contexts[0]
-                page = context.new_page()
+                page = context.pages[0] if (context.pages and context.pages[0].url in ["about:blank", ""]) else context.new_page()
                 page.set_viewport_size({"width": 1280, "height": 800})
                 
                 # Navigate to Pin Builder with a retry loop

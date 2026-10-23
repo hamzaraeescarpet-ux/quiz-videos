@@ -169,12 +169,19 @@ export default function History() {
                   </td>
                   <td className="px-4 py-3 md:px-6 md:py-4 text-gray-700 dark:text-gray-300 font-medium">{job.completed_so_far} / {job.total_expected}</td>
                   <td className="px-4 py-3 md:px-6 md:py-4 text-right">
-                    {(job.status === 'Completed' || job.status === 'Interrupted') && (
+                    {(job.status === 'Completed' || (job.status === 'Interrupted' && job.completed_so_far > 0)) && (
                       <button 
-                        onClick={() => window.location.href = `/api/hf/download/${job.session_id}`}
-                        className="inline-flex items-center gap-1 md:gap-2 text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors bg-brand-500/10 hover:bg-brand-500/20 px-3 py-1.5 md:px-4 md:py-2 rounded-lg"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = `/api/hf/download/${job.session_id}`;
+                          link.setAttribute('download', `QuizViral_Videos_${job.session_id}.zip`);
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                        className="inline-flex items-center gap-1 md:gap-2 text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors bg-brand-500/10 hover:bg-brand-500/20 px-3 py-1.5 md:px-4 md:py-2 rounded-lg cursor-pointer"
                       >
-                        <Download className="w-4 h-4" /> <span className="hidden md:inline">Download ZIP</span>
+                        <Download className="w-4 h-4" /> <span className="hidden md:inline">Download ZIP ({job.completed_so_far})</span>
                       </button>
                     )}
                   </td>
