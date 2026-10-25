@@ -4301,3 +4301,27 @@ To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
 [2026-10-24 18:41:54] Naya din (2026-10-24) - daily counter reset ho raha hai.
 [2026-10-24 18:41:54] Aaj (2026-10-24) ab tak 0/3 blogs publish hue hain.
 [2026-10-24 18:41:54] Blog #1 generation shuru ho raha hai...
+[2026-10-24 19:00:14] Blog #1 successfully publish ho gaya!
+[2026-10-24 19:00:14] Progress: 1/3 blogs aaj k liye.
+[2026-10-24 19:00:14] Wait: Blog #2 k liye 2 ghante ka gap (120 min 0 sec)
+[2026-10-24 19:05:14]   ... abhi bhi wait kar raha hoon (114 min baaki)
+[2026-10-24 19:10:14]   ... abhi bhi wait kar raha hoon (109 min baaki)
+[2026-10-24 19:15:14]   ... abhi bhi wait kar raha hoon (104 min baaki)
+[2026-10-24 19:20:14]   ... abhi bhi wait kar raha hoon (99 min baaki)
+[2026-10-24 19:25:14]   ... abhi bhi wait kar raha hoon (94 min baaki)
+[2026-10-24 19:30:14]   ... abhi bhi wait kar raha hoon (89 min baaki)
+[2026-10-24 19:35:14]   ... abhi bhi wait kar raha hoon (84 min baaki)
+[2026-10-24 19:40:14]   ... abhi bhi wait kar raha hoon (79 min baaki)
+[2026-10-24 19:45:14]   ... abhi bhi wait kar raha hoon (74 min baaki)
+[2026-10-24 19:50:14]   ... abhi bhi wait kar raha hoon (69 min baaki)
+[2026-10-24 19:55:14]   ... abhi bhi wait kar raha hoon (64 min baaki)
+[2026-10-24 20:00:14]   ... abhi bhi wait kar raha hoon (59 min baaki)
+[2026-10-24 20:05:14]   ... abhi bhi wait kar raha hoon (54 min baaki)
+[2026-10-25 14:43:33] ============================================================
+[2026-10-25 14:43:33] Blog Automation Worker START
+[2026-10-25 14:43:33] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-10-25 14:43:33] Daily target: 3 blogs, gap: 2h
+[2026-10-25 14:43:33] ============================================================
+[2026-10-25 14:43:33] Naya din (2026-10-25) - daily counter reset ho raha hai.
+[2026-10-25 14:43:33] Aaj (2026-10-25) ab tak 0/3 blogs publish hue hain.
+[2026-10-25 14:43:33] Blog #1 generation shuru ho raha hai...
