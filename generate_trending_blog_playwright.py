@@ -76,6 +76,89 @@ def is_safe_topic(topic):
 DAILY_POST_TARGET = 3
 
 PRODUCT_SEEDS = [
+    # Cluster 1: High-Volume Trivia & Knowledge Searches (50k+ Monthly Searches)
+    {
+        "topic": "hard general knowledge quiz questions with answers",
+        "keywords": ["general knowledge quiz", "hard trivia questions", "general knowledge test", "pub quiz general knowledge"],
+        "angle": "Curate an elite set of brain-testing general knowledge questions that challenge even trivia masters, with thorough explanations for each answer."
+    },
+    {
+        "topic": "world geography trivia quiz with country capitals",
+        "keywords": ["geography trivia questions", "world capitals quiz", "country flags quiz", "world geography test"],
+        "angle": "Challenge readers with intriguing borders, obscure world capitals, and country geography trivia designed for vertical video creators."
+    },
+    {
+        "topic": "science and space trivia questions for adults",
+        "keywords": ["science trivia questions", "space quiz", "astronomy trivia", "hard science questions"],
+        "angle": "Explore mind-bending astronomical facts, quantum oddities, and human biology secrets that make viral short-form quiz videos."
+    },
+    {
+        "topic": "trick questions with answers that test your brain",
+        "keywords": ["trick questions with answers", "brain teasers", "riddles for adults", "lateral thinking puzzles"],
+        "angle": "Share deceptive, mind-bending riddles and trick questions that force viewers to comment, debate, and rewatch short videos."
+    },
+    {
+        "topic": "animal kingdom extreme facts quiz",
+        "keywords": ["animal trivia questions", "nature quiz", "weird animal facts", "wildlife trivia"],
+        "angle": "Highlight the bizarre, unbelievable defense mechanisms and habits of the animal world that captivate social media viewers."
+    },
+    {
+        "topic": "history timeline quiz ancient civilizations to modern era",
+        "keywords": ["history trivia questions", "ancient history quiz", "world history trivia", "historical events quiz"],
+        "angle": "Test readers on turning points in human history, famous empires, and historical mysteries that ignite curiosity."
+    },
+    {
+        "topic": "marvel cinematic universe ultimate trivia quiz",
+        "keywords": ["marvel trivia questions", "mcu quiz", "avengers trivia", "superhero trivia"],
+        "angle": "Deep dive into MCU lore, Easter eggs, comic book origins, and character trivia for passionate superhero communities."
+    },
+    {
+        "topic": "90s nostalgia pop culture trivia questions and answers",
+        "keywords": ["90s trivia questions", "90s pop culture quiz", "retro 90s quiz", "90s nostalgia trivia"],
+        "angle": "Tap into retro nostalgia with 90s cartoons, music hits, iconic movies, and childhood memories that trigger massive shares."
+    },
+    {
+        "topic": "2000s music and movies nostalgia trivia quiz",
+        "keywords": ["2000s trivia", "2000s music quiz", "y2k pop culture", "2000s movie trivia"],
+        "angle": "Relive the Y2K era with memorable chart-toppers, blockbuster releases, and early internet culture quiz questions."
+    },
+    {
+        "topic": "world cup football and soccer records trivia",
+        "keywords": ["football trivia questions", "soccer quiz", "world cup records", "champions league trivia"],
+        "angle": "Cover historic goals, legendary players, iconic World Cup moments, and unbelievable stats that sports fans argue over."
+    },
+    {
+        "topic": "nba basketball history and legendary records quiz",
+        "keywords": ["nba trivia questions", "basketball quiz", "nba records", "basketball legends quiz"],
+        "angle": "Analyze legendary buzzer beaters, championship dynasties, and individual NBA records that make great short quiz videos."
+    },
+    {
+        "topic": "classic movie quotes and film trivia challenge",
+        "keywords": ["movie trivia questions", "film quotes quiz", "cinema trivia", "famous movie quotes"],
+        "angle": "Test movie buffs on unforgettable cinematic lines, Oscar records, and behind-the-scenes movie trivia."
+    },
+    {
+        "topic": "video game history and gaming lore quiz",
+        "keywords": ["gaming trivia questions", "video game quiz", "retro gaming trivia", "gaming lore quiz"],
+        "angle": "Challenge gamers with hidden secrets, development Easter eggs, and historic milestones across Nintendo, PlayStation, and PC gaming."
+    },
+    {
+        "topic": "pub quiz general knowledge rounds and ideas",
+        "keywords": ["pub quiz questions", "trivia night ideas", "pub quiz rounds", "trivia night questions"],
+        "angle": "Provide ready-to-use pub quiz rounds with varied difficulty, perfect for social trivia nights and community engagement."
+    },
+    {
+        "topic": "bible trivia questions and answers for adults",
+        "keywords": ["bible trivia questions", "scripture quiz", "bible trivia with answers", "old testament new testament quiz"],
+        "angle": "Cover meaningful scripture passages, historical figures, and biblical stories formatted for respectful, engaging community quizzes."
+    },
+    {
+        "topic": "food and international cuisine trivia quiz",
+        "keywords": ["food trivia questions", "cuisine quiz", "international food facts", "cooking trivia"],
+        "angle": "Reveal culinary origins, exotic ingredients, and surprising food science facts that make delicious visual content."
+    },
+
+    # Cluster 2: High-Demand YouTube Automation & Faceless Creator Topics
     {
         "topic": "faceless YouTube quiz channel ideas",
         "keywords": ["faceless youtube channel", "quiz channel ideas", "youtube channel ideas", "faceless creator"],
@@ -125,6 +208,31 @@ PRODUCT_SEEDS = [
         "topic": "leveraging trending news for quiz videos",
         "keywords": ["trending quiz videos", "real time content", "news trivia", "google trends workflow"],
         "angle": "Show how to quickly capitalize on trending sports matches, celebrity events, or pop culture news by spinning up timely quiz videos."
+    },
+    {
+        "topic": "best faceless youtube niches with high cpm",
+        "keywords": ["high cpm youtube niches", "faceless channel cpm", "best youtube niches 2026", "highest paying shorts niches"],
+        "angle": "Analyze RPM and CPM numbers across finance, tech, trivia, and luxury niches, showing how to maximize revenue on Shorts."
+    },
+    {
+        "topic": "how to get 10 million views on youtube shorts",
+        "keywords": ["how to get views on shorts", "youtube shorts algorithm", "10 million shorts views", "viral shorts strategy"],
+        "angle": "Break down the exact retention, swipe-away rate, and pacing formula needed to hit YouTube's 10M Shorts views monetization milestone."
+    },
+    {
+        "topic": "copyright safe music and audio for faceless shorts",
+        "keywords": ["copyright free music for youtube", "royalty free shorts audio", "sound effects for quiz videos", "youtube audio library"],
+        "angle": "Guide creators on picking high-energy, copyright-cleared background music and sound effects that prevent Content ID claims."
+    },
+    {
+        "topic": "how to hook viewers in the first 3 seconds on shorts",
+        "keywords": ["youtube shorts hooks", "how to hook viewers", "first 3 seconds video hook", "shorts retention rate"],
+        "angle": "Analyze visual and psychological hooks that drop swipe-away rates below 20% and trigger algorithmic recommendation loops."
+    },
+    {
+        "topic": "interactive community polls and quiz strategies for creators",
+        "keywords": ["youtube community tab polls", "interactive quiz posts", "grow subscribers with polls", "community engagement tips"],
+        "angle": "Demonstrate how combining daily YouTube community polls with daily Shorts creates an unstoppable subscriber growth flywheel."
     }
 ]
 
@@ -266,15 +374,17 @@ def determine_next_topic_source(posts):
 def select_next_product_topic(posts):
     existing_slugs_and_titles = []
     for p in posts:
-        existing_slugs_and_titles.append(p.get("slug", "").lower())
-        existing_slugs_and_titles.append(p.get("title", "").lower())
+        existing_slugs_and_titles.append(p.get("slug", "").lower().strip())
+        existing_slugs_and_titles.append(p.get("title", "").lower().strip())
+        existing_slugs_and_titles.append(p.get("trendingKeyword", "").lower().strip())
         
     unused_seeds = []
     for seed in PRODUCT_SEEDS:
-        topic_lower = seed["topic"].lower()
+        topic_lower = seed["topic"].lower().strip()
+        topic_slug = topic_lower.replace(" ", "-")
         is_used = False
         for est in existing_slugs_and_titles:
-            if topic_lower in est or est in topic_lower or seed["topic"].lower().replace(" ", "-") in est:
+            if topic_lower == est or topic_slug == est or topic_slug in est:
                 is_used = True
                 break
         if not is_used:
@@ -285,18 +395,24 @@ def select_next_product_topic(posts):
         print(f"[Topic Selector] Selected unused product seed topic: '{selected['topic']}'")
         return selected
     else:
-        seed_scores = {}
-        for idx, seed in enumerate(PRODUCT_SEEDS):
-            found_pos = float('inf')
-            for pos, p in enumerate(posts):
-                if seed["topic"].lower() in p.get("title", "").lower() or seed["topic"].lower().replace(" ", "-") in p.get("slug", "").lower():
-                    found_pos = pos
-                    break
-            seed_scores[idx] = found_pos
+        # Dynamic fallback: if all static seeds have been used, pick a category and generate an unpublished variation
+        import random
+        base_seed = random.choice(PRODUCT_SEEDS)
+        curr_year = datetime.now().year
+        variant_suffix = random.choice(["Ultimate Edition", f"{curr_year} Strategy", "Master Guide", "Step-by-Step", "Pro Tips"])
+        new_topic = f"{base_seed['topic']} {variant_suffix}"
+        
+        counter = 1
+        while any(new_topic.lower() in est for est in existing_slugs_and_titles):
+            new_topic = f"{base_seed['topic']} Part {counter}"
+            counter += 1
             
-        best_idx = max(seed_scores, key=seed_scores.get)
-        selected = PRODUCT_SEEDS[best_idx]
-        print(f"[Topic Selector] Selected oldest used product seed topic: '{selected['topic']}'")
+        selected = {
+            "topic": new_topic,
+            "keywords": base_seed["keywords"],
+            "angle": f"{base_seed['angle']} Focus on fresh 2026 insights and updated strategies."
+        }
+        print(f"[Topic Selector] All base seeds used. Generated fresh unique topic: '{selected['topic']}'")
         return selected
 
 def get_string_similarity(str1, str2):
@@ -1739,7 +1855,7 @@ def submit_prompt_to_chatgpt(page, prompt_text):
     if btn and btn.is_visible() and btn.is_enabled():
         print("Clicking active Send button...")
         try:
-            btn.click(timeout=3000)
+            btn.click(timeout=1500)
             clicked = True
         except Exception as e:
             print(f"Send button click failed: {e}")
@@ -2208,7 +2324,7 @@ def run_blog_generator_playwright():
                 "Awesome. Based on the complete article we just generated, compile the SEO metadata.\n"
                 "Respond ONLY with a JSON object in this format. Do not wrap in markdown code blocks:\n"
                 "{\n"
-                "  \"title\": \"SEO Headline containing the keyword (strictly about the topic itself, e.g. secrets/history/stardom of the topic. DO NOT mention quiz, video, or QuizViral in the title)\",\n"
+                "  \"title\": \"Compelling, high-CTR headline containing the target keyword (strictly 50-60 characters, curiosity-driven with numbers or hooks like [2026 Guide] or (With Answers) where appropriate. DO NOT mention QuizViral in the title)\",\n"
                 "  \"slug\": \"url-friendly-slug-with-keyword (strictly about the topic itself, no quiz/video terms)\",\n"
                 "  \"excerpt\": \"Compelling 2-sentence summary of the post (strictly about the topic itself)\",\n"
                 "  \"meta_title\": \"SEO Meta Title (exactly 50-60 characters featuring the topic and high-intent keywords naturally at the end)\",\n"
@@ -2360,6 +2476,23 @@ def update_blog_posts_file(new_post):
     # Re-align JSON properties names for compatibility with JS parser
     for prop in ["title", "slug", "excerpt", "date", "readTime", "author", "image", "pinterest_image", "metaDescription", "seoKeywords", "content", "trendingKeyword", "topicSource"]:
         new_post_str = new_post_str.replace(f'"{prop}":', f'{prop}:')
+
+    # Check if slug already exists in blogPosts.js to prevent any duplicate slugs!
+    existing_slugs = re.findall(r"slug:\s*['\"`]([^'\"`]+)['\"`]", file_content)
+    if new_post["slug"] in existing_slugs:
+        curr_year = datetime.now().year
+        suffix = 2
+        candidate_slug = f"{new_post['slug']}-{curr_year}"
+        while candidate_slug in existing_slugs:
+            candidate_slug = f"{new_post['slug']}-{curr_year}-v{suffix}"
+            suffix += 1
+        print(f"[Duplicate Guard] Slug '{new_post['slug']}' already exists! Made unique: '{candidate_slug}'")
+        new_post["slug"] = candidate_slug
+        post_item["slug"] = candidate_slug
+        # Re-serialize with unique slug
+        new_post_str = json.dumps(post_item, indent=2)
+        for prop in ["title", "slug", "excerpt", "date", "readTime", "author", "image", "pinterest_image", "metaDescription", "seoKeywords", "content", "trendingKeyword", "topicSource"]:
+            new_post_str = new_post_str.replace(f'"{prop}":', f'{prop}:')
 
     if posts_array_content:
         updated_array = new_post_str + ",\n  " + posts_array_content

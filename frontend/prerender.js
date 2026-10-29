@@ -362,17 +362,24 @@ function runPrerender() {
       schemaFaqScript = `<script type="application/ld+json">${JSON.stringify(schemaFaq)}</script>`;
     }
 
-    // Inject Search Engine and Social Media Meta Tags
+    // Inject Search Engine and Social Media Meta Tags with Full Google Discover & Rich Snippets Directives
     const metaTags = `
     <link rel="canonical" href="${postUrl}" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="description" content="${post.metaDescription || post.excerpt}" />
     <meta name="keywords" content="${(post.seoKeywords || []).join(', ')}" />
-    <!-- Open Graph / Facebook Meta Tags -->
+    <!-- Open Graph / Facebook / Discover Meta Tags -->
     <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="QuizViral AI" />
     <meta property="og:title" content="${post.title}" />
     <meta property="og:description" content="${post.metaDescription || post.excerpt}" />
     <meta property="og:image" content="${absImage}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="675" />
     <meta property="og:url" content="${postUrl}" />
+    <meta property="article:published_time" content="${isoDate}" />
+    <meta property="article:modified_time" content="${isoDate}" />
+    <meta property="article:author" content="${post.author || 'QuizViral AI Team'}" />
     <!-- Twitter Meta Tags -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${post.title}" />

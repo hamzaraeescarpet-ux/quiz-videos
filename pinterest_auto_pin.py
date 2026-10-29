@@ -284,6 +284,83 @@ def format_pinterest_description(title, excerpt, url):
         desc = desc[:497] + "..."
     return desc
 
+def format_pinterest_title_smart(title, max_len=50):
+    title = title.strip()
+    title = title.strip('"\'` ')
+    for divider in [":", "-", "|"]:
+        if divider in title:
+            parts = title.split(divider)
+            for part in parts:
+                cleaned = part.strip()
+                if 20 <= len(cleaned) <= max_len:
+                    return cleaned
+    if len(title) > max_len:
+        truncated = title[:max_len - 3]
+        last_space = truncated.rfind(" ")
+        if last_space > 15:
+            return truncated[:last_space] + "..."
+        return truncated + "..."
+    return title
+
+def generate_profile_pin_variation(blog_data, profile_idx):
+    """
+    Generates 4 distinct, anti-spam Pinterest variations across the 4 profiles.
+    Each profile gets a unique hook angle, custom description structure, and hashtag cluster.
+    """
+    base_title = blog_data.get("title", "")
+    excerpt = blog_data.get("excerpt", "")
+    slug = blog_data.get("slug", "")
+    full_url = f"https://quizviral-nine.vercel.app/blog/{slug}"
+    topic_tags = generate_topic_hashtags(base_title)
+    
+    clean_title = format_pinterest_title_smart(base_title, max_len=45)
+    
+    if profile_idx == 0:
+        # Profile 1: Action Hook
+        p_title = f"🔥 {clean_title}"[:50]
+        p_desc = (
+            f"💡 {base_title}\n\n"
+            f"{excerpt}\n\n"
+            f"👉 Test your knowledge with the full interactive quiz here:\n{full_url}\n\n"
+            f"{topic_tags} #quiz #trivia #viral #quizviral"
+        )
+    elif profile_idx == 1:
+        # Profile 2: Curiosity Question Hook
+        p_title = f"Can You Score 10/10? {clean_title}"[:50]
+        p_desc = (
+            f"🧠 Think you know everything about this?\n\n"
+            f"Take the ultimate challenge and see if you can get a perfect score!\n\n"
+            f"👉 Play the full trivia challenge here:\n{full_url}\n\n"
+            f"{topic_tags} #triviaquiz #challenge #brainteaser #mindgames"
+        )
+    elif profile_idx == 2:
+        # Profile 3: 2026 Guide / Checklist
+        p_title = f"2026 Guide: {clean_title}"[:50]
+        p_desc = (
+            f"📌 The Complete Breakdown:\n\n"
+            f"Everything you need to know about {base_title}, including full answers and explanations.\n\n"
+            f"👉 Read the complete guide & questions:\n{full_url}\n\n"
+            f"{topic_tags} #contentcreator #learnontiktok #smartcontent #education"
+        )
+    else:
+        # Profile 4: Surprising Facts Hook
+        p_title = f"Shocking Facts: {clean_title}"[:50]
+        p_desc = (
+            f"⚡ The most fascinating questions and insights you won't believe!\n\n"
+            f"{excerpt}\n\n"
+            f"👉 Discover the answers and full breakdown:\n{full_url}\n\n"
+            f"{topic_tags} #didyouknow #amazingfacts #triviaquestions #quiztime"
+        )
+        
+    if len(p_desc) > 500:
+        p_desc = p_desc[:497] + "..."
+        
+    return {
+        "title": p_title,
+        "description": p_desc,
+        "link": full_url
+    }
+
 def find_builder_fields(page):
     """
     Scans the Pin Builder page and detects Title, Description, and Link fields
@@ -546,7 +623,7 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                         target_tag_btn.scroll_into_view_if_needed()
                         time.sleep(1.5)
                         print("Tag products button mil gaya. Click kar rahe hai...")
-                        target_tag_btn.click()
+                        target_tag_btn.click(timeout=3000)
                         time.sleep(4)
                         
                         tag_input = page.locator(
@@ -881,17 +958,14 @@ def run_pinterest_syndication(blog_data):
     # Generate long, rich description containing the full blog post URL
     rich_description = format_pinterest_description(blog_data["title"], blog_data.get("excerpt", ""), full_url)
     
-    pin_data = {
-        "title": short_title,
-        "description": rich_description,
-        "link": full_url,
-        "image_path": local_image
-    }
-    
     successful_pins = 0
     for idx, profile in enumerate(CHROME_PROFILES):
         print(f"\n--- Processing Profile {idx + 1}/{len(CHROME_PROFILES)} ---")
-        if publish_pin_for_profile(profile, pin_data, idx):
+        # Generate custom unique variation for this profile to prevent multi-account spam flags
+        profile_pin = generate_profile_pin_variation(blog_data, idx)
+        profile_pin["image_path"] = local_image
+        print(f"Profile {idx + 1} Pin Title: '{profile_pin['title']}'")
+        if publish_pin_for_profile(profile, profile_pin, idx):
             successful_pins += 1
             
         # Add a delay between profiles (except for the last profile) to make it feel human
