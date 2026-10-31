@@ -503,6 +503,24 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                 print("Pinterest components load hone ka wait kar rahe hai (10 seconds)...")
                 time.sleep(10)
                 
+                # Dismiss common Pinterest overlays/popups if present
+                for popup_sel in [
+                    'button:has-text("Accept all")',
+                    'button:has-text("Accept")',
+                    'button:has-text("Got it")',
+                    'button:has-text("Dismiss")',
+                    '[aria-label="Close"]',
+                    'button:has-text("Continue")',
+                    'button:has-text("Not now")'
+                ]:
+                    try:
+                        p_btn = page.locator(popup_sel).first
+                        if p_btn.is_visible():
+                            p_btn.click(timeout=1500)
+                            time.sleep(1)
+                    except Exception:
+                        pass
+
                 fields = find_builder_fields(page)
                 
                 # Verify login state
@@ -719,51 +737,76 @@ def publish_pin_for_profile(profile_path, pin_data, idx):
                             break
                             
                     if target_board_opener:
-                        target_board_opener.scroll_into_view_if_needed()
-                        time.sleep(1.5)
-                        target_board_opener.click()
-                        time.sleep(4)
-                        
-                        search_box = page.locator(
-                             '[role="listbox"] input, '
-                             '[class*="dropdown"] input, '
-                             '[data-testid="board-dropdown"] input, '
-                             '[data-test-id="board-dropdown"] input'
-                         ).first
-                        if search_box.count() > 0 and search_box.is_visible():
-                            search_box.click()
-                            time.sleep(1.5)
-                            search_box.fill(BOARD_NAME)
+                        try:
+                            target_board_opener.scroll_into_view_if_needed()
+                            time.sleep(1)
+                            # Wait up to 10s if board button is disabled / processing image
+                            for _w in range(5):
+                                try:
+                                    is_aria_dis = target_board_opener.get_attribute("aria-disabled") == "true"
+                                    is_dis = target_board_opener.get_attribute("disabled") is not None
+                                    if not is_aria_dis and not is_dis:
+                                        break
+                                except Exception:
+                                    break
+                                time.sleep(2)
+                            
+                            # Attempt click with safe 4000ms timeout
+                            try:
+                                target_board_opener.click(timeout=4000)
+                            except Exception:
+                                try:
+                                    target_board_opener.click(force=True, timeout=2000)
+                                except Exception:
+                                    target_board_opener.dispatch_event("click")
                             time.sleep(3)
                             
-                        # Retry up to 3 times — Pinterest dropdown is flaky
-                        board_selected = False
-                        for _attempt in range(3):
-                            board_item = page.locator(
-                                f'div[role="listitem"] div:has-text("{BOARD_NAME}"), '
-                                f'div[role="option"]:has-text("{BOARD_NAME}"), '
-                                f'div[role="option"] span:has-text("{BOARD_NAME}"), '
-                                f'[data-testid*="board"]:has-text("{BOARD_NAME}"), '
-                                f'[data-test-id*="board"]:has-text("{BOARD_NAME}")'
-                            ).first
-                            if board_item.count() > 0:
+                            search_box = page.locator(
+                                 '[role="listbox"] input, '
+                                 '[class*="dropdown"] input, '
+                                 '[data-testid="board-dropdown"] input, '
+                                 '[data-test-id="board-dropdown"] input'
+                             ).first
+                            if search_box.count() > 0 and search_box.is_visible():
+                                search_box.click(timeout=3000)
+                                time.sleep(1)
+                                search_box.fill(BOARD_NAME)
+                                time.sleep(2)
+                                
+                            # Retry up to 3 times — Pinterest dropdown is flaky
+                            board_selected = False
+                            for _attempt in range(3):
+                                board_item = page.locator(
+                                    f'div[role="listitem"] div:has-text("{BOARD_NAME}"), '
+                                    f'div[role="option"]:has-text("{BOARD_NAME}"), '
+                                    f'div[role="option"] span:has-text("{BOARD_NAME}"), '
+                                    f'[data-testid*="board"]:has-text("{BOARD_NAME}"), '
+                                    f'[data-test-id*="board"]:has-text("{BOARD_NAME}")'
+                                ).first
+                                if board_item.count() > 0:
+                                    try:
+                                        board_item.wait_for(state="visible", timeout=4000)
+                                        board_item.click()
+                                        print(f"Board '{BOARD_NAME}' selected! (attempt {_attempt+1})")
+                                        board_selected = True
+                                        time.sleep(2)
+                                        break
+                                    except Exception:
+                                        pass
+                                time.sleep(1.5)
+                            if not board_selected:
+                                print(f"Board '{BOARD_NAME}' not found in dropdown. Default board will be used.")
                                 try:
-                                    board_item.wait_for(state="visible", timeout=5000)
-                                    board_item.click()
-                                    print(f"Board '{BOARD_NAME}' selected! (attempt {_attempt+1})")
-                                    board_selected = True
-                                    time.sleep(3)
-                                    break
+                                    page.locator("body").click(position={"x": 10, "y": 10}, force=True)
                                 except Exception:
-                                    pass
-                            time.sleep(2)
-                        if not board_selected:
-                            print(f"Board '{BOARD_NAME}' not found in dropdown. Default board will be used.")
+                                    page.keyboard.press("Escape")
+                                time.sleep(1.5)
+                        except Exception as b_err:
+                            print(f"Board selection skipped ({b_err}). Default board will be used.")
                             try:
-                                page.locator("body").click(position={"x": 10, "y": 10}, force=True)
-                            except Exception:
                                 page.keyboard.press("Escape")
-                            time.sleep(2)
+                            except Exception:
+                                pass
                     else:
                         print("Could not open board picker. Default board use kiya jayega.")
                         

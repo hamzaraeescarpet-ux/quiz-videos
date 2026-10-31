@@ -1855,7 +1855,7 @@ def submit_prompt_to_chatgpt(page, prompt_text):
     if btn and btn.is_visible() and btn.is_enabled():
         print("Clicking active Send button...")
         try:
-            btn.click(timeout=1500)
+            btn.click(timeout=5000)
             clicked = True
         except Exception as e:
             print(f"Send button click failed: {e}")
