@@ -836,8 +836,14 @@ def check_port_open(port):
     except Exception:
         return False
 
+CHROME_PROC = None
+
 def kill_chrome_on_port_9222():
-    print("Checking if port 9222 is busy...")
+    global CHROME_PROC
+    print("Ensuring Chrome automation browser is completely closed...")
+    killed_any = False
+
+    # 1. Kill process listening on port 9222 with process tree (/T)
     try:
         output = subprocess.check_output("netstat -aon", shell=True).decode('utf-8', errors='ignore')
         for line in output.splitlines():
@@ -845,13 +851,34 @@ def kill_chrome_on_port_9222():
                 parts = line.strip().split()
                 if len(parts) >= 5:
                     pid = parts[-1]
-                    print(f"Terminating Chrome process (PID: {pid}) listening on port 9222...")
-                    subprocess.run(f"taskkill /F /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    time.sleep(2)
-                    return True
+                    print(f"Terminating Chrome process tree (PID: {pid}) on port 9222...")
+                    subprocess.run(f"taskkill /F /T /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    killed_any = True
     except Exception as e:
-        print(f"Error terminating Chrome process: {e}")
-    return False
+        print(f"Error terminating Chrome by port: {e}")
+
+    # 2. Terminate any Chrome process launched with --remote-debugging-port=9222 via PowerShell CIM
+    try:
+        ps_cmd = [
+            "powershell", "-NoProfile", "-Command",
+            "Get-CimInstance Win32_Process -Filter \"Name = 'chrome.exe' AND CommandLine LIKE '%--remote-debugging-port=9222%'\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+        ]
+        subprocess.run(ps_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        killed_any = True
+    except Exception:
+        pass
+
+    # 3. Terminate tracked subprocess handle if still alive
+    try:
+        if CHROME_PROC and CHROME_PROC.poll() is None:
+            subprocess.run(f"taskkill /F /T /PID {CHROME_PROC.pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            CHROME_PROC = None
+            killed_any = True
+    except Exception:
+        pass
+
+    time.sleep(1)
+    return killed_any
 
 def launch_chrome_if_needed():
     # Force kill any active debug Chrome instances first to ensure a fresh session with our new flags!
@@ -902,8 +929,9 @@ def launch_chrome_if_needed():
         "about:blank"
     ]
     
+    global CHROME_PROC
     try:
-        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        CHROME_PROC = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for _ in range(8):
             time.sleep(1)
             if check_port_open(9222):

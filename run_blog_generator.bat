@@ -1,5 +1,9 @@
 @echo off
 cd /d "%~dp0"
+title Trending Blog Generator - Running...
 echo Starting Trending Blog Generator...
 python generate_trending_blog_playwright.py
-pause
+echo.
+echo Blog generation finished! Closing terminal window in 5 seconds...
+timeout /t 5 >nul
+exit

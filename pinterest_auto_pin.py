@@ -83,8 +83,14 @@ def reset_chrome_crash_state(profile_path):
             except Exception as e:
                 print(f"Could not reset Preferences file crash state: {e}")
 
+CHROME_PROC = None
+
 def kill_chrome_on_port_9222():
-    print("Checking if port 9222 is busy...")
+    global CHROME_PROC
+    print("Ensuring Chrome automation browser is completely closed...")
+    killed_any = False
+
+    # 1. Kill process listening on port 9222 with process tree (/T)
     try:
         output = subprocess.check_output("netstat -aon", shell=True).decode('utf-8', errors='ignore')
         for line in output.splitlines():
@@ -92,13 +98,34 @@ def kill_chrome_on_port_9222():
                 parts = line.strip().split()
                 if len(parts) >= 5:
                     pid = parts[-1]
-                    print(f"Terminating Chrome debugging process (PID: {pid}) on port 9222...")
-                    subprocess.run(f"taskkill /F /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    time.sleep(2)
-                    return True
+                    print(f"Terminating Chrome debugging process tree (PID: {pid}) on port 9222...")
+                    subprocess.run(f"taskkill /F /T /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    killed_any = True
     except Exception as e:
         print(f"Error checking/killing Chrome on port 9222: {e}")
-    return False
+
+    # 2. Terminate any Chrome process launched with --remote-debugging-port=9222 via PowerShell CIM
+    try:
+        ps_cmd = [
+            "powershell", "-NoProfile", "-Command",
+            "Get-CimInstance Win32_Process -Filter \"Name = 'chrome.exe' AND CommandLine LIKE '%--remote-debugging-port=9222%'\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+        ]
+        subprocess.run(ps_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        killed_any = True
+    except Exception:
+        pass
+
+    # 3. Terminate tracked subprocess handle if still alive
+    try:
+        if CHROME_PROC and CHROME_PROC.poll() is None:
+            subprocess.run(f"taskkill /F /T /PID {CHROME_PROC.pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            CHROME_PROC = None
+            killed_any = True
+    except Exception:
+        pass
+
+    time.sleep(1)
+    return killed_any
 
 def launch_chrome_with_profile(profile_path, headless_mode=False):
     # Ensure port is clean
@@ -148,8 +175,9 @@ def launch_chrome_with_profile(profile_path, headless_mode=False):
     if headless_mode:
         cmd.extend(["--headless=new"])
         
+    global CHROME_PROC
     try:
-        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        CHROME_PROC = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         # Wait for port to open
         for _ in range(10):
             time.sleep(1)
@@ -1019,6 +1047,7 @@ def run_pinterest_syndication(blog_data):
             time.sleep(delay_sec)
             
     print(f"\n=================== PINTEREST SYNDICATION COMPLETE ({successful_pins}/{len(CHROME_PROFILES)} posted) ===================")
+    kill_chrome_on_port_9222()
     
     # Cleanup temp file ONLY if we downloaded it
     if is_temp_download:

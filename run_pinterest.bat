@@ -1,5 +1,9 @@
 @echo off
 cd /d "%~dp0"
+title Pinterest Syndication - Running...
 echo Starting Pinterest Auto-Pinning Automation...
 python pinterest_auto_pin.py
-pause
+echo.
+echo Pinterest automation finished! Closing terminal window in 5 seconds...
+timeout /t 5 >nul
+exit

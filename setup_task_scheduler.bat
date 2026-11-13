@@ -66,7 +66,8 @@ if %errorLevel% EQU 0 (
     echo ============================================================
     echo.
     echo Ab har baar PC on karke login karne k 2 minute baad
-    echo blog scheduler automatically start ho jayega.
+    echo blog scheduler automatically 1 blog publish karega
+    echo aur kaam pura hote hi browser aur terminal khud band ho jayenge.
     echo.
     echo Task Manager > Task Scheduler mein "%TASK_NAME%" naam se
     echo is task ko dekh sakte ho.

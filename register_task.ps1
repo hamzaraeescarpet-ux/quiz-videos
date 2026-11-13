@@ -3,11 +3,11 @@
 $TaskName    = "BlogAutoScheduler"
 $BatFile     = "C:\Users\hamza\OneDrive\Desktop\QuizBot\start_blog_scheduler.bat"
 $WorkingDir  = "C:\Users\hamza\OneDrive\Desktop\QuizBot"
-$Description = "Runs blog auto-scheduler on PC login. Publishes 3 blogs/day with 2-hour gaps."
+$Description = "Runs blog auto-scheduler on PC login. Publishes 1 blog/day and closes automatically on completion."
 
 Write-Host ""
 Write-Host "============================================================"
-Write-Host "  Blog Auto Scheduler - Task Scheduler Registration"
+Write-Host "  Blog Auto Scheduler - Task Scheduler Registration (1 Blog/Day)"
 Write-Host "============================================================"
 Write-Host ""
 
@@ -23,10 +23,12 @@ $action = New-ScheduledTaskAction `
 
 Write-Host "[2/4] Action created."
 
-# Trigger: User login par, 2 minute delay ke saath
-$trigger = New-ScheduledTaskTrigger -AtLogOn
-$trigger.Delay = "PT2M"
-Write-Host "[3/4] Trigger created (At Logon + 2 min delay)."
+# Triggers: 1) At Log On (2 min delay), 2) Daily at 10:00 AM
+$triggerLogon = New-ScheduledTaskTrigger -AtLogOn
+$triggerLogon.Delay = "PT2M"
+$triggerDaily = New-ScheduledTaskTrigger -Daily -At "10:00AM"
+$triggers = @($triggerLogon, $triggerDaily)
+Write-Host "[3/4] Triggers created (At Logon + Daily 10:00 AM)."
 
 # Settings
 $settings = New-ScheduledTaskSettingsSet `
@@ -48,7 +50,7 @@ try {
     $task = Register-ScheduledTask `
         -TaskName $TaskName `
         -Action $action `
-        -Trigger $trigger `
+        -Trigger $triggers `
         -Settings $settings `
         -Principal $principal `
         -Description $Description `

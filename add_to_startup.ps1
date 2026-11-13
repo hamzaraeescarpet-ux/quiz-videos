@@ -17,7 +17,7 @@ $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
 $Shortcut.TargetPath      = $BatFile
 $Shortcut.WorkingDirectory = $WorkingDir
 $Shortcut.WindowStyle     = 7   # 7 = Minimized
-$Shortcut.Description     = "Blog Auto Scheduler - 3 blogs/day"
+$Shortcut.Description     = "Blog Auto Scheduler - 1 blog/day (Auto-Closes on Completion)"
 $Shortcut.Save()
 
 if (Test-Path $ShortcutPath) {
