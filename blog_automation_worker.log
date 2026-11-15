@@ -5099,3 +5099,35 @@ To https://github.com/hamzaraeescarpet-ux/quiz-videos.git
 [2026-11-14 12:03:44] Naya din (2026-11-14) - daily counter reset ho raha hai.
 [2026-11-14 12:03:44] Aaj (2026-11-14) ab tak 0/1 blogs publish hue hain.
 [2026-11-14 12:03:44] Daily Blog generation shuru ho raha hai...
+[2026-11-14 12:22:17] Daily blog successfully publish ho gaya!
+[2026-11-14 12:22:17] ============================================================
+[2026-11-14 12:22:17] SUCCESS: Aaj ka daily blog publish ho gaya (1/1)!
+[2026-11-14 12:22:17] Kaam poora ho chuka hai. Browser aur terminal window band ho rahe hain...
+[2026-11-14 12:22:17] ============================================================
+[2026-11-14 17:37:37] ============================================================
+[2026-11-14 17:37:37] Blog Automation Worker START
+[2026-11-14 17:37:37] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-11-14 17:37:37] Daily target: 1 blog per day
+[2026-11-14 17:37:37] ============================================================
+[2026-11-14 17:37:37] Aaj (2026-11-14) ab tak 1/1 blogs publish hue hain.
+[2026-11-14 17:37:37] Aaj ka target (1 blog) pehle se pura ho chuka hai!
+[2026-11-14 17:37:37] Sab kaam complete hai. Automation browser aur terminal band ho rahe hain...
+[2026-11-14 22:33:18] ============================================================
+[2026-11-14 22:33:18] Blog Automation Worker START
+[2026-11-14 22:33:18] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-11-14 22:33:18] Daily target: 1 blog per day
+[2026-11-14 22:33:18] ============================================================
+[2026-11-14 22:33:18] Aaj (2026-11-14) ab tak 1/1 blogs publish hue hain.
+[2026-11-14 22:33:18] Aaj ka target (1 blog) pehle se pura ho chuka hai!
+[2026-11-14 22:33:18] Sab kaam complete hai. Automation browser aur terminal band ho rahe hain...
+[2026-11-15 11:08:44] ============================================================
+[2026-11-15 11:08:44] Blog Automation Worker START
+[2026-11-15 11:08:44] Script: C:\Users\hamza\OneDrive\Desktop\QuizBot\generate_trending_blog_playwright.py
+[2026-11-15 11:08:44] Daily target: 1 blog per day
+[2026-11-15 11:08:44] ============================================================
+[2026-11-15 11:08:44] Naya din (2026-11-15) - daily counter reset ho raha hai.
+[2026-11-15 11:08:44] Aaj (2026-11-15) ab tak 0/1 blogs publish hue hain.
+[2026-11-15 11:08:44] Daily Blog generation shuru ho raha hai...
+[2026-11-15 11:08:57] Daily blog fail hua (return code: 1).
+[2026-11-15 11:08:57] Attempt 1 fail hua. 120 seconds baad retry karunga...
+[2026-11-15 11:10:57] Daily Blog generation shuru ho raha hai...
