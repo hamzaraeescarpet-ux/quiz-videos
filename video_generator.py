@@ -148,85 +148,94 @@ def _next_pexels_key():
 # SMART VISUAL QUERY EXTRACTION & MULTI-SOURCE HD IMAGE FETCHING
 # =============================================================================
 
-STOP_PHRASES = [
-    r"which of the following\b",
-    r"which one of the\b",
-    r"which one of these\b",
-    r"which type of\b",
-    r"which kind of\b",
-    r"which major\b",
-    r"which famous\b",
-    r"which popular\b",
-    r"which european\b",
-    r"which us\b",
-    r"which american\b",
-    r"which country is\b",
-    r"which company is\b",
-    r"which company\b",
-    r"which animal\b",
-    r"which planet\b",
-    r"which organ\b",
-    r"what is the name of the\b",
-    r"what is the name of\b",
-    r"what is the term for a\b",
-    r"what is the term for\b",
-    r"what is the primary\b",
-    r"what is the world\'?s\b",
-    r"what is the length of the\b",
-    r"what is the length of\b",
-    r"what is the capital of\b",
-    r"what is the highest\b",
-    r"what is the largest\b",
-    r"what is the fastest\b",
-    r"what is the\b",
-    r"what are the\b",
-    r"what does\b",
-    r"who is the founder of\b",
-    r"who was the first person to\b",
-    r"who was the first\b",
-    r"who was the\b",
-    r"who is the\b",
-    r"who painted the\b",
-    r"who painted\b",
-    r"who directed\b",
-    r"who wrote\b",
-    r"who created\b",
-    r"who discovered\b",
-    r"in which year did the\b",
-    r"in which year did\b",
-    r"in which year was\b",
-    r"in which year\b",
-    r"in what year\b",
-    r"in which country\b",
-    r"in which city\b",
-    r"how much of the\b",
-    r"how many\b",
-    r"where is\b",
-    r"where was\b",
-    r"according to\b",
-    r"stand for in\b",
-    r"stand for\b",
-    r"mean in\b",
-    r"refers to what\b",
-    r"refers to\b",
-    r"is known as\b",
-    r"is called\b",
-    r"is considered\b",
-    r"headquartered where\b",
+# =============================================================================
+# SMART VISUAL QUERY EXTRACTION & MULTI-SOURCE HD IMAGE FETCHING
+# =============================================================================
+
+QUESTION_PREFIXES = [
+    r"^which of the following (?:is|are|was|were)\b",
+    r"^which one of the (?:following|these)\b",
+    r"^which of these\b",
+    r"^which type of\b",
+    r"^which kind of\b",
+    r"^which major\b",
+    r"^which famous\b",
+    r"^which popular\b",
+    r"^what is the name of the\b",
+    r"^what is the name of\b",
+    r"^what is the term for a\b",
+    r"^what is the term for\b",
+    r"^what is the\b",
+    r"^what are the\b",
+    r"^what does\b",
+    r"^who was the first person to\b",
+    r"^who was the first man to\b",
+    r"^who was the first woman to\b",
+    r"^who was the first\b",
+    r"^who was the\b",
+    r"^who is the founder of\b",
+    r"^who is the\b",
+    r"^who painted the\b",
+    r"^who painted\b",
+    r"^who directed\b",
+    r"^who wrote\b",
+    r"^who created\b",
+    r"^who discovered\b",
+    r"^in which year did the\b",
+    r"^in which year did\b",
+    r"^in which year was\b",
+    r"^in which year\b",
+    r"^in what year did\b",
+    r"^in what year was\b",
+    r"^in what year\b",
+    r"^how many\b",
+    r"^how much of the\b",
+    r"^how much\b",
+    r"^where is the\b",
+    r"^where is\b",
+    r"^where was\b",
+    r"^according to\b",
 ]
 
-DOMAIN_KEYWORDS = [
-    ("train", ["railroad", "railway", "train", "locomotive", "rail freight", "rail tracks", "bnsf", "union pacific"]),
-    ("aviation", ["plane", "airplane", "aircraft", "cargo plane", "flight", "airline", "airport", "prime air", "jet"]),
-    ("tech", ["semiconductor", "microchip", "computer", "server", "software", "erp", "coding", "cyber", "hardware", "laptop", "database", "artificial intelligence", "robot"]),
-    ("maritime", ["bulk carrier", "container ship", "cargo ship", "tanker", "shipping container", "freight ship", "ocean cargo", "ship", "vessel", "maritime", "seaport", "harbor", "ocean", "dock", "hapag", "cma cgm", "ro-ro", "lcl"]),
-    ("automotive", ["car", "truck", "automobile", "vehicle", "driving", "race car"]),
-    ("space", ["planet", "space", "galaxy", "mars", "moon", "star", "astronaut", "telescope", "nasa", "orbit", "solar system"]),
-    ("animal", ["animal", "wildlife", "mammal", "bird", "fish", "lion", "tiger", "elephant", "whale", "dog", "cat", "reptile", "safari"]),
-    ("landmark", ["tower", "monument", "pyramid", "statue", "palace", "castle", "bridge", "cathedral", "temple", "colosseum", "wall"]),
-    ("logistics", ["supply chain", "warehouse", "package", "delivery", "barcode", "courier", "logistics", "nearshoring", "freight forwarder"]),
-    ("biology", ["human heart", "brain anatomy", "cell biology", "mitochondria", "dna genetics", "skeleton"])
-]
+TARGET_CATEGORIES = {
+    "fruit": "fresh fruit",
+    "vegetable": "vegetable",
+    "animal": "wildlife animal",
+    "mammal": "wildlife animal",
+    "bird": "bird wildlife",
+    "fish": "underwater fish",
+    "reptile": "reptile wildlife",
+    "insect": "insect macro",
+    "planet": "planet space",
+    "moon": "moon space",
+    "star": "space astronomy",
+    "galaxy": "galaxy space",
+    "instrument": "musical instrument",
+    "musical instrument": "musical instrument",
+    "organ": "human anatomy",
+    "flower": "flower nature",
+    "tree": "tree nature",
+    "food": "food dish",
+    "drink": "beverage drink",
+    "car": "car automobile",
+    "vehicle": "vehicle automotive",
+    "ship": "ship ocean",
+    "airplane": "airplane flight",
+    "plane": "airplane flight",
+    "ocean": "ocean blue water",
+    "sea": "sea ocean water",
+    "river": "river nature landscape",
+    "mountain": "mountain peak landscape",
+    "city": "city skyline landmark",
+    "country": "landmark landscape",
+    "island": "tropical island ocean",
+    "desert": "desert landscape",
+    "gas": "science chemistry",
+    "metal": "metal raw",
+    "element": "science chemistry",
+    "gemstone": "gemstone crystal jewelry",
+    "dinosaur": "dinosaur prehistoric",
+}
 
 DISAMBIGUATION = {
     "apple": "Apple tech computer",
@@ -242,13 +251,84 @@ DISAMBIGUATION = {
     "mona lisa": "Mona Lisa Leonardo da Vinci painting",
     "mitochondria": "mitochondria cell biology",
     "heart": "human heart anatomy medical",
+    "skin": "human skin dermatology anatomy",
+    "brain": "human brain anatomy neuroscience",
     "mars": "Mars red planet space",
+    "venus": "Venus planet space",
+    "jupiter": "Jupiter planet space",
+    "saturn": "Saturn planet rings space",
+    "mercury": "Mercury planet space",
+    "neptune": "Neptune planet space",
+    "uranus": "Uranus planet space",
+    "pluto": "Pluto dwarf planet space",
     "eiffel tower": "Eiffel Tower Paris landmark",
     "statue of liberty": "Statue of Liberty New York landmark",
+    "colosseum": "Colosseum Rome landmark",
+    "taj mahal": "Taj Mahal India landmark",
+    "machu picchu": "Machu Picchu Peru landmark",
+    "mount everest": "Mount Everest mountain peak",
+    "great wall of china": "Great Wall of China landmark",
+    "pyramids of giza": "Pyramids of Giza Egypt",
+    "cheetah": "Cheetah wildlife animal",
+    "lion": "Lion wildlife animal",
+    "tiger": "Tiger wildlife animal",
+    "giant panda": "Giant Panda bamboo",
+    "panda": "Giant Panda bamboo",
+    "elephant": "Elephant wildlife safari",
+    "snail": "garden snail animal macro",
+    "strawberry": "Strawberry fresh fruit",
+    "piano": "Grand Piano musical instrument",
+    "guitar": "Acoustic Guitar musical instrument",
+    "violin": "Violin musical instrument",
+    "drums": "Drum set musical instrument",
+    "flute": "Flute musical instrument",
+    "neil armstrong": "Neil Armstrong Apollo moon landing",
+    "albert einstein": "Albert Einstein physicist",
+    "isaac newton": "Isaac Newton scientist",
+    "marie curie": "Marie Curie scientist",
+    "leonardo da vinci": "Leonardo da Vinci art",
+    "william shakespeare": "William Shakespeare portrait",
+    "george washington": "George Washington portrait",
+    "abraham lincoln": "Abraham Lincoln portrait",
+    "hedwig": "Snowy Owl bird",
+    "pacific ocean": "Pacific Ocean blue waters",
+    "atlantic ocean": "Atlantic Ocean waters",
+    "nile river": "Nile River Egypt landscape",
+    "amazon river": "Amazon River rainforest",
+    "water": "water splash droplet blue",
+    "gold": "gold bars bullion shiny",
+    "diamond": "diamond gemstone sparkling",
+    "iron": "iron metal element",
+    "oxygen": "oxygen atmosphere nature sky",
+    "nitrogen": "Earth atmosphere blue sky",
+    "carbon dioxide": "plants green nature photosynthesis",
+    "bones": "human skeleton anatomy bones",
+    "skeleton": "human skeleton anatomy",
+    "world war ii": "World War II historical",
+    "world war 2": "World War II historical",
+    "world war i": "World War I historical",
+    "world war 1": "World War I historical",
 }
 
 def clean_text_for_query(t):
-    return re.sub(r'[^a-zA-Z0-9\s\-]', ' ', t).strip()
+    t = re.sub(r'[\x27\x22\?\,\.\!\:\;\(\)\[\]]', ' ', t)
+    return ' '.join(t.split())
+
+def is_concrete_entity(ans):
+    ans = str(ans).strip()
+    if not ans or len(ans) < 2:
+        return False
+    ans_lower = ans.lower()
+    if ans_lower in ['yes', 'no', 'true', 'false', 'none', 'all', 'both', 'neither', 'unknown', 'n/a']:
+        return False
+    cleaned = re.sub(r'[\$\%\,\.\s\-]', '', ans)
+    if cleaned.isdigit():
+        return False
+    if len(ans.split()) > 4:
+        return False
+    if any(phrase in ans_lower for phrase in ['closer to', 'moving away', 'less than', 'more than', 'depends on', 'because', 'in order to']):
+        return False
+    return True
 
 def extract_smart_visual_queries(row, category=""):
     """
@@ -256,7 +336,6 @@ def extract_smart_visual_queries(row, category=""):
     a prioritized list of 3-5 clean, high-precision photographic search queries.
     """
     if isinstance(row, str):
-        # Legacy fallback if just a string is passed
         return [row]
 
     q = str(row.get('question', '')).strip()
@@ -264,123 +343,191 @@ def extract_smart_visual_queries(row, category=""):
     candidates = []
     q_lower = q.lower()
     a_lower = a.lower()
-    
-    # Check custom image query in row if provided
+
+    # 0. Custom image query override in row if provided
     for custom_key in ['image_query', 'custom_query', 'search_query', 'subject']:
         val = str(row.get(custom_key, '')).strip()
         if val and len(val) > 2 and val not in candidates:
             candidates.append(val)
 
-    # 1. Answer entity disambiguation (e.g. Apple -> Apple tech computer, SAP -> enterprise software)
+    # 1. Exact Disambiguation Table Lookup (High Priority)
     if a_lower in DISAMBIGUATION:
         candidates.append(DISAMBIGUATION[a_lower])
-        
     for key, repl in DISAMBIGUATION.items():
-        if key in q_lower and repl not in candidates:
+        if re.search(r'\b' + re.escape(key) + r'\b', q_lower) and repl not in candidates:
             candidates.append(repl)
-            
-    # 2. Extract quoted terms in the question (e.g. 'Prime Air', 'LCL', 'Ro-Ro', 'nearshoring')
+
+    # 2. Extract Quoted Terms (e.g. 'Mona Lisa', 'Titanic', 'Prime Air')
     quotes = re.findall(r'[\x27\x22]([^\x27\x22]+)[\x27\x22]', q)
     for quote in quotes:
         clean_q = clean_text_for_query(quote)
-        clean_q_lower = clean_q.lower()
-        if len(clean_q) > 1 and clean_q_lower not in ['a', 'b', 'c', 'd', 'yes', 'no']:
-            if 'prime air' in clean_q_lower:
-                candidates.append('cargo airplane flight')
-            elif 'nearshoring' in clean_q_lower:
-                candidates.append('global supply chain logistics')
-            elif 'lcl' in clean_q_lower:
-                candidates.append('cargo container shipping ocean')
-            elif 'ro-ro' in clean_q_lower:
-                candidates.append('car carrier ship maritime')
-            elif clean_q_lower in DISAMBIGUATION:
-                candidates.append(DISAMBIGUATION[clean_q_lower])
+        if len(clean_q) > 2 and clean_q.lower() not in ['a', 'b', 'c', 'd', 'yes', 'no', 'true', 'false']:
+            if clean_q.lower() in DISAMBIGUATION:
+                candidates.append(DISAMBIGUATION[clean_q.lower()])
             elif len(clean_q.split()) <= 3:
                 candidates.append(clean_q)
 
-    # 3. Detect dominant domain keywords in question
-    found_domain = None
-    for dom, kws in DOMAIN_KEYWORDS:
-        for kw in kws:
-            if re.search(r'\b' + re.escape(kw) + r's?\b', q_lower):
-                found_domain = dom
-                break
-        if found_domain:
-            break
-
-    # 4. Strip trivia question stems
-    stripped_q = q
-    for pattern in STOP_PHRASES:
-        stripped_q = re.sub(pattern, ' ', stripped_q, flags=re.IGNORECASE)
-    stripped_q = clean_text_for_query(stripped_q)
+    # 3. Detect Targeted Question Patterns:
     
-    words = [w for w in stripped_q.split() if len(w) > 2 and w.lower() not in [
-        'the', 'and', 'for', 'with', 'from', 'that', 'this', 'were', 'have', 'been',
-        'some', 'most', 'over', 'around', 'used', 'make', 'such', 'into', 'also',
-        'than', 'more', 'like', 'major', 'world', 'largest', 'standard', 'primary',
-        'commonly', 'specifically', 'designed', 'term', 'name', 'type', 'heavily'
-    ]]
-    
-    if len(words) >= 2:
-        candidates.append(' '.join(words[:3]))
-        
-    # 5. Check if answer is a concrete entity (skip measurements, percentages, booleans, or full sentences)
-    is_num_or_sentence = False
-    try:
-        float(a.replace('%', '').replace('$', '').strip())
-        is_num_or_sentence = True
-    except ValueError:
-        pass
-    if len(a.split()) > 3 or any(w in a_lower for w in ['percent', 'closer to', 'less than', 'moving', 'feet', 'meter', 'dollar', 'year', 'century']):
-        is_num_or_sentence = True
-        
-    # Check "capital of [Country]" question pattern
-    if 'capital of' in q_lower and not is_num_or_sentence and len(a) > 2:
-        country_match = re.search(r'capital of\s+([A-Za-z\s]+)', q, re.IGNORECASE)
-        country_name = country_match.group(1).strip('?.,!') if country_match else ''
+    # Pattern A: "capital/currency/flag/national bird of [Country]"
+    country_match = re.search(r'(?:capital|currency|national (?:animal|bird|flower|anthem|sport)|flag)\s+of\s+([A-Za-z\s]+)', q, re.IGNORECASE)
+    if country_match:
+        country_name = clean_text_for_query(country_match.group(1))
+        country_name = re.sub(r'\b(?:is|was|are|in|the)\b', '', country_name, flags=re.IGNORECASE).strip()
+        if is_concrete_entity(a):
+            candidates.append(f"{a} {country_name} landmark")
+            candidates.append(f"{a} {country_name}")
+            candidates.append(a)
         if country_name:
-            candidates.insert(0, f"{clean_text_for_query(a)} {clean_text_for_query(country_name)} landmark")
+            candidates.append(f"{country_name} landmark")
 
-    if not is_num_or_sentence and len(a) > 2 and a_lower not in ['yes', 'no', 'true', 'false', 'none', 'france', 'germany', 'mexico', 'usa', 'china']:
-        clean_a = clean_text_for_query(a)
-        if found_domain == 'maritime' and 'ship' not in clean_a.lower():
-            candidates.append(f'{clean_a} ship')
-        elif found_domain == 'train' and 'train' not in clean_a.lower():
-            candidates.append(f'{clean_a} train')
-        elif found_domain == 'tech' and 'tech' not in clean_a.lower():
-            candidates.append(f'{clean_a} technology')
-        elif found_domain == 'animal' and 'animal' not in clean_a.lower():
-            candidates.append(f'{clean_a} wildlife animal')
+    # Pattern B: "Who painted/wrote/directed/invented/discovered/composed/founded [Object]?"
+    verb_match = re.search(r'who\s+(?:was the\s+)?(?:painted|wrote|directed|composed|authored|invented|discovered|created|built|designed|founded)\s+(?:the\s+)?([A-Za-z0-9\s\'\-]+)', q, re.IGNORECASE)
+    if verb_match:
+        target_obj = clean_text_for_query(verb_match.group(1))
+        target_obj = re.sub(r'\b(?:in|during|for|from|by|with)\b.*$', '', target_obj, flags=re.IGNORECASE).strip()
+        if len(target_obj.split()) <= 4 and len(target_obj) > 2:
+            candidates.append(f"{target_obj}")
+        if is_concrete_entity(a):
+            candidates.append(f"{a}")
+
+    # Pattern C: "In which city/country/place is [Landmark] located/situated?"
+    loc_match = re.search(r'(?:where|in which\s+(?:city|country|state|continent|ocean))\s+is\s+(?:the\s+)?([A-Za-z0-9\s\'\-]+?)\s+(?:located|situated|found)', q, re.IGNORECASE)
+    if loc_match:
+        landmark = clean_text_for_query(loc_match.group(1))
+        if is_concrete_entity(a):
+            candidates.append(f"{landmark} {a}")
+        candidates.append(f"{landmark}")
+
+    # Pattern D: "Which [Category] has/is/was [Property]?" -> e.g. fruit, animal, planet, instrument, organ
+    cat_match = re.search(r'\bwhich\s+([a-z\s]+?)\s+(?:has|is|was|can|are|were|do|does)\b', q_lower)
+    if cat_match:
+        matched_cat_word = cat_match.group(1).strip()
+        for cat_key, cat_modifier in TARGET_CATEGORIES.items():
+            if cat_key in matched_cat_word:
+                if is_concrete_entity(a):
+                    candidates.append(f"{a} {cat_key}")
+                    candidates.append(f"{a}")
+                break
+
+    # Pattern E: "first man/person/human to [Action]" -> e.g. walk on moon
+    if re.search(r'first\s+(?:person|man|woman|human|astronaut)\s+(?:to\s+)?(?:walk\s+on\s+the\s+moon|step\s+on\s+the\s+moon|in\s+space)', q_lower):
+        if is_concrete_entity(a):
+            candidates.append(f"{a} Apollo moon landing")
+            candidates.append(f"{a}")
+        candidates.append("Apollo moon landing astronaut")
+        candidates.append("astronaut on moon space")
+
+    # Pattern F: "chemical formula/symbol for [Substance]"
+    chem_match = re.search(r'(?:chemical formula|chemical symbol|symbol)\s+(?:for|of)\s+([A-Za-z\s]+)', q, re.IGNORECASE)
+    if chem_match:
+        substance = clean_text_for_query(chem_match.group(1)).strip()
+        if substance:
+            candidates.append(f"{substance} splash")
+            candidates.append(f"{substance}")
+
+    # Pattern G: "primary food/diet of [Animal]"
+    food_match = re.search(r'(?:primary food|main diet|food|diet)\s+of\s+(?:the\s+)?([A-Za-z\s]+)', q, re.IGNORECASE)
+    if food_match:
+        animal = clean_text_for_query(food_match.group(1)).strip()
+        if is_concrete_entity(a):
+            candidates.append(f"{animal} {a}")
+            candidates.append(f"{animal}")
+            candidates.append(f"{a}")
         else:
-            candidates.append(clean_a)
-            
-    # 6. High-reliability visual domain fallbacks
-    if found_domain == 'maritime':
-        candidates.append('cargo ship ocean')
-        candidates.append('shipping containers port')
-    elif found_domain == 'train':
-        candidates.append('freight train railroad')
-    elif found_domain == 'aviation':
-        candidates.append('cargo airplane flight')
-    elif found_domain == 'tech':
-        candidates.append('semiconductor chip technology')
-    elif found_domain == 'logistics':
-        candidates.append('shipping warehouse logistics')
-    elif found_domain == 'space':
-        candidates.append('galaxy space planets')
-    elif found_domain == 'animal':
-        candidates.append('wildlife animals safari')
+            candidates.append(f"{animal}")
 
-    # Deduplicate while preserving priority order
+    # Pattern H: "In [Franchise/Context], what is [Subject]?"
+    franchise_match = re.search(r'^(?:in|from)\s+([A-Z][A-Za-z0-9\s\:\']+?),\s+(?:what|who|which)', q)
+    if franchise_match:
+        franchise = clean_text_for_query(franchise_match.group(1)).strip()
+        if is_concrete_entity(a):
+            candidates.append(f"{franchise} {a}")
+            candidates.append(f"{a}")
+        candidates.append(f"{franchise}")
+
+    # Pattern I: "How many [Noun] are in [Domain]?" (e.g. bones in the adult human body)
+    how_many_match = re.search(r'how many\s+([A-Za-z\s]+?)\s+(?:are|is)\s+(?:in|on|there)\s+(?:the\s+)?([A-Za-z\s]+)', q, re.IGNORECASE)
+    if how_many_match:
+        noun_part = clean_text_for_query(how_many_match.group(1)).strip()
+        domain_part = clean_text_for_query(how_many_match.group(2)).strip()
+        domain_part = re.sub(r'\b(?:adult|total|approximately)\b', '', domain_part, flags=re.IGNORECASE).strip()
+        if 'bone' in noun_part.lower():
+            candidates.append("human skeleton anatomy")
+            candidates.append("human bones anatomy")
+        else:
+            candidates.append(f"{domain_part} {noun_part}".strip())
+            candidates.append(noun_part)
+
+    # 4. Superlative detection: "What is the largest/fastest/highest [Noun]..."
+    super_match = re.search(r'what\s+is\s+the\s+(?:largest|smallest|highest|tallest|fastest|slowest|deepest|longest|hottest|coldest|oldest|heaviest)\s+([A-Za-z\s]+?)(?:\s+(?:in|on|of)\s+|$)', q, re.IGNORECASE)
+    if super_match:
+        super_noun = clean_text_for_query(super_match.group(1)).strip()
+        if is_concrete_entity(a):
+            candidates.append(f"{a} {super_noun}")
+            candidates.append(f"{a}")
+        elif len(super_noun.split()) <= 2:
+            candidates.append(f"{super_noun}")
+
+    # 5. Extract Capitalized Named Entities from question (excluding first word of sentence)
+    q_words = q.split()
+    if len(q_words) > 1:
+        cap_tokens = []
+        for w in q_words[1:]:
+            clean_w = re.sub(r'[^A-Za-z]', '', w)
+            if clean_w and clean_w[0].isupper() and clean_w.lower() not in [
+                'a', 'an', 'the', 'is', 'was', 'in', 'on', 'at', 'of', 'for', 'which', 'what', 'who', 'how', 'when', 'where', 'why'
+            ]:
+                cap_tokens.append(clean_w)
+            else:
+                if len(cap_tokens) >= 1:
+                    ne = ' '.join(cap_tokens)
+                    if len(ne) > 2 and ne.lower() not in [c.lower() for c in candidates]:
+                        candidates.append(ne)
+                cap_tokens = []
+        if len(cap_tokens) >= 1:
+            ne = ' '.join(cap_tokens)
+            if len(ne) > 2 and ne.lower() not in [c.lower() for c in candidates]:
+                candidates.append(ne)
+
+    # 6. Concrete Answer fallback (if not already added)
+    if is_concrete_entity(a):
+        clean_a = clean_text_for_query(a)
+        if clean_a.lower() not in [c.lower() for c in candidates]:
+            candidates.append(clean_a)
+
+    # 7. Fallback: Strip trivia stop phrases and take most meaningful 2-3 content words
+    stripped_q = q
+    for pat in QUESTION_PREFIXES:
+        stripped_q = re.sub(pat, '', stripped_q, flags=re.IGNORECASE)
+    stripped_q = clean_text_for_query(stripped_q)
+    content_words = [
+        w for w in stripped_q.split()
+        if len(w) > 2 and w.lower() not in [
+            'the', 'and', 'for', 'with', 'from', 'that', 'this', 'were', 'have', 'been',
+            'some', 'most', 'over', 'around', 'used', 'make', 'such', 'into', 'also',
+            'than', 'more', 'like', 'major', 'world', 'largest', 'standard', 'primary',
+            'commonly', 'specifically', 'designed', 'term', 'name', 'type', 'heavily',
+            'which', 'what', 'who', 'where', 'when', 'whose', 'does', 'question', 'answer',
+            'are', 'did', 'was', 'many', 'much', 'adult', 'human', 'approximately', 'known'
+        ]
+    ]
+    if len(content_words) >= 2:
+        meaningful_term = ' '.join(content_words[:3])
+        if meaningful_term.lower() not in [c.lower() for c in candidates]:
+            candidates.append(meaningful_term)
+
+    # Deduplicate while preserving order and ensuring maximum 4-word length for stock APIs
     seen = set()
     final_queries = []
     for c in candidates:
-        c_clean = ' '.join(c.split())
-        if c_clean.lower() not in seen and len(c_clean) > 2:
-            seen.add(c_clean.lower())
-            final_queries.append(c_clean)
-            
-    return final_queries if final_queries else [q[:50]]
+        words = c.split()
+        clean_cand = ' '.join(words[:4]).strip()
+        if clean_cand.lower() not in seen and len(clean_cand) > 1:
+            seen.add(clean_cand.lower())
+            final_queries.append(clean_cand)
+
+    return final_queries if final_queries else [clean_text_for_query(q)[:40]]
 
 def extract_subject(row):
     """Backwards-compatibility helper for legacy callers."""
@@ -405,7 +552,7 @@ def fetch_pixabay_image(query_text, orientation="vertical"):
             url = (
                 f"https://pixabay.com/api/?key={api_key}"
                 f"&q={query}&image_type=photo&per_page=6"
-                f"&safesearch=true&min_width=800&order=popular{ori_param}"
+                f"&safesearch=true&min_width=500&order=popular{ori_param}"
             )
             req = urllib.request.Request(url, headers={'User-Agent': 'QuizViralBot/2.0'})
             with urllib.request.urlopen(req, timeout=8, context=ssl_ctx) as resp:
@@ -491,7 +638,7 @@ def fetch_wikipedia_image(subject):
             if not search_results:
                 return None
             
-        bad_patterns = ["flag", "coat_of_arms", "map", "location", "symbol", "icon", ".svg", "diagram"]
+        bad_patterns = ["flag", "coat_of_arms", "map", "location", "symbol", "icon", ".svg", "diagram", "insignia", "seal_of"]
 
         for item in search_results[:3]:
             title = item.get("title", "")
